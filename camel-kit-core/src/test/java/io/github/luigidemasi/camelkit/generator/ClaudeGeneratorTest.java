@@ -151,7 +151,7 @@ class ClaudeGeneratorTest {
     }
 
     @Test
-    void skillDescriptionsAreClaudeCodeDiscoverable() throws Exception {
+    void skillDescriptionsFollowUseWhenConvention() throws Exception {
         InitContext ctx = createContext();
         new ClaudeGenerator().generate(ctx);
 
@@ -172,6 +172,7 @@ class ClaudeGeneratorTest {
         Files.writeString(legacyDir.resolve("camel-start.md"), "legacy stub");
         Files.writeString(legacyDir.resolve("camel-migrate.md"), "legacy stub");
         Files.writeString(legacyDir.resolve("user-custom.md"), "user file");
+        Files.writeString(legacyDir.resolve("camel-company-deploy.md"), "user command");
 
         new ClaudeGenerator().generate(ctx);
 
@@ -181,5 +182,7 @@ class ClaudeGeneratorTest {
                 "Legacy camel-migrate command stub must be removed");
         assertTrue(Files.exists(legacyDir.resolve("user-custom.md")),
                 "Non-camel user files must be preserved");
+        assertTrue(Files.exists(legacyDir.resolve("camel-company-deploy.md")),
+                "User-created camel-*.md commands not owned by the workflow must be preserved");
     }
 }

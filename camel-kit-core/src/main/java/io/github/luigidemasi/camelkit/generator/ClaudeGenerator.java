@@ -2,19 +2,41 @@ package io.github.luigidemasi.camelkit.generator;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import io.github.luigidemasi.camelkit.config.AgentDescriptor;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
 import io.github.luigidemasi.camelkit.util.AnsiColors;
+import io.github.luigidemasi.camelkit.workflow.WorkflowManifestLoader;
 
 public class ClaudeGenerator extends DefaultGenerator {
 
     private final QuteTemplateEngine templateEngine = new QuteTemplateEngine();
 
     private static final String LEGACY_COMMAND_DIR = ".claude/commands";
+
+    @Override
+    public void preflight(InitContext ctx) throws Exception {
+        Path current = ctx.projectDir();
+        for (Path component : ctx.projectDir().relativize(ctx.projectDir().resolve(LEGACY_COMMAND_DIR))) {
+            current = current.resolve(component);
+            if (Files.isSymbolicLink(current)) {
+                throw new IOException(
+                        "Initialization aborted: " + current + " is a symbolic link. Camel-Kit generates "
+                                      + "and removes files under the agent directories and refuses to operate "
+                                      + "through symbolic links; replace the link with a real directory and "
+                                      + "re-run init.");
+            }
+            if (!Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
+                break;
+            }
+        }
+    }
 
     @Override
     public void generate(InitContext ctx) throws Exception {
@@ -30,9 +52,11 @@ public class ClaudeGenerator extends DefaultGenerator {
         if (!Files.isDirectory(legacyDir)) {
             return;
         }
+        Set<String> ownedStubs = WorkflowManifestLoader.loadDefault().generatedCommandStubs().stream()
+                .map(c -> c.name() + ".md")
+                .collect(Collectors.toSet());
         try (var files = Files.list(legacyDir)) {
-            for (Path file : files.filter(f -> f.getFileName().toString().startsWith("camel-")
-                    && f.getFileName().toString().endsWith(".md")).toList()) {
+            for (Path file : files.filter(f -> ownedStubs.contains(f.getFileName().toString())).toList()) {
                 GeneratedAssetCleaner.deleteRegularFile(ctx, file);
             }
         }

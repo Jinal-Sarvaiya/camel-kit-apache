@@ -219,7 +219,7 @@ cd my-integration
 
 | Agent | Init Flag | Primary Generated Assets | MCP Config |
 |-------|-----------|--------------------------|------------|
-| Anthropic Claude Code | `--ai claude` | `CLAUDE.md` + `.claude/commands/` + `.claude/skills/` | `.mcp.json` |
+| Anthropic Claude Code | `--ai claude` | `CLAUDE.md` + `.claude/skills/` + `.claude/agents/` + `.claude/camel-kit-personas/` | `.mcp.json` |
 | IBM Bob 2 (default) | `--ai bob2` | `.bob/custom_modes.yaml` + rules + shared `.bob/skills/` + scoped `.bob/agents/` + `.bob/personas/` | `.bob/mcp.json` |
 | Google Antigravity | `--ai antigravity` | `AGENTS.md` + `.agents/skills/` + `.agents/agents/` + `.agents/camel-kit-personas/` | `.agents/mcp_config.json` |
 | OpenAI Codex CLI | `--ai codex` | `AGENTS.md` + `.agents/skills/` + `.codex/agents/` | `.codex/config.toml` |

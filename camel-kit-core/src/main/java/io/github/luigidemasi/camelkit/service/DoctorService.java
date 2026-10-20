@@ -141,7 +141,8 @@ public class DoctorService {
 
         AgentConfig agent = AgentRegistry.get(agentName);
         String folder = config.getProperty("agent.folder", "").trim();
-        if (agent.folder().equals(folder) || agent.commandDirectory().equals(folder)) {
+        if (agent.folder().equals(folder)
+                || (agent.commandDirectory() != null && agent.commandDirectory().equals(folder))) {
             findings.add(DoctorFinding.pass("config", ".camel-kit/config.properties",
                     "Agent configuration selects " + agent.name(),
                     "No action required."));

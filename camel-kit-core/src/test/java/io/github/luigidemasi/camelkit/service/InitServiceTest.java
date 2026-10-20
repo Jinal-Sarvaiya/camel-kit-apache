@@ -207,6 +207,28 @@ class InitServiceTest {
 
     @Test
     @EnabledOnOs(OS.LINUX)
+    void rejectsSymlinkedLegacyCommandDirectoryBeforeWriting() throws Exception {
+        Path targetDir = Files.createDirectory(tempDir.resolve("claude-legacy"));
+        Path outside = Files.createDirectory(tempDir.resolve("claude-legacy-outside"));
+        Files.writeString(outside.resolve("camel-start.md"), "legacy stub");
+        Files.createDirectories(targetDir.resolve(".claude"));
+        Files.createSymbolicLink(targetDir.resolve(".claude/commands"), outside);
+        List<String> before = snapshot(outside);
+
+        IOException failure = assertThrows(
+                IOException.class,
+                () -> new InitService().initialize(
+                        request(targetDir, "claude", InitProgress.noop(), InitReporter.noop())));
+
+        assertTrue(failure.getMessage().contains("symbolic link"));
+        assertTrue(failure.getMessage().contains("Initialization aborted"));
+        assertEquals(before, snapshot(outside), "Must not write through the legacy command directory link");
+        assertFalse(Files.exists(targetDir.resolve(".camel-kit")),
+                "Must fail before writing any project files");
+    }
+
+    @Test
+    @EnabledOnOs(OS.LINUX)
     void normalizesTheTargetBeforeCleanupAndGeneration() throws Exception {
         Path targetDir = Files.createDirectory(tempDir.resolve("orders"));
         Path outside = Files.createDirectory(tempDir.resolve("outside"));
@@ -219,7 +241,7 @@ class InitServiceTest {
                 request(targetDir.resolve("link/.."), "claude", InitProgress.noop(), InitReporter.noop()));
 
         assertEquals(targetDir.toAbsolutePath().normalize(), result.targetDir());
-        assertTrue(Files.isRegularFile(targetDir.resolve(".claude/commands/camel-ship.md")));
+        assertTrue(Files.isRegularFile(targetDir.resolve(".claude/skills/camel-ship/SKILL.md")));
         assertEquals(before, snapshot(outside));
     }
 

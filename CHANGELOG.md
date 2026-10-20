@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Claude Code native skill discovery (#243)** — skills are now installed to `.claude/skills/` with
+  `user-invocable` and `description` frontmatter so Claude Code discovers them natively without command stubs.
+  Legacy `.claude/commands/camel-*.md` stubs are cleaned up on regeneration; user-created commands are preserved.
+  Internal skills (`camel-design`, `camel-implement`, `camel-test`, `camel-verify`) are hidden from both user
+  invocation and model auto-selection. Doctor accepts legacy `.claude/commands` workspaces.
 - **`camel-migrate` direct mode (#245)** — add a third invocation mode that implements routes
   directly under Iron Laws 1 and 2 when the user's request names concrete deliverables. Scope
   Iron Law 3 and the HARD-RULE block to chained/standalone modes. Add direct-mode implementation

@@ -1732,6 +1732,21 @@ class DoctorServiceTest {
         return hasFinding(result, status, category, null, null);
     }
 
+    @Test
+    void claudeDoctorAcceptsLegacyCommandDirectoryFolder() throws Exception {
+        Path root = tempDir.resolve("legacy-claude");
+        createHealthyWorkspace(root, CLAUDE);
+        Path config = root.resolve(".camel-kit/config.properties");
+        String content = Files.readString(config);
+        Files.writeString(config, content.replace(
+                "agent.folder=" + AgentRegistry.get(CLAUDE).folder(),
+                "agent.folder=.claude/commands"));
+
+        DoctorResult result = new DoctorService().inspect(new DoctorRequest(root));
+        assertTrue(hasFinding(result, DoctorFinding.Status.PASS, "config", "Agent configuration selects", null),
+                "Doctor must accept legacy .claude/commands folder for Claude");
+    }
+
     private boolean hasFinding(
             DoctorResult result,
             DoctorFinding.Status status,

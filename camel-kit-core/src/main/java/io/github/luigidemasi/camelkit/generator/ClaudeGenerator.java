@@ -1,5 +1,6 @@
 package io.github.luigidemasi.camelkit.generator;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -13,12 +14,28 @@ public class ClaudeGenerator extends DefaultGenerator {
 
     private final QuteTemplateEngine templateEngine = new QuteTemplateEngine();
 
+    private static final String LEGACY_COMMAND_DIR = ".claude/commands";
+
     @Override
     public void generate(InitContext ctx) throws Exception {
         super.generate(ctx);
+        removeLegacyCommandStubs(ctx);
         generateClaudeMd(ctx);
         generateSettings(ctx);
         generateSubagents(ctx);
+    }
+
+    private void removeLegacyCommandStubs(InitContext ctx) throws IOException {
+        Path legacyDir = ctx.projectDir().resolve(LEGACY_COMMAND_DIR);
+        if (!Files.isDirectory(legacyDir)) {
+            return;
+        }
+        try (var files = Files.list(legacyDir)) {
+            for (Path file : files.filter(f -> f.getFileName().toString().startsWith("camel-")
+                    && f.getFileName().toString().endsWith(".md")).toList()) {
+                GeneratedAssetCleaner.deleteRegularFile(ctx, file);
+            }
+        }
     }
 
     /** Installs the registry-declared project subagents, currently the read-only Ship worker. */

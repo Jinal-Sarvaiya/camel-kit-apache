@@ -158,8 +158,8 @@ class SkillResourceInstaller {
             if (AgentGeneratorStrategy.BOB2.descriptorValue().equals(ctx.agentName())
                     || AgentGeneratorStrategy.QWEN.descriptorValue().equals(ctx.agentName())
                     || AgentGeneratorStrategy.CLAUDE.descriptorValue().equals(ctx.agentName())) {
-                // Bob Shell's native skill picker hides false values; same-name command stubs cannot override them.
-                boolean exposeCommand = AgentGeneratorStrategy.BOB2.descriptorValue().equals(ctx.agentName())
+                boolean exposeCommand = (AgentGeneratorStrategy.BOB2.descriptorValue().equals(ctx.agentName())
+                        || AgentGeneratorStrategy.CLAUDE.descriptorValue().equals(ctx.agentName()))
                         && workflow.commands().stream().anyMatch(command -> command.userFacing()
                                 && command.skill().equals(skillName));
                 addHyphenatedUserInvocableMetadata(destination, exposeCommand);

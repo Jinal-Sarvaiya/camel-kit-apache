@@ -135,13 +135,19 @@ class ClaudeGeneratorTest {
         InitContext ctx = createContext();
         new ClaudeGenerator().generate(ctx);
 
-        String start = Files.readString(ctx.skillsDir().resolve("camel-start/SKILL.md"));
-        assertTrue(start.contains("user-invocable: true"),
-                "camel-start must have hyphenated user-invocable for Claude Code discovery");
+        for (String userFacingSkill : Set.of("camel-start", "camel-brainstorm", "camel-migrate",
+                "camel-plan", "camel-execute", "camel-validate", "camel-ship",
+                "camel-knowledge", "camel-debug")) {
+            String skill = Files.readString(ctx.skillsDir().resolve(userFacingSkill + "/SKILL.md"));
+            assertTrue(skill.contains("user-invocable: true"),
+                    userFacingSkill + " must have user-invocable: true for Claude Code discovery");
+        }
 
-        String brainstorm = Files.readString(ctx.skillsDir().resolve("camel-brainstorm/SKILL.md"));
-        assertTrue(brainstorm.contains("user-invocable: false"),
-                "camel-brainstorm must have hyphenated user-invocable: false for Claude Code");
+        for (String internalSkill : INTERNAL_SKILLS) {
+            String skill = Files.readString(ctx.skillsDir().resolve(internalSkill + "/SKILL.md"));
+            assertTrue(skill.contains("user-invocable: false"),
+                    internalSkill + " must have user-invocable: false for Claude Code");
+        }
     }
 
     @Test
@@ -156,5 +162,24 @@ class ClaudeGeneratorTest {
             assertTrue(skill.contains("description: Use when"),
                     skillName + " description must start with 'Use when' for Claude Code discovery");
         }
+    }
+
+    @Test
+    void removesLegacyCommandStubsOnRegeneration() throws Exception {
+        InitContext ctx = createContext();
+        Path legacyDir = tempDir.resolve(".claude/commands");
+        Files.createDirectories(legacyDir);
+        Files.writeString(legacyDir.resolve("camel-start.md"), "legacy stub");
+        Files.writeString(legacyDir.resolve("camel-migrate.md"), "legacy stub");
+        Files.writeString(legacyDir.resolve("user-custom.md"), "user file");
+
+        new ClaudeGenerator().generate(ctx);
+
+        assertFalse(Files.exists(legacyDir.resolve("camel-start.md")),
+                "Legacy camel-start command stub must be removed");
+        assertFalse(Files.exists(legacyDir.resolve("camel-migrate.md")),
+                "Legacy camel-migrate command stub must be removed");
+        assertTrue(Files.exists(legacyDir.resolve("user-custom.md")),
+                "Non-camel user files must be preserved");
     }
 }

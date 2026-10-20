@@ -2,6 +2,7 @@ package io.github.luigidemasi.camelkit.generator;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 import io.github.luigidemasi.camelkit.config.AgentConfig;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
@@ -13,6 +14,12 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class ClaudeGeneratorTest {
+
+    private static final Set<String> INTERNAL_SKILLS = Set.of(
+            "camel-design",
+            "camel-implement",
+            "camel-test",
+            "camel-verify");
 
     @TempDir
     Path tempDir;
@@ -81,8 +88,6 @@ class ClaudeGeneratorTest {
             assertTrue(worker.contains("name: camel-ship-worker"));
             assertTrue(worker.contains("tools: Read, Grep, Glob"));
             assertFalse(worker.contains("mcpServers"));
-            String command = Files.readString(ctx.commandsDir().resolve("camel-ship.md"));
-            assertTrue(command.contains("Read .claude/skills/camel-ship/SKILL.md and follow those instructions"));
             String claudeMd = Files.readString(tempDir.resolve("CLAUDE.md"));
             assertTrue(claudeMd.contains("@AGENTS.md"),
                     "CLAUDE.md must import AGENTS.md via @AGENTS.md directive");
@@ -102,7 +107,54 @@ class ClaudeGeneratorTest {
         String content = Files.readString(brainstormSkill);
         assertTrue(content.contains("Dispatch"));
 
-        // Slash commands still exist
-        assertTrue(Files.exists(ctx.commandsDir().resolve("camel-migrate.md")));
+        // Claude skills are discoverable natively — no duplicate command stubs
+        assertFalse(Files.exists(ctx.commandsDir().resolve("camel-migrate.md")),
+                "Claude must not generate command stubs — skills are discoverable via frontmatter");
+    }
+
+    @Test
+    void marksInternalSkillsAsNotUserOrModelInvocableForClaude() throws Exception {
+        InitContext ctx = createContext();
+        new ClaudeGenerator().generate(ctx);
+
+        for (String skillName : INTERNAL_SKILLS) {
+            String skill = Files.readString(ctx.skillsDir().resolve(skillName + "/SKILL.md"));
+            assertTrue(skill.contains("user-invocable: false"),
+                    skillName + " must declare user-invocable: false for Claude");
+            assertTrue(skill.contains("disable-model-invocation: true"),
+                    skillName + " must not be model invocable for Claude");
+        }
+
+        String start = Files.readString(ctx.skillsDir().resolve("camel-start/SKILL.md"));
+        assertFalse(start.contains("disable-model-invocation: true"),
+                "camel-start must remain model-invocable");
+    }
+
+    @Test
+    void addsHyphenatedUserInvocableMetadataForClaude() throws Exception {
+        InitContext ctx = createContext();
+        new ClaudeGenerator().generate(ctx);
+
+        String start = Files.readString(ctx.skillsDir().resolve("camel-start/SKILL.md"));
+        assertTrue(start.contains("user-invocable: true"),
+                "camel-start must have hyphenated user-invocable for Claude Code discovery");
+
+        String brainstorm = Files.readString(ctx.skillsDir().resolve("camel-brainstorm/SKILL.md"));
+        assertTrue(brainstorm.contains("user-invocable: false"),
+                "camel-brainstorm must have hyphenated user-invocable: false for Claude Code");
+    }
+
+    @Test
+    void skillDescriptionsAreClaudeCodeDiscoverable() throws Exception {
+        InitContext ctx = createContext();
+        new ClaudeGenerator().generate(ctx);
+
+        for (String skillName : Set.of("camel-start", "camel-brainstorm", "camel-migrate",
+                "camel-plan", "camel-execute", "camel-validate", "camel-ship",
+                "camel-knowledge", "camel-debug")) {
+            String skill = Files.readString(ctx.skillsDir().resolve(skillName + "/SKILL.md"));
+            assertTrue(skill.contains("description: Use when"),
+                    skillName + " description must start with 'Use when' for Claude Code discovery");
+        }
     }
 }

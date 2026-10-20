@@ -1,6 +1,6 @@
 ---
 name: camel-debug
-description: Ad-hoc troubleshooting for broken Camel routes outside of a pipeline run.
+description: Use when a Camel route is broken and needs ad-hoc troubleshooting outside of a pipeline run.
 user_invocable: false
 ---
 

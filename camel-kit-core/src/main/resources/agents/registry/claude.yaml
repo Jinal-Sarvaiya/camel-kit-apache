@@ -2,7 +2,7 @@ id: claude
 displayName: Claude Code
 commandDirectory: .claude/commands
 skillsDirectory: .claude/skills
-generatesCommandStubs: true
+generatesCommandStubs: false
 commandFileFormat: md
 argumentPlaceholder: $ARGUMENTS
 mcpConfigPath: .mcp.json

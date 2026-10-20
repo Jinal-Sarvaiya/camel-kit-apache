@@ -1,6 +1,6 @@
 ---
 name: camel-brainstorm
-description: Design and plan Camel integrations through collaborative dialogue.
+description: Use when designing a new Camel integration through collaborative dialogue to produce a design spec.
 user_invocable: false
 ---
 

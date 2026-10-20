@@ -1,6 +1,6 @@
 ---
 name: camel-plan
-description: Break a design spec into implementation tasks with wave analysis.
+description: Use when an approved design spec needs to be broken into implementation tasks with wave analysis.
 user_invocable: false
 ---
 

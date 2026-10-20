@@ -156,7 +156,8 @@ class SkillResourceInstaller {
                 }
             }
             if (AgentGeneratorStrategy.BOB2.descriptorValue().equals(ctx.agentName())
-                    || AgentGeneratorStrategy.QWEN.descriptorValue().equals(ctx.agentName())) {
+                    || AgentGeneratorStrategy.QWEN.descriptorValue().equals(ctx.agentName())
+                    || AgentGeneratorStrategy.CLAUDE.descriptorValue().equals(ctx.agentName())) {
                 // Bob Shell's native skill picker hides false values; same-name command stubs cannot override them.
                 boolean exposeCommand = AgentGeneratorStrategy.BOB2.descriptorValue().equals(ctx.agentName())
                         && workflow.commands().stream().anyMatch(command -> command.userFacing()
@@ -165,6 +166,9 @@ class SkillResourceInstaller {
             }
             if (AgentGeneratorStrategy.COPILOT.descriptorValue().equals(ctx.agentName())) {
                 addCopilotReadableInternalSkillMetadata(destination);
+            }
+            if (AgentGeneratorStrategy.CLAUDE.descriptorValue().equals(ctx.agentName())) {
+                addClaudeReadableInternalSkillMetadata(destination);
             }
             if (AgentGeneratorStrategy.PI.descriptorValue().equals(ctx.agentName())) {
                 addPiReadableInternalSkillMetadata(destination);
@@ -236,6 +240,10 @@ class SkillResourceInstaller {
         if (inserted) {
             Files.writeString(skillFile, updated.toString());
         }
+    }
+
+    void addClaudeReadableInternalSkillMetadata(Path skillFile) throws Exception {
+        addInternalSkillInvocationMetadata(skillFile, "Claude");
     }
 
     void addCopilotReadableInternalSkillMetadata(Path skillFile) throws Exception {

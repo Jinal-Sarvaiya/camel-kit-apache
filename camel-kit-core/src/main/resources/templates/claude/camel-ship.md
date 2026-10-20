@@ -1,6 +1,6 @@
 ---
 name: camel-ship
-description: Run the Camel Ship Technology Preview through Claude Code native subagents when the active session permits it.
+description: Use when the user explicitly asks to ship or publish a Camel project via the Technology Preview Ship workflow.
 argument-hint: "[ship-options]"
 user-invocable: true
 ---

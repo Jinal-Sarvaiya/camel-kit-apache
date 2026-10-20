@@ -45,6 +45,7 @@ class ShippedAssetStructureTest {
     // Command directories that non-stub agents historically used; generation must never recreate them.
     private static final Map<String, String> LEGACY_COMMAND_DIRS = Map.of(
             "antigravity", ".agents/commands",
+            "claude", ".claude/commands",
             "codex", ".codex/commands",
             "copilot", ".github/commands");
 
@@ -800,8 +801,6 @@ class ShippedAssetStructureTest {
                 assertTrue(skillContent.contains("Leave `model` and `isolation` unset"));
                 assertTrue(skillContent.contains("outside the project directory"));
                 assertFalse(skillContent.contains("`fork_context`"));
-                Path command = ctx.commandsDir().resolve("camel-ship.md");
-                assertTrue(Files.readString(command).contains("Read .claude/skills/camel-ship/SKILL.md"));
                 String worker = Files.readString(ctx.projectDir().resolve(".claude/agents/camel-ship-worker.md"));
                 assertTrue(worker.contains("\ntools: Read, Grep, Glob\n"));
                 assertFalse(worker.contains("mcpServers"));

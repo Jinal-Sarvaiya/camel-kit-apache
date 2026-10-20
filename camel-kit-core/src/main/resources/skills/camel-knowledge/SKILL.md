@@ -1,6 +1,6 @@
 ---
 name: camel-knowledge
-description: Look up Camel documentation, components, CVEs/security advisories, and versions.
+description: Use when looking up Apache Camel documentation, components, CVEs/security advisories, or version information.
 user_invocable: false
 ---
 

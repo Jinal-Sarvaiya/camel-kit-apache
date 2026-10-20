@@ -1,6 +1,6 @@
 ---
 name: camel-execute
-description: Execute a ready implementation plan derived from an approved design with an adversarial pre-filter and ordered spec and quality review.
+description: Use when executing a ready implementation plan with adversarial pre-filter and ordered spec and quality review.
 user_invocable: false
 ---
 

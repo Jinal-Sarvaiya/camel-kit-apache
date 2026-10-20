@@ -1,6 +1,6 @@
 ---
 name: camel-ship
-description: Delegate the Technology Preview Ship workflow to the registered Camel-Kit CLI command.
+description: Use when the user explicitly asks to ship or publish a Camel project via the Technology Preview Ship workflow.
 user_invocable: false
 ---
 

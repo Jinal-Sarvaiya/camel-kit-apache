@@ -1,6 +1,6 @@
 ---
 name: camel-migrate
-description: Migrate an existing integration from another product to Apache Camel
+description: Use when migrating an existing integration from MuleSoft, BizTalk, Fuse, or older Camel to Apache Camel.
 user_invocable: false
 metadata:
   version: "2.0.0"

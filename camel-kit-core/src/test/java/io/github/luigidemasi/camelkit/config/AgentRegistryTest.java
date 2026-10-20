@@ -29,7 +29,7 @@ class AgentRegistryTest {
         AgentConfig claude = AgentRegistry.get("claude");
         assertNotNull(claude);
         assertEquals("Claude Code", claude.name());
-        assertEquals(".claude/commands", claude.folder());
+        assertEquals(".claude/skills", claude.folder());
         assertEquals("md", claude.fileFormat());
         assertEquals("$ARGUMENTS", claude.argPlaceholder());
         assertEquals(".mcp.json", claude.mcpConfigPath());

@@ -1,6 +1,6 @@
 ---
 name: camel-validate
-description: Static quality analysis of Camel routes — correctness, security, anti-patterns.
+description: Use when running static quality analysis on Camel routes for correctness, security, and anti-patterns.
 user_invocable: false
 ---
 

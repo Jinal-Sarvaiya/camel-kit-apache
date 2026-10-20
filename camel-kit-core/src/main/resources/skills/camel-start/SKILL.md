@@ -1,6 +1,6 @@
 ---
 name: camel-start
-description: Route to the right camel-kit skill for integration work.
+description: Use when the user wants to start an integration task and you need to pick the right camel-kit skill.
 user_invocable: true
 ---
 

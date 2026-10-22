@@ -49,10 +49,12 @@ Conditionally load:
 
 → **For MCP setup, version mapping, and fallback policy:** see `skills/shared/mcp-setup.md`
 
-**CRITICAL:** Establish a matching `camel_catalog_components(limit=0)` version binding, then pass the exact `RUNTIME` and
-full `PLATFORM_BOM` GAV to every catalog call as defined by `shared/mcp-setup.md`. Detail tools do not all echo a Camel
-version. A detail error is `UNVERIFIED`; absence requires a successful complete exact-name type-list query. Use
-`camel_catalog_component_maven` for component coordinates. Never use model memory or response prose as catalog data.
+**CRITICAL:** Bind the catalog version from `.camel-kit/config.properties` (`project.camelVersion`,
+`project.platformBomVersion`, `project.runtime`), then pass the exact `RUNTIME` and full `PLATFORM_BOM` GAV to every
+catalog call as defined by `shared/mcp-setup.md`. Detail tools do not all echo a Camel version. A detail error is
+`UNVERIFIED`; absence requires a successful complete exact-name type-list query. Use `camel_catalog_component_maven` for
+component coordinates. Never use model memory or response prose as catalog data. For behaviour questions, call
+`camel_docs_search` on the `camel-knowledge` server — see `shared/mcp-setup.md`.
 
 For every migration decision, follow the **Verification Chain**:
 

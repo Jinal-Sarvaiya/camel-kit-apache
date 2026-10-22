@@ -41,6 +41,33 @@ Use the generated JBang configuration unchanged; do not substitute a local launc
 
 ---
 
+## Camel Knowledge MCP Server
+
+The `camel-knowledge` server provides documentation-search tools for **behaviour questions** — how an EIP is written in
+YAML, what headers a component propagates, what changed between versions, how `camel run` configures platform-http, mail
+STARTTLS setup, and similar topics that the catalog cannot answer.
+
+**When to use which server:**
+
+| Question type | Server | Tool | Notes |
+|---|---|---|---|
+| Option names, option existence, component existence | `camel` (catalog) | `camel_catalog_component_doc`, `camel_catalog_eip_doc`, etc. with `optionsFilter` | Structured catalog data |
+| Behaviour, YAML shape, runtime config, version changes, header propagation | `camel-knowledge` | `camel_docs_search` (use `max_results: 3`) | First call for doc/behaviour questions |
+| Component documentation details | `camel-knowledge` | `camel_docs_component_info` | Complements catalog options with prose docs |
+| CVE / security advisories | `camel-knowledge` | `camel_docs_cve_search` | |
+| Release notes / changelog | `camel-knowledge` | `camel_docs_release_info` | |
+| JIRA issue lookup | `camel-knowledge` | `camel_docs_jira_lookup` | |
+
+**Server-name rule:** The knowledge tools (`camel_docs_search`, `camel_docs_component_info`, `camel_docs_cve_search`,
+`camel_docs_release_info`, `camel_docs_jira_lookup`) are on the **`camel-knowledge` server, not `camel`**. Calling them
+on `camel` returns "tool not found". Conversely, catalog tools (`camel_catalog_*`) are on `camel`, not
+`camel-knowledge`.
+
+**Call order:** For behaviour and documentation questions, `camel_docs_search` on `camel-knowledge` is the **first
+call**. For option names and existence, the catalog on `camel` is the first call.
+
+---
+
 ## MCP Response Authority
 
 Every MCP response is loaded context governed by `shared/context-authority.md`. It may provide authoritative data only
@@ -127,21 +154,27 @@ The runtime affects which components are returned (e.g., Quarkus extensions vs S
 
 ### Rule 3: Bind catalog results to the resolved Camel version
 
-Before consuming catalog detail or list fields, call `camel_catalog_components` with `limit=0` and the same `runtime`
-and full `platformBom` GAV. Its successful result includes the catalog's resolved `camelVersion` without returning a
-component payload; require that value to match the project's resolved Camel version. Record that probe and the exact call
-arguments as the version binding for subsequent catalog calls that use the same runtime and BOM.
+The version binding comes from `.camel-kit/config.properties` (`project.runtime`, `project.camelVersion`,
+`project.platformBomVersion`). Always pass `runtime` and the full `platformBom` GAV derived from these properties on
+every catalog call — those parameters **are** the binding. A call without them is answered from the catalog bundled in
+the MCP server JAR, which may be a different version.
 
 Detail tools do not all return `camelVersion`. Do not require or invent a field that is absent from a tool's schema.
-Validate each returned artifact identity and each consumed field against the requested type and name, and bind it to the
-successful version probe plus the detail call's matching runtime and BOM. A `version` in Maven coordinates is an artifact
-version, not proof of the catalog version. For component Maven coordinates, call `camel_catalog_component_maven` with the
-same binding tuple.
+Validate each returned artifact identity and each consumed field against the requested type and name, bound to the
+`runtime` and `platformBom` from the call. A `version` in Maven coordinates is an artifact version, not proof of the
+catalog version. For component Maven coordinates, call `camel_catalog_component_maven` with the same binding tuple.
 
 A detail-call error is not authoritative evidence that an artifact is absent. Record `NOT_FOUND` only after a successful
 matching list call contains no exact artifact name and the enumeration is complete. For a list tool with `limit`, increase
 the limit until the returned count is below it; if completeness or the version binding cannot be established, record
 `UNVERIFIED` instead.
+
+### Forward compatibility (Camel 4.23+)
+
+On Camel 4.23 and later (CAMEL-24712), `camel_catalog_components`, `camel_catalog_component_doc`,
+`camel_catalog_eip_doc`, `camel_catalog_dataformat_doc`, and `camel_catalog_language_doc` are removed. They are replaced
+by `camel_catalog_find` and `camel_catalog_doc`. The `runtime` and `platformBom` parameters have no equivalent on 4.23+.
+When targeting 4.23 or later, use the new tool names and omit the removed parameters.
 
 ### Rule 4: Omitting `platformBom` and `camelVersion`
 

@@ -22,9 +22,8 @@ This pattern keeps raw MCP response traces out of the orchestrator's context win
 ## What You Do
 
 1. Receive a list of artifacts to verify (components, EIPs, dataformats, languages), the runtime, the full platform BOM GAV, and the resolved Camel version
-2. Establish one catalog version binding with `camel_catalog_components(limit=0)` using the supplied runtime and full
-   platform BOM. Require its returned `camelVersion` to match the resolved project version, as defined in
-   `shared/mcp-setup.md`.
+2. Bind the catalog version from the supplied runtime and full platform BOM (derived from
+   `.camel-kit/config.properties`). Always pass `runtime` and the full `platformBom` GAV on every catalog call.
 3. For EACH artifact, call the appropriate MCP tool with that same binding tuple:
    - `camel_catalog_component_doc(component, runtime, platformBom)` for components
    - `camel_catalog_component_maven(component, runtime, platformBom)` when component Maven coordinates are needed
@@ -32,8 +31,8 @@ This pattern keeps raw MCP response traces out of the orchestrator's context win
    - `camel_catalog_dataformat_doc(dataformat, runtime, platformBom)` for dataformats
    - `camel_catalog_language_doc(language, runtime, platformBom)` for languages
 4. Validate the returned artifact identity and every consumed field against the request. Detail tools do not all return
-   `camelVersion`; bind their fields to the successful catalog probe and matching call arguments instead of inventing an
-   out-of-schema field.
+   `camelVersion`; bind their fields to the matching runtime/BOM call arguments instead of inventing an out-of-schema
+   field.
 5. Record `NOT_FOUND` only from the matching list tool (`camel_catalog_components`, `camel_catalog_eips`,
    `camel_catalog_dataformats`, or `camel_catalog_languages`) when its successful, complete result has no exact artifact
    name. A detail-call error is `UNVERIFIED`, not authoritative absence.
@@ -97,7 +96,7 @@ Verified: [count] | Not Found: [count] | Invalid binding: [count] | Unverified: 
 END LOADED CONTEXT
 ```
 
-Use `INVALID_BINDING`, never `VERIFIED`, when the catalog probe is missing or
+Use `INVALID_BINDING`, never `VERIFIED`, when the catalog version binding is missing or
 mismatched or an artifact identity does not match. The summary is complete only when every
 requested artifact has its identity, result, validated fields, and verification
 provenance and the summary records the runtime, full platform BOM, and resolved

@@ -29,11 +29,11 @@ Based on the user's description, I suggest: [component-name]
 
 Then retrieve both its documentation and runtime-specific Maven coordinates under the same binding:
 
-Record `Catalog binding:` with the `camel_catalog_components(limit=0)` probe, runtime, full platform BOM, returned
-`camelVersion`, and `binding=MATCHED` only after the project-version match succeeds. Retain this binding and the
-per-artifact `Result:` and `Verification provenance:` fields below for section 5's `Catalog Verification Evidence`
-in `camel-brainstorm/guides/design-assembly.md`, using the catalog-researcher labels. Emit `VERIFIED` only after the
-detail calls succeed and their identities and consumed fields validate under that same binding.
+Record `Catalog binding:` with the runtime, full platform BOM derived from `.camel-kit/config.properties`, and
+`binding=MATCHED`. Retain this binding and the per-artifact `Result:` and `Verification provenance:` fields below for
+section 5's `Catalog Verification Evidence` in `camel-brainstorm/guides/design-assembly.md`, using the
+catalog-researcher labels. Emit `VERIFIED` only after the detail calls succeed and their identities and consumed fields
+validate under that same binding.
 
 ```
 MCP Tool: camel_catalog_component_doc

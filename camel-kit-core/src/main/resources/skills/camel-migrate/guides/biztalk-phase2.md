@@ -39,11 +39,12 @@ approval do not authorize any deployment, cutover, rollback, or traffic action.
 **MCP catalog tools — MANDATORY when MCP is configured (same rules as the design assembly guide):**
 
 Before every MCP catalog call, resolve `CAMEL_VERSION` + `RUNTIME` to the full runtime-specific `PLATFORM_BOM` GAV using
-Rule 1 in `skills/shared/mcp-setup.md`, establish the `limit=0` version probe, and pass that same runtime/BOM binding to
-the list and detail calls. Never substitute a stripped minor version (for example `4.14`) or treat the separately supplied
-`camelVersion` field as the binding when `platformBom` is present. Never use a Camel component name, EIP name, data
-format name, or expression language name from training data or the mapping guide without first verifying it in the
-catalog.
+Rule 1 in `skills/shared/mcp-setup.md`, and pass that same runtime/BOM binding (derived from
+`.camel-kit/config.properties`) to the list and detail calls. Never substitute a stripped minor version (for example
+`4.14`) or treat the separately supplied `camelVersion` field as the binding when `platformBom` is present. Never use a
+Camel component name, EIP name, data format name, or expression language name from training data or the mapping guide
+without first verifying it in the catalog. For behaviour questions (YAML shape, runtime configuration, version changes),
+call `camel_docs_search` on the `camel-knowledge` server — see `shared/mcp-setup.md` for the server niche and tool list.
 
 → **For MCP setup, version mapping, and fallback policy:** see `skills/shared/mcp-setup.md`
 
@@ -53,7 +54,7 @@ catalog.
 | Camel EIP for a BizTalk orchestration shape | `camel_catalog_eips` | `camel_catalog_eip_doc` |
 | Data format for unmarshal/marshal | `camel_catalog_dataformats` | `camel_catalog_dataformat_doc` |
 | Expression language for conditions/predicates | `camel_catalog_languages` | `camel_catalog_language_doc` |
-| Migration context for mapped Camel component | `camel_docs_search` | — |
+| Migration context for mapped Camel component | `camel_docs_search` (on `camel-knowledge`) | — |
 
 The static `biztalk-component-mapping.md` guide provides a **starting point** (the suggested Camel component name). It does NOT replace catalog verification — always confirm availability and option names in `CAMEL_VERSION` before writing the design spec.
 

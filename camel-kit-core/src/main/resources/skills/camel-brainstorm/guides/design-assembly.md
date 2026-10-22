@@ -168,7 +168,7 @@ All flows in this spec are designed to comply with the 8 constitution rules:
 
 ### Catalog Verification Evidence
 
-Catalog binding: camel_catalog_components(limit=0); runtime=[runtime]; platformBom=[groupId:artifactId:version]; returned camelVersion=[camelVersion]; binding=MATCHED
+Catalog binding: runtime=[runtime]; platformBom=[groupId:artifactId:version]; source=.camel-kit/config.properties
 
 | Artifact identity | Result | Verification provenance |
 |---|---|---|
@@ -179,11 +179,11 @@ Catalog binding: camel_catalog_components(limit=0); runtime=[runtime]; platformB
 
 [Replace the examples with one row per artifact named in section 3, deduplicated across flows by type and exact catalog
 name. Record only VERIFIED rows from successful detail calls whose identities and consumed fields were validated under
-the same runtime/full platform BOM binding. The probe's returned camelVersion must match the resolved project version
-per shared/mcp-setup.md. When component coordinates were consumed, include camel_catalog_component_maven alongside
-camel_catalog_component_doc in that row's provenance. Use the actual recorded calls; do not infer evidence from an
-inline (MCP-verified) tag or invent documentation URLs. If a detail call fails or the binding cannot be established,
-record an open design question and omit the artifact from section 3 until verified.]
+the same runtime/full platform BOM binding from `.camel-kit/config.properties`. When component coordinates were consumed,
+include camel_catalog_component_maven alongside camel_catalog_component_doc in that row's provenance. Use the actual
+recorded calls; do not infer evidence from an inline (MCP-verified) tag or invent documentation URLs. If a detail call
+fails or the binding cannot be established, record an open design question and omit the artifact from section 3 until
+verified.]
 
 ---
 

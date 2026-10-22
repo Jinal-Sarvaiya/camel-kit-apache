@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Legacy `.claude/commands/camel-*.md` stubs are cleaned up on regeneration; user-created commands are preserved.
   Internal skills (`camel-design`, `camel-implement`, `camel-test`, `camel-verify`) are hidden from both user
   invocation and model auto-selection. Doctor accepts legacy `.claude/commands` workspaces.
+- **Teach knowledge server niche and drop `limit=0` probe (#108)** — add a `## Camel Knowledge MCP Server` section
+  to `shared/mcp-setup.md` documenting when to use `camel-knowledge` vs `camel` catalog, with the server-name rule
+  and tool list. Rewrite Rule 3 and Iron Law 1 steps 2–3 to bind the catalog version from
+  `.camel-kit/config.properties` instead of the broken `camel_catalog_components(limit=0)` probe. Remove all
+  `limit=0` probe references from downstream guides and agent personas. Add forward-compatibility notes for
+  Camel 4.23+ tool renames (`camel_catalog_find` / `camel_catalog_doc`).
 - **`camel-migrate` direct mode (#245)** — add a third invocation mode that implements routes
   directly under Iron Laws 1 and 2 when the user's request names concrete deliverables. Scope
   Iron Law 3 and the HARD-RULE block to chained/standalone modes. Add direct-mode implementation

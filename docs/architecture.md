@@ -866,6 +866,26 @@ The **Iron Laws** define six pipeline process rules (how the pipeline operates):
 
 Iron Law 2 explicitly incorporates and enforces the 8 constitution rules. They are complementary, not overlapping -- the constitution says what to check, the iron laws say when and how to enforce it.
 
+### Security Model Document (Oct 2026)
+
+Camel-Kit publishes its security model and threat model as `docs/security-model.md`, structured with the
+threat-model rubric the Apache Security team uses for sub-projects (header with version binding and provenance
+tags, component families, trust boundaries, claimed and disclaimed properties, known non-findings, a closed set
+of triage dispositions, and open maintainer questions), plus a derived `docs/security-model.yaml` sidecar and a
+root `SECURITY.md` with the ASF reporting process. It is the additive sub-project expansion of the
+[Apache Camel Security Model](https://camel.apache.org/manual/security-model.html), as Camel K's `docs/threat-model.md`
+is for the Kubernetes layer.
+
+Rejected alternatives: an AsciiDoc page in an Antora module as Camel core uses (Camel-Kit has no Antora site; its
+documentation is GitHub-rendered Markdown under `docs/`); a `SECURITY.md`-only policy with no model (gives
+triagers no dispositions to cite and leaves the AI-agent, graph-parsing and Ship boundaries undefined);
+inheriting the umbrella model verbatim as camel-spring-boot does (Camel-Kit introduces development-time boundaries
+-- untrusted source trees read without running them, model output, dynamic artifact resolution, a local
+controller -- that the umbrella model excludes); and omitting the YAML sidecar (automated triage is the stated
+purpose, and both the umbrella model and Camel K ship one). Generated workspace instructions deliberately do not
+link to the model; they carry the operative rules themselves (Iron Laws, `context-authority.md`, the security
+checklist).
+
 ---
 
 ## 10. How to Add a Skill

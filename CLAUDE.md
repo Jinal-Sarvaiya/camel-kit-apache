@@ -57,6 +57,20 @@ Governance:
 - Record every architectural decision, including rejected alternatives. Never reference
   internal architecture decision documents in public PRs/issues.
 
+## Security model
+
+- `SECURITY.md` — how to report a vulnerability (private ASF process). An agent that discovers or is handed a
+  suspected vulnerability MUST NOT open a public issue, PR, discussion or mailing-list post about it — point the
+  user to `SECURITY.md` and stop.
+- `docs/security-model.md` — who is trusted, where the trust boundaries sit, what counts as a Camel-Kit
+  vulnerability, and the closed set of triage dispositions. Use it when triaging a report or reviewing a
+  security-sensitive PR. `docs/security-model.yaml` is the derived machine-readable index; regenerate it whenever
+  the prose changes.
+- A change that moves a boundary the model describes — a parser or input format in `camel-kit-graph`, Ship tree,
+  expression, secret-scan or resolver policy, worker launch flags, generated allow-lists, hooks or guard policies,
+  MCP coordinates or repositories in `distribution.properties`, or a trust statement in `skills/shared/` — must
+  update `docs/security-model.md` in the same PR (its §4.12 lists the triggers).
+
 ## Graph module
 
 - New parsers must be registered in the parser registry.
@@ -77,3 +91,5 @@ Work is finished only when all of these hold:
 8. Independent releases follow `docs/releasing.md`; never deploy the whole reactor for a product release.
 9. Nothing was skipped, disabled, or weakened to get green — if a check fails, report
    the output rather than claiming done.
+9. Security-relevant change (see §4.12 of `docs/security-model.md`): the security model and its
+   `docs/security-model.yaml` sidecar are updated.

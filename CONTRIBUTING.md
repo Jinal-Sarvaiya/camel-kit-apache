@@ -15,6 +15,7 @@ Thank you for your interest in contributing to Camel-Kit! This document provides
 - [Coding Standards](#coding-standards)
 - [Testing](#testing)
 - [Documentation](#documentation)
+- [Security](#security)
 - [Adding New Skills](#adding-new-skills)
 - [Release Process](#release-process)
 
@@ -120,6 +121,7 @@ Before opening an issue:
 2. Use the appropriate issue template
 3. Provide clear reproduction steps for bugs
 4. Include relevant version information
+5. **Never** report a suspected security vulnerability in a public issue or pull request — follow [SECURITY.md](SECURITY.md)
 
 ### Branch Naming
 
@@ -288,6 +290,7 @@ class CatalogServiceTest {
 | Architecture (skills, MCP) | `docs/architecture.md` |
 | API documentation | Docstrings in code |
 | Change log | `CHANGELOG.md` |
+| Security model and threat model | `docs/security-model.md` (prose, canonical) and `docs/security-model.yaml` (derived sidecar) |
 
 ### Documentation Style
 
@@ -295,6 +298,31 @@ class CatalogServiceTest {
 - Include code examples
 - Add screenshots for visual features
 - Keep documentation up-to-date with code
+
+## Security
+
+### Reporting Vulnerabilities
+
+Do not report a suspected vulnerability in a public issue, pull request or discussion. Follow the private Apache
+Software Foundation process described in [SECURITY.md](SECURITY.md).
+
+### Security-Sensitive Changes
+
+[`docs/security-model.md`](docs/security-model.md) is the project's security model and threat model: who is trusted,
+where the trust boundaries sit, which properties Camel-Kit claims and disclaims, and how reports are triaged. Its
+§4.12 lists the changes that require a revision. In practice, update the model (and regenerate
+`docs/security-model.yaml`) in the same PR when you:
+
+- add or change a parser or input format in `camel-kit-graph`, or any CLI command that reads external content;
+- change the Ship tree policy, expression gate, secret scan, resolver, worker launch flags or oversight defaults;
+- add or change a generated harness asset that grants permissions (allow-lists, hooks, guard policies, MCP
+  auto-approval lists) or a worker definition's tool list;
+- add a remote repository or coordinate to `distribution.properties`, or change how downloads are verified;
+- change a trust statement in `skills/shared/context-authority.md`, `skills/shared/iron-laws.md` or
+  `skills/shared/camel-security-checklist.md`.
+
+Reviewers of such PRs should check the change against the model's §4.8 (claimed properties) and §4.9 (disclaimed
+properties) before approving.
 
 ## Adding New Skills
 

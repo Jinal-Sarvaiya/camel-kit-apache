@@ -87,6 +87,10 @@ releases explicitly. The server automatically selects a compatible published
 index, supports an exact index-version pin, and retains a working cached index
 when an update fails. See [Knowledge index distribution](knowledge/README.md#index-distribution).
 
+## Security
+
+To report a suspected vulnerability, follow [SECURITY.md](SECURITY.md) — never a public issue or pull request. The [Security Model](docs/security-model.md) documents trust boundaries and security-report triage.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development checks and

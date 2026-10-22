@@ -1,0 +1,441 @@
+# Machine-readable companion to docs/security-model.md (Camel-Kit Security Model and Threat Model).
+# The prose document is canonical; regenerate this file whenever it changes.
+# Section references (4.x) point at the prose document. Disposition labels match the Apache Camel Security Model.
+schema: camel-kit-security-model/1
+project: Apache Camel Kit
+repository: apache/camel-kit
+version: 0.4.2-SNAPSHOT
+commit: 70796c02
+date: "2026-10-22"
+status: draft
+canonical: docs/security-model.md
+umbrella_model: https://camel.apache.org/manual/security-model.html
+reporting:
+  policy: SECURITY.md
+  process: https://camel.apache.org/security/
+  private_list: private-security@camel.apache.org
+  asf_security_team: security@apache.org
+  public_issues_for_vulnerabilities: forbidden
+
+roles:
+  - role: developer
+    trust: fully-trusted
+    note: Route author and operator of their own machine; flags, config files and design approvals are trusted input.
+  - role: developer-os-account-and-same-user-processes
+    trust: trusted
+    note: Outside the adversary model (luigidemasi/camel-kit#149).
+  - role: ai-coding-harness
+    trust: trusted-to-enforce-its-own-permission-model
+    note: Holds provider credentials; its model output is untrusted input.
+  - role: author-of-analysed-source-tree
+    trust: untrusted
+    note: Umbrella "Reading route sources without running them" contract applies.
+  - role: far-side-services
+    trust: trusted-to-contact-at-pinned-coordinate
+    note: MCP servers, Maven Central, ASF repositories, GitHub; responses are data, never instructions.
+  - role: other-local-accounts
+    trust: weaker-adversary
+    note: Camel-Kit must not widen what they can read.
+  - role: network-peer
+    trust: untrusted
+    note: TLS assumed.
+
+component_families:
+  - id: A
+    name: Workspace CLI
+    paths: ["camel-kit-core (command, service, generator, catalog, config)", camel-kit-main, camel-jbang-plugin-kit]
+    entry_points: [init, doctor, doc, nextId, plan analyze, graph]
+    in_model: true
+    reachability: Reachable from a non-operator input (analysed tree via init --here, downloaded catalog content, model-authored pipeline artifact, another local account).
+  - id: B
+    name: Graph analysis
+    paths: [camel-kit-graph]
+    entry_points: [camel-kit graph, init --here auto-analysis]
+    in_model: true
+    reachability: Reachable from the contents of the analysed tree (file bodies, names, symbolic links) without building or running the project.
+  - id: C
+    name: Skills, templates, traits, agent registry, workflow manifest
+    paths: [camel-kit-core/src/main/resources/skills, camel-kit-core/src/main/resources/templates, camel-kit-core/src/main/resources/agents, camel-kit-core/src/main/resources/workflow]
+    in_model: true
+    reachability: Only when a shipped instruction or generated artifact itself crosses a boundary it documents holding (allow-list, worker tool list, hook or guard, MCP coordinate or repository). The model disobeying an instruction is not a finding.
+  - id: D
+    name: Ship controller (Technology Preview)
+    paths: [camel-kit-core ship/**, camel-kit-core command/ship]
+    entry_points: [camel-kit ship, /camel-ship delegates]
+    in_model: true
+    reachability: Reachable from worker or native-result output, the staged or analysed tree, a Maven Central response, or another local account; never when it requires the developer's own OS account.
+  - id: E
+    name: Ship resolver and evidence payloads
+    paths: [camel-kit-ship-resolver, camel-kit-core ship/evidence/**]
+    in_model: true
+    reachability: Same as D.
+  - id: F
+    name: MCP servers (Camel JBang MCP, Camel-Kit Knowledge MCP, Citrus MCP)
+    in_model: false
+    route_to: ["apache/camel (Apache Camel Security Model)", luigidemasi/camel-kit-knowledge, Citrus]
+    note: Camel-Kit's responsibility ends at the generated configuration (pinned coordinate, named repositories, allowed-tool list).
+  - id: G
+    name: Generated integration projects
+    in_model: false
+    route_to: [Apache Camel Security Model]
+    note: In model only for what Camel-Kit's gates claim about them (P10) and disclaim (4.9).
+  - id: H
+    name: Shipped but unsupported
+    paths: [examples/, tools/, camel-kit-dispatch/, src/test/**, .idea/, camel-kit.gif, .github/workflows]
+    in_model: false
+
+entry_points:
+  - entry: camel-kit init
+    input: project name, --ai, --here, --force, -p, -c, --citrus-version, --source-platform
+    attacker_controllable: false
+    trust: operator
+  - entry: camel-kit init --here / --source-platform
+    input: existing source tree (graph analysis, runtime detection, merge of .codex/config.toml and opencode.json)
+    attacker_controllable: true
+    caller_must_enforce: Analyse only trees you are willing to read; building or running them is a separate decision.
+  - entry: camel-kit init (fetch)
+    input: catalog JAR, YAML schema, Kamelet listing, Maven search JSON, Citrus schema JAR, Forage catalog
+    attacker_controllable: network-peer-or-hostile-origin
+    caller_must_enforce: Trust the pinned HTTPS origins or use --no-fetch with a vetted cache; no checksum or signature verification (Q7).
+  - entry: ~/.camel-kit/config.properties, .camel-kit/config.properties
+    attacker_controllable: false
+    trust: operator
+  - entry: camel-kit graph <sub> [root]
+    input: file bodies, names and link targets under root
+    attacker_controllable: true
+    caller_must_enforce: No symlink or size guard is claimed (Q2).
+  - entry: .camel-kit/project-graph.json (graph output consumed by skills)
+    attacker_controllable: derived-from-tree
+    caller_must_enforce: Treat as data in prompts.
+  - entry: camel-kit doc check/stale/unstale
+    input: YAML frontmatter of model-authored pipeline artifacts
+    attacker_controllable: true
+    caller_must_enforce: Parsed as data; digests are staleness markers only.
+  - entry: camel-kit plan analyze
+    input: implementation-plan.md task metadata (model-authored)
+    attacker_controllable: true
+  - entry: camel-kit nextId <slug>
+    attacker_controllable: false
+    trust: operator
+  - entry: camel-kit ship --text / --document
+    input: context for the model
+    attacker_controllable: developer-supplied-but-loaded-context
+    caller_must_enforce: Do not pass secrets; third-party documents can carry instruction-like text.
+  - entry: camel-kit ship worker result (Pi RPC output, native --result envelope)
+    input: stage result JSON and file proposals
+    attacker_controllable: true
+    controller_enforces: [strict JSON schema, approved path set only, size limits, tree policy, expression gate, secret scan, deterministic validation]
+  - entry: camel-kit ship staged workspace / candidate tree
+    attacker_controllable: derived
+    controller_enforces: [tree policy]
+  - entry: Ship resolver
+    input: Maven Central responses
+    attacker_controllable: true
+    controller_enforces: [checksum fail, exact coordinates, size caps, no redirects, SHA-256 content identity]
+  - entry: Ship environment variables
+    attacker_controllable: false
+    trust: operator
+    note: Sensitive-looking values redacted from evidence and scanned for leaks; passed to the Pi worker (Q8).
+  - entry: shipped skills, templates, traits, agents/registry, camel-kit-workflow.yaml
+    attacker_controllable: false
+    trust: distribution
+  - entry: MCP responses, downloaded documentation, repository READMEs (consumed by the agent)
+    attacker_controllable: true
+    caller_must_enforce: Loaded context is data (context-authority.md); only purpose-specific validated fields carry data authority.
+
+configuration_variants:
+  - knob: camel-kit init --ai <target>
+    default: bob2
+    effect: Selects which generated harness controls exist (allow-lists, read-only worker definitions, hooks, guard policies).
+    security_relevant: true
+    stance: open (Q3) - proposed supported posture
+  - knob: MCP autoApprove / alwaysAllow / directTools / enabled_tools
+    default: workflow manifest allowed_tools (read-only and generation helpers)
+    security_relevant: true
+    stance: open (Q3)
+  - knob: camel.mcp.repos, knowledge.mcp.repos, citrus.mcp.repos, camel.catalog.repos, JBang //REPOS
+    default: Maven Central, ASF public, ASF snapshots, Central snapshots
+    effect: Snapshot repositories serve mutable artifacts.
+    security_relevant: true
+    stance: open (Q4) - proposed development convenience, BY-DESIGN
+  - knob: camel-kit init --no-fetch
+    default: false
+    effect: Skips every init-time download.
+    security_relevant: false
+  - knob: camel-kit init --force
+    default: false
+    effect: Overwrites generated assets (data loss, not security).
+    security_relevant: false
+  - knob: -p key=value, -c path
+    default: none
+    effect: Overrides any distribution property including versions and repository lists.
+    security_relevant: true
+    stance: trusted input
+  - knob: camel-kit ship --ask
+    default: smart
+    effect: never removes pauses for ambiguity, not authority checks; not a safety mode.
+    security_relevant: true
+    stance: documented
+  - knob: camel-kit ship --backend
+    default: pi
+    effect: Pi worker gets read-only tools or, in EXECUTE, bash/edit/write inside the staging cwd, launched with --no-approve and --offline, inheriting the controller environment; native backends use the host's read-only subagent.
+    security_relevant: true
+    stance: open (Q8) for Pi; documented for native
+  - knob: camel-kit ship --accept-experimental
+    default: false
+    effect: Runs unverified Pi/Node versions.
+    security_relevant: true
+    stance: documented opt-in
+  - knob: camel-kit ship --maven-repository
+    default: <state root>/catalog-repository
+    effect: Checksum enforcement applies to downloads only; protecting the repository between runs is the caller's.
+    security_relevant: true
+    stance: documented
+  - knob: CAMEL_KIT_SHIP_STATE_HOME
+    default: unset (.camel-kit/ship/state in the project)
+    effect: Relocates run records, evidence, transcripts and the staged workspace.
+    security_relevant: true
+    stance: documented
+  - knob: camel-kit ship --stage-timeout
+    default: 10m
+    security_relevant: false
+
+claimed_properties:
+  - id: P1
+    property: Source-reading contract for graph analysis - no code execution, class loading, placeholder/secret resolution or network; output is data (inherited from the umbrella model).
+    violation_symptom: Child process, class loaded or defined from the source, outbound connection, read outside the tree, or placeholder resolved during graph analysis.
+    severity: security-critical
+    provenance: documented (umbrella, SecureXml, BizTalk parsers); inferred for Java, Groovy, YAML, DataWeave, properties (Q1)
+  - id: P2
+    property: Hardened XML parsing at every XML entry point, including Ship pom.xml validation.
+    violation_symptom: XXE, SSRF or local file read through XML.
+    severity: security-critical
+    provenance: documented (SecureXml, BizTalk*Parser, ArtifactValidator)
+  - id: P3
+    property: init confines its writes to the target directory and removes only what it generated, through no symlink.
+    violation_symptom: File created, replaced or deleted outside the target directory, or deletion through a symlink.
+    severity: security-critical when reachable from an attacker-controllable input; otherwise correctness
+    provenance: documented (GeneratedAssetCleaner, AtomicFileWriter); write confinement inferred (Q9)
+  - id: P4
+    property: Pinned, named-repository supply chain for everything fetched or configured; Ship resolver uses fixed HTTPS Maven Central, checksum fail, no redirects, exact coordinates, size caps, SHA-256 content identity, isolated URLClassLoader payloads.
+    violation_symptom: Unpinned coordinate, repository outside the named lists, download accepted on checksum mismatch, artifact outside its exact path, payload class loaded from elsewhere.
+    severity: security-critical
+    provenance: documented (mcp-setup.md, distribution.properties, ShipMavenResolver, ShipJvmPayloadBootstrap)
+  - id: P5
+    property: Ship controller alone writes run state and commits transitions; proposals accepted only for the approved path set; publication journaled, atomic, verified against the validated candidate, recoverable.
+    violation_symptom: Worker output changes a stage, pause or publication decision; proposal lands outside the approved set; published tree differs from the validated candidate; torn publication left unrecovered.
+    severity: security-critical
+    provenance: documented (docs/commands.md, docs/ship-native.md, ShipPublicationService)
+  - id: P6
+    property: Ship tree policy - denied credential and state paths, protected and volatile classes, rejection of symlinks, hard links and special files, quotas (20000 entries, 64 MiB per file, 1 GiB aggregate, depth 128, 4096-char paths).
+    violation_symptom: Denied path enters a snapshot, workspace, prompt or publication; a link is followed.
+    severity: security-critical
+    provenance: documented (ShipTreePolicy, docs/architecture.md)
+  - id: P7
+    property: Ship never persists provider credentials; sensitive environment values redacted from evidence, Stamp arguments and transcripts; verbatim secret in a changed material file rejected.
+    violation_symptom: Provider credential unredacted in run state, Stamp, logs or a published file.
+    severity: security-critical
+    provenance: documented (#149, LocalCommandRunner, ChangedWorkspaceSecretScanner)
+  - id: P8
+    property: Ship validation isolated from the live project and the network - separate JVM, controller-resolved classpath, scrubbed environment, frozen read-only copy, owner-only directories, log cap, timeout, process-tree termination, endpoint stubbing, rejection of code-bearing YAML.
+    violation_symptom: Validation JVM reaches the network or live project, inherits caller secrets, writes outside private directories, or starts YAML that executes a script.
+    severity: security-critical (network/live-project reach, secret inheritance)
+    provenance: documented (EvidenceRunner, ShipCamelMainBootstrap, docs/commands.md)
+  - id: P9
+    property: Ship Simple-expression gate - 16 KiB bound, no control/format characters, no indirect expansion.
+    violation_symptom: Expression with indirect expansion forwarded.
+    severity: hardening
+    provenance: documented (ShipExpressionPolicy)
+  - id: P10
+    property: Generated harness assets carry their documented least-privilege posture (read-only Ship workers, read-only Codex roles, Copilot deny hook, Pi guard policy, MCP allow-lists without runtime control tools, no HTTP port for MCP servers). Claim is about the generated artifact; enforcement is the harness's.
+    violation_symptom: Generated asset grants more than documented.
+    severity: hardening; security-critical when the widened grant reaches a credential or destructive action without a prompt
+    provenance: documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates)
+  - id: P11
+    property: Stated resource bounds - route/Citrus YAML 2 MiB, native result 16 MiB and 1000 files, Pi prompt 1 MiB, Pi log 16 MiB, session 64 MiB, evidence log 64 MiB, stage timeout 10m, resolver 64 roots/512 artifacts/128 MiB JAR/4 MiB POM, tree quotas, migration-context depth 3 and 50 nodes.
+    violation_symptom: A limit not enforced at its documented value.
+    severity: hardening
+    provenance: documented (ShipArtifactLimits, ShipNativeWorker, PiWorker, EvidenceRunner, ShipMavenResolver, ShipTreePolicy, docs/commands.md)
+
+disclaimed_properties:
+  - id: D1
+    statement: Not a sandbox or permission system for the AI agent; Iron Laws, constitution, checklist and context-authority are instructions to a model.
+  - id: D2
+    statement: No defence against prompt injection beyond instruction.
+  - id: D3
+    statement: Ship is not a hostile same-user sandbox, credential broker, daemon or attestation system; Stamp and digests are not attestations.
+  - id: D4
+    statement: Secret scan is a floor - exact UTF-8 matches of sensitive-named environment values of at least 8 characters; encoded forms and non-environment secrets are not detected.
+  - id: D5
+    statement: Endpoint stubbing is not an OS sandbox; the Pi worker's cwd is not a filesystem sandbox.
+  - id: D6
+    statement: No signature or checksum verification for init-time downloads (TLS only, redirects followed) (Q7).
+  - id: D7
+    statement: Snapshot repositories are mutable; no reproducibility or integrity claim (Q4).
+  - id: D8
+    statement: No resource bound or symlink guard for graph analysis of a hostile tree (Q2).
+  - id: D9
+    statement: Validation of generated routes is a static quality gate, not a security audit.
+  - id: D10
+    statement: Generated guards and hooks are deliberately narrow pattern lists.
+  - id: D11
+    statement: --ask never is not a safety mode.
+  - id: D12
+    statement: No protection of provider credentials from the harness or the model; the Pi worker receives the controller's environment (Q8).
+  - id: D13
+    statement: Camel-Kit does not hold or verify the Camel runtime's security properties for generated projects.
+false_friends:
+  - claim: The Iron Laws / constitution are enforced
+    reality: Enforced on the model by instruction; by machinery only in Ship's deterministic checks.
+  - claim: The Ship Stamp proves the integration is safe to release
+    reality: It records which checks ran on this machine, with redacted arguments, exit codes and log digests.
+  - claim: camel-kit doc check detects tampering
+    reality: It detects staleness of pipeline artifacts by digest; anyone who can write the file can rewrite the digest.
+  - claim: The safety hook / guard makes autonomous runs safe
+    reality: It blocks a short list of obvious patterns; the harness permission model is the control.
+  - claim: Read-only Ship workers cannot leak
+    reality: They cannot write, but they read what the parent's permissions allow and return text; a fresh context is not an OS sandbox.
+  - claim: camel_route_harden_context / camel_security_scan passed
+    reality: MCP output is supplemental candidate evidence, never the canonical result.
+attack_classes_left_downstream:
+  - prompt injection through repository content, documentation, logs and MCP responses
+  - MCP tool poisoning and rug-pulls
+  - supply-chain substitution of dynamically fetched MCP servers and JBang dependencies
+  - dependency confusion through snapshot or mirror repositories
+  - secret exfiltration through generated configuration, test data, logs or transcripts
+  - build-time code execution by running an untrusted project's Maven build during verification
+  - insecure generated code accepted without review
+  - destructive shell commands issued by an autonomous agent
+
+known_non_findings:
+  - pattern: ProcessBuilder / Runtime use in ProcessRunner, PrerequisiteChecker, DoctorService, EvidenceRunner, LocalCommandRunner, PiWorker; availableProcessors in GraphBuilder
+    why: Argument vectors are fixed by the CLI or controller; nothing from model output or analysed sources is spliced in.
+    disposition: KNOWN-NON-FINDING
+  - pattern: Files.delete / tree deletion in GeneratedAssetCleaner, ForageCatalogService, Ship services, ShipJvmPayloadBootstrap
+    why: Confined to project-relative generated assets, controller-owned state, caches and private temp, with symlink refusal.
+    disposition: KNOWN-NON-FINDING
+  - pattern: URLClassLoader / Class.forName in ShipJvmPayloadBootstrap, ShipCitrusYamlMain
+    why: Loads only the controller-materialised payload resolved under P4; launcher class is a controller argument.
+    disposition: KNOWN-NON-FINDING
+  - pattern: System.getenv() in Ship
+    why: Read to redact and scan secrets and to launch the Pi worker; never persisted.
+    disposition: KNOWN-NON-FINDING
+  - pattern: XML factories flagged for XXE
+    why: Every DocumentBuilderFactory and XMLInputFactory is hardened (P2).
+    disposition: KNOWN-NON-FINDING
+  - pattern: new ObjectMapper(new YAMLFactory())
+    why: Jackson tree model does not honour YAML type tags.
+    disposition: KNOWN-NON-FINDING
+  - pattern: Hardcoded credential hits in skills/**, templates/**, test resources
+    why: Placeholders and fixtures.
+    disposition: KNOWN-NON-FINDING
+  - pattern: --no-approve in the Pi worker argument list
+    why: Pi's prompt is replaced by controller oversight gates and deterministic validation.
+    disposition: KNOWN-NON-FINDING
+  - pattern: followRedirects(NORMAL) in init downloaders
+    why: HTTPS-to-HTTPS redirects expected; NORMAL never downgrades to HTTP (verification gap is Q7).
+    disposition: KNOWN-NON-FINDING
+  - pattern: Generated Claude settings.json pre-approving mvn
+    why: Documented posture (Q3).
+    disposition: KNOWN-NON-FINDING
+  - pattern: Ship state inside the project (.camel-kit/ship/state)
+    why: Controller-owned, denied by tree policy, self-ignored for git.
+    disposition: KNOWN-NON-FINDING
+  - pattern: GIT_CEILING_DIRECTORIES set for child processes
+    why: Intended boundary (P8).
+    disposition: KNOWN-NON-FINDING
+  - pattern: The CLI downloads from the internet during init
+    why: Documented, pinned, avoidable with --no-fetch.
+    disposition: KNOWN-NON-FINDING
+  - pattern: Scanner hits in examples/, tools/, camel-kit-dispatch/, src/test/**
+    why: Shipped-but-unsupported code.
+    disposition: OUT-OF-MODEL:unsupported-component
+
+dispositions:
+  - label: VALID
+    licensed_by: ["4.8", "4.6", "4.7"]
+  - label: VALID-HARDENING
+    licensed_by: ["4.11", "4.8 P9", "4.8 P11"]
+  - label: OUT-OF-MODEL:trusted-input
+    licensed_by: ["4.6", "4.2"]
+  - label: OUT-OF-MODEL:adversary-not-in-scope
+    licensed_by: ["4.7"]
+  - label: OUT-OF-MODEL:unsupported-component
+    licensed_by: ["4.3", "4.2"]
+  - label: OUT-OF-MODEL:non-default-build
+    licensed_by: ["4.5a"]
+  - label: BY-DESIGN:property-disclaimed
+    licensed_by: ["4.9"]
+  - label: KNOWN-NON-FINDING
+    licensed_by: ["4.11a"]
+  - label: MODEL-GAP
+    licensed_by: ["4.12"]
+issue_5_category_mapping:
+  framework_vulnerability: VALID
+  llm_hallucination_or_insecure_suggestion: BY-DESIGN:property-disclaimed unless a 4.8 hard control failed
+  user_directed_insecure_route_design: OUT-OF-MODEL:trusted-input
+  local_operator_environment_misconfiguration: OUT-OF-MODEL:adversary-not-in-scope or OUT-OF-MODEL:non-default-build
+
+open_questions:
+  - id: Q1
+    wave: 1
+    sections: ["4.2", "4.5", "4.8 P1"]
+    proposed: Umbrella source-reading contract applies to all nine parsers; graph analysis spawns no process; Java AST-only; Groovy CONVERSION phase only.
+  - id: Q2
+    wave: 1
+    sections: ["4.6", "4.8 P1", "4.9"]
+    proposed: No termination or memory bound claimed; hang is VALID-HARDENING; read through a symlink outside the root is VALID.
+  - id: Q3
+    wave: 1
+    sections: ["4.5a", "4.8 P10"]
+    proposed: Generated Claude allow-list and MCP auto-approval are the supported posture.
+  - id: Q4
+    wave: 1
+    sections: ["4.5a", "4.9"]
+    proposed: Snapshot repositories are development conveniences; changed snapshot content is BY-DESIGN.
+  - id: Q5
+    wave: 1
+    sections: ["4.3", "4.7", "4.9"]
+    proposed: Prompt injection and wrong model output are out of scope unless a shipped hard control fails.
+  - id: Q6
+    wave: 2
+    sections: ["4.5", "4.6"]
+    proposed: Negative side-effect inventory as stated (no sockets, no $HOME writes, no telemetry, no git against the live repo, listed executables only).
+  - id: Q7
+    wave: 2
+    sections: ["4.6", "4.7", "4.9"]
+    proposed: init downloads are TLS-only from pinned origins; verification disclaimed.
+  - id: Q8
+    wave: 2
+    sections: ["4.5", "4.5a", "4.8 P7", "4.9"]
+    proposed: Pi worker inherits the environment and runs --no-approve with bash/edit/write in EXECUTE by design; secret-scan floor is the intended claim.
+  - id: Q9
+    wave: 2
+    sections: ["4.5", "4.8 P3"]
+    proposed: init writes only inside the target directory.
+  - id: Q10
+    wave: 3
+    sections: ["4.1"]
+    proposed: Additive sub-project expansion of the umbrella model; register in apache/security-site project-coordinates.json.
+  - id: Q11
+    wave: 3
+    sections: ["4.3", "4.12"]
+    proposed: camel-kit-knowledge stays out while a separate repository.
+  - id: Q12
+    wave: 3
+    sections: ["SECURITY.md"]
+    proposed: Latest release line supported; Ship preview findings still VALID.
+  - id: Q13
+    wave: 3
+    sections: ["4.10"]
+    proposed: Generated workspace instructions do not link to this model.
+
+revision_triggers:
+  - New CLI command, parser or input format reading external content; parser moving to later compilation phase or symbol resolution.
+  - Camel-Kit gaining a network listener (e.g. merging the Knowledge MCP server, apache/camel-kit#2).
+  - Change to default oversight mode, default backend, Pi tool lists or flags, tree policy rules/quotas, expression gate, secret-scan rules, resolver origin/checksum/redirect policy.
+  - init writing outside the target directory or under $HOME; Ship state moving to a user-level default.
+  - New or changed generated harness asset granting permissions, installing hooks or auto-approving tools.
+  - New remote repository or coordinate in distribution.properties; verification added to init downloads.
+  - Ship supporting Spring Boot/Quarkus, non-Linux hosts, binary or deletion proposals, or leaving Technology Preview.
+  - Any report that is a MODEL-GAP.

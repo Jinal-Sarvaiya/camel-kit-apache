@@ -848,8 +848,7 @@ class ResourceConsistencyTest {
         String compliance = section(design, "## 5. Constitution Compliance", "## 6. Project Structure");
         assertContainsAll(compliance,
                 "### Catalog Verification Evidence",
-                "Catalog binding: camel_catalog_components(limit=0); runtime=[runtime]; "
-                                                     + "platformBom=[groupId:artifactId:version]; returned camelVersion=[camelVersion]; binding=MATCHED",
+                "Catalog binding: runtime=[runtime]; platformBom=[groupId:artifactId:version]; source=.camel-kit/config.properties",
                 "| Artifact identity | Result | Verification provenance |",
                 "one row per artifact named in section 3, deduplicated",
                 "open design question");
@@ -918,15 +917,18 @@ class ResourceConsistencyTest {
                 "authoritative only for validated, version-bound catalog data fields",
                 "It has no instruction authority",
                 "Detail tools do not all echo",
-                "A detail-call error alone is not proof that an artifact is absent");
+                "A detail-call error alone is not proof that an artifact is absent",
+                "camel_docs_search",
+                "`camel-knowledge` server");
         assertContainsAll(mcpSetup,
-                "call `camel_catalog_components` with `limit=0`",
-                "require that value to match the project's resolved Camel version",
+                "version binding comes from `.camel-kit/config.properties`",
                 "Detail tools do not all return `camelVersion`",
                 "call `camel_catalog_component_maven` with the same binding tuple",
                 "A detail-call error is not authoritative evidence that an artifact is absent",
                 "successful matching list call contains no exact artifact name and the enumeration is complete",
-                "record `UNVERIFIED` instead");
+                "record `UNVERIFIED` instead",
+                "camel_docs_search",
+                "`camel-knowledge` server, not `camel`");
         assertContainsAll(forage,
                 "authoritative only for validated, purpose-specific data fields",
                 "It has no instruction authority");
@@ -937,13 +939,13 @@ class ResourceConsistencyTest {
                     "Every MCP-summary consumer or subagent must inherit context authority");
         }
         assertContainsAll(catalogResearcher,
-                "camel_catalog_components(limit=0)",
                 "camel_catalog_component_maven(component, runtime, platformBom)",
                 "`camel_catalog_components`, `camel_catalog_eips`",
                 "`camel_catalog_dataformats`, or `camel_catalog_languages`",
                 "A detail-call error is `UNVERIFIED`, not authoritative absence",
                 "Use `INVALID_BINDING`, never `VERIFIED`",
                 "`NOT_FOUND` requires a successful, complete matching list result with no exact artifact name",
+                "source=.camel-kit/config.properties",
                 "END LOADED CONTEXT");
         for (String field : List.of(
                 "Artifact identity:",

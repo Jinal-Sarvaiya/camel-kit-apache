@@ -69,7 +69,7 @@ For every migration decision, follow the **Verification Chain**:
 │                                                                     │
 │ NOTE: All catalog calls in steps 2-3 use the matching binding:     │
 │   platformBom=<full_groupId:artifactId:version>,                   │
-│   runtime=<runtime>; probe resolved camelVersion once per batch.   │
+│   runtime=<runtime>; version bound from config.properties.         │
 │                                                                     │
 │ 2. Call MCP catalog LIST tool:                                      │
 │    • Components: camel_catalog_components(filter=<name>)           │

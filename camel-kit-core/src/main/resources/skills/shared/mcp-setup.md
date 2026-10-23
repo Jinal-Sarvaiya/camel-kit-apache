@@ -169,13 +169,6 @@ matching list call contains no exact artifact name and the enumeration is comple
 the limit until the returned count is below it; if completeness or the version binding cannot be established, record
 `UNVERIFIED` instead.
 
-### Forward compatibility (Camel 4.23+)
-
-On Camel 4.23 and later (CAMEL-24712), `camel_catalog_components`, `camel_catalog_component_doc`,
-`camel_catalog_eip_doc`, `camel_catalog_dataformat_doc`, and `camel_catalog_language_doc` are removed. They are replaced
-by `camel_catalog_find` and `camel_catalog_doc`. The `runtime` and `platformBom` parameters have no equivalent on 4.23+.
-When targeting 4.23 or later, use the new tool names and omit the removed parameters.
-
 ### Rule 4: Omitting `platformBom` and `camelVersion`
 
 When both are omitted, the MCP server uses its built-in catalog for the server artifact configured by the distribution.

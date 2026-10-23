@@ -60,7 +60,7 @@ Source: Camel MCP catalog responses
 Runtime: [runtime]
 Full platform BOM: [groupId:artifactId:version]
 Resolved Camel version: [camelVersion]
-Catalog binding: camel_catalog_components; requested runtime=[runtime]; requested platformBom=[groupId:artifactId:version]; returned camelVersion=[camelVersion]; binding=MATCHED
+Catalog binding: runtime=[runtime]; platformBom=[groupId:artifactId:version]; source=.camel-kit/config.properties; binding=MATCHED
 
 ### Components
 - Artifact identity: component:kafka

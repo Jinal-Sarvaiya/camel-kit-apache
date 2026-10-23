@@ -80,12 +80,17 @@ bundled in the server, which may be the wrong version.
 | `quarkus` | `io.quarkus.platform:quarkus-camel-bom:<project.platformBomVersion>`
 |===
 
-Before consuming catalog data the skill calls `camel_catalog_components` with `limit=0` and the same binding; the
-result carries the catalog's resolved Camel version without a component payload, and it must match the project's
-version. That probe is the binding for the following calls. Detail tools do not all echo a version, so each artifact
-is validated by type and name against the request instead. A detail-call error is not proof of absence: an artifact
-is recorded as `NOT_FOUND` only after a successful list call with a complete enumeration contains no exact match,
-and as `UNVERIFIED` when completeness or the binding cannot be established.
+The version binding comes from `.camel-kit/config.properties` (`project.runtime`, `project.camelVersion`,
+`project.platformBomVersion`). Every catalog call passes `runtime` and the full `platformBom` GAV derived from those
+properties — those parameters are the binding. Detail tools do not all echo a version, so each artifact is validated
+by type and name against the request instead. A detail-call error is not proof of absence: an artifact is recorded as
+`NOT_FOUND` only after a successful list call with a complete enumeration contains no exact match, and as `UNVERIFIED`
+when completeness or the binding cannot be established.
+
+For behaviour questions — YAML shape, runtime configuration, version changes, header propagation — skills call
+`camel_docs_search` on the `camel-knowledge` server, not `camel`. The knowledge server tools (`camel_docs_search`,
+`camel_docs_component_info`, `camel_docs_cve_search`, `camel_docs_release_info`, `camel_docs_jira_lookup`) complement
+the catalog with documentation search; catalog tools (`camel_catalog_*`) remain on `camel`.
 
 The current defaults are Camel {camel-version} for Camel Main and Spring Boot, with Camel {camel-quarkus-version}
 on the Quarkus platform {quarkus-platform-version}; the catalog server artifact follows the Camel Main stream.

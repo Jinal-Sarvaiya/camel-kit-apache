@@ -148,7 +148,19 @@ class ResourceConsistencyTest {
                     "raw verification log forwarded as an escalation",
                     staleLine("Each phase has an independent iteration budget of 15 attempts. If the same error recurs "
                               + "after a fix attempt, the loop short-circuits and escalates to the user. Unclassified "
-                              + "errors are also escalated with the raw log output.")));
+                              + "errors are also escalated with the raw log output.")),
+            new StalePattern(
+                    "obsolete limit=0 version probe",
+                    Pattern.compile("\\blimit=0\\b")),
+            new StalePattern(
+                    "obsolete probe-resolved-version instruction",
+                    Pattern.compile("probe resolved camelVersion")),
+            new StalePattern(
+                    "obsolete camel_catalog_components probe binding",
+                    Pattern.compile("Catalog binding:\\s*camel_catalog_components")),
+            new StalePattern(
+                    "unsupported 4.23+ tool name camel_catalog_find",
+                    Pattern.compile("\\bcamel_catalog_find\\b")));
 
     @TempDir
     Path tempDir;
@@ -947,6 +959,10 @@ class ResourceConsistencyTest {
                 "`NOT_FOUND` requires a successful, complete matching list result with no exact artifact name",
                 "source=.camel-kit/config.properties",
                 "END LOADED CONTEXT");
+        assertFalse(catalogResearcher.contains("camel_catalog_components(limit=0)"),
+                "Researcher must not require the obsolete limit=0 probe");
+        assertFalse(catalogResearcher.contains("returned camelVersion"),
+                "Researcher output must not require a returned camelVersion from the probe");
         for (String field : List.of(
                 "Artifact identity:",
                 "Runtime:",

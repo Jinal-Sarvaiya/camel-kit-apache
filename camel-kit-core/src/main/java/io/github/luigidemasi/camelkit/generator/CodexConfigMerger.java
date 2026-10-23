@@ -14,22 +14,26 @@ final class CodexConfigMerger {
     static final String BEGIN_MARKER = "# BEGIN CAMEL-KIT MANAGED MCP SERVERS";
     static final String END_MARKER = "# END CAMEL-KIT MANAGED MCP SERVERS";
 
-    private static final List<String> MANAGED_SERVERS = List.of("camel", "camel-knowledge", "citrus");
+    static List<String> managedServers(boolean citrusEnabled) {
+        return citrusEnabled
+                ? List.of("camel", "camel-knowledge", "citrus")
+                : List.of("camel", "camel-knowledge");
+    }
 
-    void merge(Path configFile, String renderedConfig) throws IOException {
+    void merge(Path configFile, String renderedConfig, boolean citrusEnabled) throws IOException {
         validateToml(renderedConfig, "generated Codex MCP configuration");
 
         String managedBlock = BEGIN_MARKER + System.lineSeparator()
                               + renderedConfig.strip() + System.lineSeparator()
                               + END_MARKER;
         String existing = Files.isRegularFile(configFile) ? Files.readString(configFile) : "";
-        String merged = merge(existing, managedBlock);
+        String merged = merge(existing, managedBlock, citrusEnabled);
         validateToml(merged, configFile.toString());
         AtomicFileWriter.write(configFile,
                 merged + (merged.endsWith(System.lineSeparator()) ? "" : System.lineSeparator()));
     }
 
-    private String merge(String existing, String managedBlock) throws IOException {
+    private String merge(String existing, String managedBlock, boolean citrusEnabled) throws IOException {
         if (existing.isBlank()) {
             return managedBlock;
         }
@@ -47,7 +51,7 @@ final class CodexConfigMerger {
 
         Object mcpServers = Toml.parse(existing).get("mcp_servers");
         if (mcpServers instanceof TomlTable servers) {
-            List<String> conflicts = MANAGED_SERVERS.stream()
+            List<String> conflicts = managedServers(citrusEnabled).stream()
                     .filter(server -> servers.get(server) instanceof TomlTable)
                     .toList();
             if (!conflicts.isEmpty()) {

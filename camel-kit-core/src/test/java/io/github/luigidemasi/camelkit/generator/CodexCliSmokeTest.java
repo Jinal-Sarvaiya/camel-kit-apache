@@ -21,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 
 import io.github.luigidemasi.camelkit.config.AgentConfig;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
+import io.github.luigidemasi.camelkit.config.DistributionConfig;
 import io.github.luigidemasi.camelkit.output.Printer;
 import io.github.luigidemasi.camelkit.workflow.WorkflowManifestLoader;
 
@@ -97,6 +98,8 @@ class CodexCliSmokeTest {
                 workspace.resolve(agent.skillsDirectory()),
                 workspace,
                 "camel-kit",
+                DistributionConfig.loadFromClasspathOrDefaults(),
+                true,
                 Printer.noop());
         AgentGeneratorFactory.create("codex").generate(context);
 

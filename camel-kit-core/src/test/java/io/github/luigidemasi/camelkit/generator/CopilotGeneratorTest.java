@@ -9,6 +9,7 @@ import java.util.Set;
 import io.github.luigidemasi.camelkit.config.AgentConfig;
 import io.github.luigidemasi.camelkit.config.AgentDescriptor;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
+import io.github.luigidemasi.camelkit.config.DistributionConfig;
 import io.github.luigidemasi.camelkit.output.Printer;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -35,7 +36,8 @@ class CopilotGeneratorTest {
         Path skillsDir = tempDir.resolve(agent.skillsDirectory());
         return new InitContext(
                 agent, "copilot", skillsDir, skillsDir, tempDir,
-                "camel-kit", Printer.noop());
+                "camel-kit", DistributionConfig.loadFromClasspathOrDefaults(),
+                true, Printer.noop());
     }
 
     @Test

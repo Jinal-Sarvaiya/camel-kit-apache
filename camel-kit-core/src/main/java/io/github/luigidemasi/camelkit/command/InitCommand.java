@@ -48,6 +48,10 @@ public class InitCommand extends CamelKitCommand {
             defaultValue = "default")
     public String citrusVersion;
 
+    @Option(names = {"--with-citrus-mcp"},
+            description = "Include the Citrus MCP server in agent configuration (default: off)")
+    public boolean withCitrusMcp;
+
     @Option(names = {"--no-fetch"}, description = "Skip external catalog fetching")
     public boolean noFetch;
 
@@ -170,6 +174,7 @@ public class InitCommand extends CamelKitCommand {
                 resolvedTargetDir,
                 citrusVersion,
                 noFetch,
+                withCitrusMcp,
                 sourcePlatform,
                 detectCommandPrefix(),
                 CamelKitMain.DEFAULT_CITRUS_VERSION,

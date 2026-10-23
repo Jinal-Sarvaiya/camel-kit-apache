@@ -15,6 +15,7 @@ public record InitRequest(
         Path targetDir,
         String citrusVersion,
         boolean noFetch,
+        boolean withCitrusMcp,
         String sourcePlatform,
         String commandPrefix,
         String defaultCitrusVersion,

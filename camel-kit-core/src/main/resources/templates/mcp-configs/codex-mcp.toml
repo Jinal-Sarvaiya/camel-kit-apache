@@ -19,6 +19,7 @@ args = [
 ]
 enabled_tools = {KNOWLEDGE_TOOLS_JSON}
 default_tools_approval_mode = "prompt"
+{#if CITRUS_ENABLED}
 
 [mcp_servers.citrus]
 command = "jbang"
@@ -30,3 +31,4 @@ args = [
 ]
 enabled_tools = {CITRUS_TOOLS_JSON}
 default_tools_approval_mode = "prompt"
+{/if}

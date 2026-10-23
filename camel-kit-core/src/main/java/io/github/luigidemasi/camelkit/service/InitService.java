@@ -54,7 +54,7 @@ public class InitService {
         InitContext genCtx = new InitContext(
                 agent, request.agentName(), commandsDir,
                 skillsDir, targetDir,
-                request.commandPrefix(), request.distribution(), request.printer());
+                request.commandPrefix(), request.distribution(), request.withCitrusMcp(), request.printer());
         AgentGenerator generator = AgentGeneratorFactory.create(request.agentName());
         requireRealAgentDirectories(targetDir, skillsDir, commandsDir);
         generator.preflight(genCtx);
@@ -156,7 +156,12 @@ public class InitService {
         config.setProperty("agent.name", agentName);
         config.setProperty("agent.folder", agent.folder());
         config.setProperty("citrus.version", request.resolvedCitrusVersion());
-        config.setProperty("citrus.mcp.version", request.distribution().citrusMcpVersion());
+        if (request.withCitrusMcp()) {
+            config.setProperty("citrus.mcp.version", request.distribution().citrusMcpVersion());
+            config.setProperty("citrus.mcp.enabled", "true");
+        } else {
+            config.setProperty("citrus.mcp.enabled", "false");
+        }
         writeVersionConfig(config, request.distribution(), "main");
         if (request.sourcePlatform() != null && !"auto".equals(request.sourcePlatform())) {
             config.setProperty("project.sourcePlatform", request.sourcePlatform());

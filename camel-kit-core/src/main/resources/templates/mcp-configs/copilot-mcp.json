@@ -23,7 +23,7 @@
       ],
       "description": "{KNOWLEDGE_DESCRIPTION}",
       "tools": {KNOWLEDGE_TOOLS_JSON}
-    },
+    }{#if CITRUS_ENABLED},
     "citrus": {
       "type": "stdio",
       "command": "jbang",
@@ -35,6 +35,6 @@
       ],
       "description": "{CITRUS_DESCRIPTION}",
       "tools": {CITRUS_TOOLS_JSON}
-    }
+    }{/if}
   }
 }

@@ -23,7 +23,7 @@
       "description": "{KNOWLEDGE_DESCRIPTION}",
       "directTools": {KNOWLEDGE_TOOLS_JSON},
       "excludeTools": []
-    },
+    }{#if CITRUS_ENABLED},
     "citrus": {
       "command": "jbang",
       "args": [
@@ -35,6 +35,6 @@
       "description": "{CITRUS_DESCRIPTION}",
       "directTools": {CITRUS_TOOLS_JSON},
       "excludeTools": []
-    }
+    }{/if}
   }
 }

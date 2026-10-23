@@ -31,9 +31,10 @@ class McpConfigGenerator {
 
             QuteTemplateEngine qute = new QuteTemplateEngine();
             String template = TemplateUtils.readTemplate(ctx.agent().mcpConfigTemplatePath());
-            String processed = qute.renderString(template, templateData(ctx.distribution(), workflow));
+            String processed
+                    = qute.renderString(template, templateData(ctx.distribution(), workflow, ctx.withCitrusMcp()));
             if ("toml".equals(ctx.agent().mcpConfigFormat())) {
-                new CodexConfigMerger().merge(configFile, processed);
+                new CodexConfigMerger().merge(configFile, processed, ctx.withCitrusMcp());
             } else if ("opencode".equals(ctx.agentName())) {
                 new OpenCodeConfigMerger().merge(configFile, processed);
             } else if ("antigravity".equals(ctx.agentName())) {
@@ -90,7 +91,9 @@ class McpConfigGenerator {
         }
     }
 
-    private Map<String, Object> templateData(DistributionConfig dist, WorkflowManifest workflow) throws IOException {
+    private Map<String, Object> templateData(
+            DistributionConfig dist, WorkflowManifest workflow, boolean withCitrusMcp)
+            throws IOException {
         Map<String, Object> data = new java.util.HashMap<>(
                 VersionPlaceholderResolver.buildVersionTemplateData(dist));
 
@@ -101,6 +104,7 @@ class McpConfigGenerator {
         data.put("KNOWLEDGE_TOOLS_JSON", toJsonArray(knowledgeServer.allowedTools()));
         data.put("KNOWLEDGE_DESCRIPTION", knowledgeServer.description());
 
+        data.put("CITRUS_ENABLED", withCitrusMcp);
         WorkflowManifest.WorkflowMcpServer citrusServer = workflow.mcpServer("citrus");
         data.put("CITRUS_TOOLS_JSON", toJsonArray(citrusServer.allowedTools()));
         data.put("CITRUS_DESCRIPTION", citrusServer.description());

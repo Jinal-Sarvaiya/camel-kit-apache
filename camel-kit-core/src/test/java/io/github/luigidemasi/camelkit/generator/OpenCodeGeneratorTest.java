@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 import io.github.luigidemasi.camelkit.config.AgentConfig;
 import io.github.luigidemasi.camelkit.config.AgentDescriptor;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
+import io.github.luigidemasi.camelkit.config.DistributionConfig;
 import io.github.luigidemasi.camelkit.config.OpenCodeProjectConfig;
 import io.github.luigidemasi.camelkit.output.Printer;
 
@@ -50,7 +51,8 @@ class OpenCodeGeneratorTest {
         Path skillsDir = tempDir.resolve(agentBaseFolder + "/skills");
         return new InitContext(
                 agent, "opencode", commandsDir, skillsDir, tempDir,
-                commandPrefix, Printer.noop());
+                commandPrefix, DistributionConfig.loadFromClasspathOrDefaults(),
+                true, Printer.noop());
     }
 
     @Test

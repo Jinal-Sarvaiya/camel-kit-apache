@@ -2,8 +2,8 @@
   "$schema": "https://opencode.ai/config.json",
   "permission": {
     "camel_*": "ask",
-    "camel-knowledge_*": "ask",
-    "citrus_*": "ask"
+    "camel-knowledge_*": "ask"{#if CITRUS_ENABLED},
+    "citrus_*": "ask"{/if}
   },
   "mcp": {
     "camel": {
@@ -27,7 +27,7 @@
         "io.github.luigidemasi:camel-kit-knowledge-mcp:{KNOWLEDGE_VERSION}:runner"
       ],
       "enabled": true
-    },
+    }{#if CITRUS_ENABLED},
     "citrus": {
       "type": "local",
       "command": [
@@ -38,6 +38,6 @@
         "org.citrusframework:citrus-mcp-server:{CITRUS_MCP_VERSION}:runner"
       ],
       "enabled": true
-    }
+    }{/if}
   }
 }

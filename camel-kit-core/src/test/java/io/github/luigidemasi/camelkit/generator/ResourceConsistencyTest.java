@@ -1658,7 +1658,8 @@ class ResourceConsistencyTest {
         Path skillsDir = projectDir.resolve(agent.skillsDirectory());
         return new InitContext(
                 agent, agentName, commandsDir, skillsDir, projectDir,
-                "camel-kit", Printer.noop());
+                "camel-kit", DistributionConfig.loadFromClasspathOrDefaults(),
+                true, Printer.noop());
     }
 
     private static List<String> sortedAgentNames() {

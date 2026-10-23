@@ -14,6 +14,7 @@ public record InitContext(
         Path projectDir,
         String commandPrefix,
         DistributionConfig distribution,
+        boolean withCitrusMcp,
         Printer printer) {
 
     public InitContext(
@@ -32,6 +33,7 @@ public record InitContext(
              projectDir,
              commandPrefix,
              DistributionConfig.loadFromClasspathOrDefaults(),
+             false,
              printer);
     }
 }

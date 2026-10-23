@@ -12,6 +12,7 @@ import java.util.stream.Collectors;
 import io.github.luigidemasi.camelkit.config.AgentConfig;
 import io.github.luigidemasi.camelkit.config.AgentDescriptor;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
+import io.github.luigidemasi.camelkit.config.DistributionConfig;
 import io.github.luigidemasi.camelkit.output.Printer;
 import io.github.luigidemasi.camelkit.workflow.WorkflowManifest;
 import io.github.luigidemasi.camelkit.workflow.WorkflowManifestLoader;
@@ -118,8 +119,7 @@ class CodexGeneratorTest {
                 ctx.distribution().camelMcpVersion());
         assertServer(servers, "camel-knowledge", workflow.mcpServer("camel-knowledge").allowedTools(),
                 ctx.distribution().knowledgeMcpVersion());
-        assertServer(servers, "citrus", workflow.mcpServer("citrus").allowedTools(),
-                ctx.distribution().citrusMcpVersion());
+        assertNull(servers.get("citrus"), "Citrus server must be absent when not opted in");
     }
 
     @Test
@@ -133,7 +133,7 @@ class CodexGeneratorTest {
                 enabled_tools = ["read"]
                 """);
 
-        new CodexGenerator().generate(createContext(tempDir));
+        new CodexGenerator().generate(createContext(tempDir, true));
 
         TomlParseResult config = Toml.parse(codexDir.resolve("config.toml"));
         assertFalse(config.hasErrors(), config.errors().toString());
@@ -229,6 +229,10 @@ class CodexGeneratorTest {
     }
 
     private InitContext createContext(Path projectDir) {
+        return createContext(projectDir, false);
+    }
+
+    private InitContext createContext(Path projectDir, boolean withCitrusMcp) {
         AgentConfig agent = AgentRegistry.get("codex");
         return new InitContext(
                 agent,
@@ -237,6 +241,8 @@ class CodexGeneratorTest {
                 projectDir.resolve(agent.skillsDirectory()),
                 projectDir,
                 "camel-kit",
+                DistributionConfig.loadFromClasspathOrDefaults(),
+                withCitrusMcp,
                 Printer.noop());
     }
 

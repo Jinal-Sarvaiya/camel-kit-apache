@@ -10,6 +10,7 @@ import java.util.Map;
 import io.github.luigidemasi.camelkit.config.AgentConfig;
 import io.github.luigidemasi.camelkit.config.AgentGeneratorStrategy;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
+import io.github.luigidemasi.camelkit.config.DistributionConfig;
 import io.github.luigidemasi.camelkit.generator.AgentGeneratorFactory;
 import io.github.luigidemasi.camelkit.generator.InitContext;
 import io.github.luigidemasi.camelkit.output.Printer;
@@ -41,8 +42,8 @@ class DoctorServiceTest {
     Path tempDir;
 
     @Test
-    void antigravityMcpUsesNativeSchemaAndRequiresCitrus() throws Exception {
-        createHealthyWorkspace(tempDir, "antigravity");
+    void antigravityMcpUsesNativeSchemaAndRequiresCitrusWhenOptedIn() throws Exception {
+        createHealthyWorkspaceWithCitrus(tempDir, "antigravity");
         Path commented = tempDir.resolve(".agents/mcp_config.json");
         Files.writeString(commented, Files.readString(commented).replaceFirst("\\{", "{ // custom comment\n"));
         DoctorResult healthy = new DoctorService().inspect(new DoctorRequest(tempDir));
@@ -998,81 +999,26 @@ class DoctorServiceTest {
     }
 
     @Test
-    void missingCitrusServerWarnsWithoutVersionPropertiesInLayeredOpenCodeWorkspace() throws Exception {
-        createHealthyWorkspace(tempDir, OPENCODE);
-        writeMcpConfig(tempDir, OPENCODE, """
-                {
-                  "mcp": {
-                    "camel": {"type": "local"},
-                    "camel-knowledge": {"type": "local"}
-                  }
-                }
-                """);
-        Files.writeString(tempDir.resolve("opencode.jsonc"), """
-                {
-                  "permission": {
-                    "camel_*": "ask",
-                    "camel-knowledge_*": "ask"
-                  }
-                }
-                """);
-
-        DoctorResult result = new DoctorService().inspect(new DoctorRequest(tempDir));
-
-        assertFalse(result.hasFailures(), result.findings().toString());
-        assertTrue(hasFinding(result, DoctorFinding.Status.WARN, "mcp",
-                "MCP server 'citrus' is not configured", "Regenerate"));
-        assertFalse(hasFinding(result, DoctorFinding.Status.FAIL, "mcp", "citrus", null));
-        assertFalse(hasFinding(result, DoctorFinding.Status.PASS, "mcp",
-                "uses supported server fields", null));
-
-        markCitrusGenerated(tempDir, "citrus.mcp.version");
-        DoctorResult currentResult = new DoctorService().inspect(new DoctorRequest(tempDir));
-
-        assertTrue(currentResult.hasFailures(), currentResult.findings().toString());
-        assertTrue(hasFinding(currentResult, DoctorFinding.Status.FAIL, "mcp",
-                "MCP server 'citrus' is missing", "Regenerate"));
-        assertFalse(hasFinding(currentResult, DoctorFinding.Status.WARN, "mcp",
-                "MCP server 'citrus' is not configured", null));
-    }
-
-    @Test
-    void missingCitrusServerWarnsWithoutVersionPropertiesForLegacyCapableJsonAgents() throws Exception {
-        for (String agentName : List.of("bob2", CLAUDE, OPENCODE, QWEN)) {
+    void missingCitrusServerPassesWhenNotOptedIn() throws Exception {
+        for (String agentName : List.of("bob2", CLAUDE, OPENCODE, QWEN, COPILOT, PI)) {
             Path root = tempDir.resolve(agentName);
             createHealthyWorkspace(root, agentName);
-            removeCitrusServer(root, agentName);
 
             DoctorResult result = new DoctorService().inspect(new DoctorRequest(root));
 
             assertFalse(result.hasFailures(), agentName + ": " + result.findings());
-            assertTrue(hasFinding(result, DoctorFinding.Status.WARN, "mcp",
-                    "MCP server 'citrus' is not configured", "Regenerate"),
+            assertFalse(hasFinding(result, DoctorFinding.Status.FAIL, "mcp", "citrus", null),
                     agentName + ": " + result.findings());
-            assertFalse(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
-                    "MCP server 'citrus' is missing", null),
-                    agentName + ": " + result.findings());
-            assertFalse(result.findings().stream().anyMatch(finding -> finding.status() == DoctorFinding.Status.PASS
-                    && "mcp".equals(finding.category())),
+            assertFalse(hasFinding(result, DoctorFinding.Status.WARN, "mcp", "citrus", null),
                     agentName + ": " + result.findings());
         }
-
-        Path currentRoot = tempDir.resolve(CLAUDE);
-        markCitrusGenerated(currentRoot, "citrus.version");
-        DoctorResult currentResult = new DoctorService().inspect(new DoctorRequest(currentRoot));
-
-        assertTrue(currentResult.hasFailures(), currentResult.findings().toString());
-        assertTrue(hasFinding(currentResult, DoctorFinding.Status.FAIL, "mcp",
-                "MCP server 'citrus' is missing", "Regenerate"));
-        assertFalse(hasFinding(currentResult, DoctorFinding.Status.WARN, "mcp",
-                "MCP server 'citrus' is not configured", null));
     }
 
     @Test
-    void missingCitrusServerFailsForJsonAgentsIntroducedAfterCitrus() throws Exception {
-        for (String agentName : List.of(COPILOT, PI)) {
-            Path root = tempDir.resolve(agentName);
-            createHealthyWorkspace(root, agentName);
+    void missingCitrusServerFailsWhenOptedIn() throws Exception {
+        for (String agentName : List.of("bob2", CLAUDE, COPILOT, PI, QWEN)) {
+            Path root = tempDir.resolve("enabled-" + agentName);
+            createHealthyWorkspaceWithCitrus(root, agentName);
             removeCitrusServer(root, agentName);
 
             DoctorResult result = new DoctorService().inspect(new DoctorRequest(root));
@@ -1081,10 +1027,20 @@ class DoctorServiceTest {
             assertTrue(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
                     "MCP server 'citrus' is missing", "Regenerate"),
                     agentName + ": " + result.findings());
-            assertFalse(hasFinding(result, DoctorFinding.Status.WARN, "mcp",
-                    "MCP server 'citrus' is not configured", null),
-                    agentName + ": " + result.findings());
         }
+    }
+
+    @Test
+    void missingCitrusServerFailsWithLegacyBackwardCompat() throws Exception {
+        Path root = tempDir.resolve("legacy-citrus");
+        createHealthyWorkspace(root, CLAUDE);
+        markCitrusGenerated(root, "citrus.mcp.version");
+
+        DoctorResult result = new DoctorService().inspect(new DoctorRequest(root));
+
+        assertTrue(result.hasFailures(), result.findings().toString());
+        assertTrue(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "MCP server 'citrus' is missing", "Regenerate"));
     }
 
     @Test
@@ -1098,7 +1054,7 @@ class DoctorServiceTest {
         for (Map.Entry<String, List<String>> schema : schemas.entrySet()) {
             String agentName = schema.getKey();
             Path root = tempDir.resolve(agentName);
-            createHealthyWorkspace(root, agentName);
+            createHealthyWorkspaceWithCitrus(root, agentName);
             Path mcpFile = root.resolve(AgentRegistry.get(agentName).mcpConfigPath());
             ObjectNode config = (ObjectNode) MAPPER.readTree(mcpFile.toFile());
             ObjectNode citrus = (ObjectNode) config.path(AgentRegistry.get(agentName).mcpServerContainerKey())
@@ -1694,6 +1650,31 @@ class DoctorServiceTest {
                 : root.resolve(".codex/commands");
         InitContext context = new InitContext(
                 agent, agentName, commands, root.resolve(agent.skillsDirectory()), root, "camel-kit", Printer.noop());
+        AgentGeneratorFactory.create(agentName).generate(context);
+    }
+
+    private void createHealthyWorkspaceWithCitrus(Path root, String agentName) throws Exception {
+        AgentConfig agent = AgentRegistry.get(agentName);
+        Files.createDirectories(root.resolve(".camel-kit"));
+        Files.writeString(root.resolve(".camel-kit/config.properties"), String.format(Locale.ROOT, """
+                project.name=orders
+                project.command-prefix=camel-kit
+                project.runtime=main
+                project.camelVersion=4.20.0
+                project.platformBomVersion=4.20.0
+                agent.name=%s
+                agent.folder=%s
+                citrus.mcp.enabled=true
+                citrus.mcp.version=5.0.1
+                """, agentName, agent.folder()));
+        Files.writeString(root.resolve(".camel-kit/project-graph.json"), "{}");
+        Files.writeString(root.resolve("mvnw"), "#!/bin/sh\n");
+        Path commands = agent.generatesCommandStubs()
+                ? root.resolve(agent.commandDirectory())
+                : root.resolve(".codex/commands");
+        InitContext context = new InitContext(
+                agent, agentName, commands, root.resolve(agent.skillsDirectory()), root, "camel-kit",
+                DistributionConfig.loadFromClasspathOrDefaults(), true, Printer.noop());
         AgentGeneratorFactory.create(agentName).generate(context);
     }
 

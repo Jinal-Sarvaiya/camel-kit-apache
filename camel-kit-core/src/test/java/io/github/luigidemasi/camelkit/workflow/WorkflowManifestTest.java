@@ -15,6 +15,7 @@ import java.util.stream.Stream;
 
 import io.github.luigidemasi.camelkit.config.AgentConfig;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
+import io.github.luigidemasi.camelkit.config.DistributionConfig;
 import io.github.luigidemasi.camelkit.generator.AgentGeneratorFactory;
 import io.github.luigidemasi.camelkit.generator.DefaultGenerator;
 import io.github.luigidemasi.camelkit.generator.InitContext;
@@ -420,7 +421,8 @@ class WorkflowManifestTest {
                 : skillsDir;
         return new InitContext(
                 agent, agentName, commandsDir, skillsDir, tempDir,
-                "camel-kit", Printer.noop());
+                "camel-kit", DistributionConfig.loadFromClasspathOrDefaults(),
+                true, Printer.noop());
     }
 
     private static Path resourcePath(String resource) throws Exception {

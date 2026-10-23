@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Set;
 
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
+import io.github.luigidemasi.camelkit.config.DistributionConfig;
 import io.github.luigidemasi.camelkit.output.Printer;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -25,7 +26,9 @@ class AntigravityGeneratorTest {
     private InitContext context(String prefix) {
         var agent = AgentRegistry.get("antigravity");
         Path skills = tempDir.resolve(agent.skillsDirectory());
-        return new InitContext(agent, "antigravity", skills, skills, tempDir, prefix, Printer.noop());
+        return new InitContext(
+                agent, "antigravity", skills, skills, tempDir, prefix,
+                DistributionConfig.loadFromClasspathOrDefaults(), true, Printer.noop());
     }
 
     @ParameterizedTest

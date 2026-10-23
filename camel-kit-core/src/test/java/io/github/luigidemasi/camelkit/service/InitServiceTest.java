@@ -56,7 +56,8 @@ class InitServiceTest {
         assertTrue(config.contains("agent.name=bob2"));
         assertTrue(config.contains("project.sourcePlatform=mulesoft"));
         assertTrue(config.contains("citrus.version=5.0.1"));
-        assertTrue(config.contains("citrus.mcp.version=" + EXPECTED_CITRUS_MCP_VERSION));
+        assertTrue(config.contains("citrus.mcp.enabled=false"));
+        assertFalse(config.contains("citrus.mcp.version="));
 
         assertTrue(progress.events().contains("start:Creating project structure"));
         assertTrue(progress.events().contains("start:Generating IBM Bob 2 workspace"));
@@ -65,14 +66,35 @@ class InitServiceTest {
     }
 
     @Test
-    void allAgentsGenerateTheDefaultCitrusRunnerAndPassDoctorMcpChecks() throws Exception {
+    void allAgentsOmitCitrusByDefaultAndPassDoctorMcpChecks() throws Exception {
         for (String agentName : AgentRegistry.names()) {
             Path targetDir = tempDir.resolve(agentName);
             new InitService().initialize(request(targetDir, agentName, InitProgress.noop(), InitReporter.noop()));
 
             String mcp = Files.readString(targetDir.resolve(AgentRegistry.get(agentName).mcpConfigPath()));
+            assertFalse(mcp.contains("citrus-mcp-server"), agentName + ": citrus should be absent by default");
+            DoctorResult result = new DoctorService().inspect(new DoctorRequest(targetDir));
+            assertTrue(result.findings().stream().anyMatch(finding -> "mcp".equals(finding.category())
+                    && finding.status() == DoctorFinding.Status.PASS), agentName + ": " + result.findings());
+            assertFalse(result.findings().stream().anyMatch(finding -> "mcp".equals(finding.category())
+                    && finding.status() == DoctorFinding.Status.FAIL), agentName + ": " + result.findings());
+        }
+    }
+
+    @Test
+    void allAgentsIncludeCitrusWhenOptedInAndPassDoctorMcpChecks() throws Exception {
+        for (String agentName : AgentRegistry.names()) {
+            Path targetDir = tempDir.resolve("citrus-" + agentName);
+            new InitService().initialize(requestWithCitrusMcp(targetDir, agentName));
+
+            String mcp = Files.readString(targetDir.resolve(AgentRegistry.get(agentName).mcpConfigPath()));
             assertTrue(mcp.contains(
                     "org.citrusframework:citrus-mcp-server:" + EXPECTED_CITRUS_MCP_VERSION + ":runner"), agentName);
+
+            String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
+            assertTrue(config.contains("citrus.mcp.enabled=true"), agentName);
+            assertTrue(config.contains("citrus.mcp.version=" + EXPECTED_CITRUS_MCP_VERSION), agentName);
+
             DoctorResult result = new DoctorService().inspect(new DoctorRequest(targetDir));
             assertTrue(result.findings().stream().anyMatch(finding -> "mcp".equals(finding.category())
                     && finding.status() == DoctorFinding.Status.PASS), agentName + ": " + result.findings());
@@ -428,12 +450,14 @@ class InitServiceTest {
         Path targetDir = tempDir.resolve("orders");
 
         InitResult result = new InitService().initialize(
-                request(targetDir, "bob2", "4.9.2", InitProgress.noop(), InitReporter.noop()));
+                request(targetDir, "bob2", "4.9.2", CamelKitMain.distribution(), true, true,
+                        InitProgress.noop(), InitReporter.noop()));
 
         assertEquals("4.9.2", result.citrusVersion());
         String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
         assertTrue(config.contains("citrus.version=4.9.2"));
         assertTrue(config.contains("citrus.mcp.version=" + EXPECTED_CITRUS_MCP_VERSION));
+        assertTrue(config.contains("citrus.mcp.enabled=true"));
         String mcp = Files.readString(targetDir.resolve(".bob/mcp.json"));
         assertTrue(mcp.contains(
                 "org.citrusframework:citrus-mcp-server:" + EXPECTED_CITRUS_MCP_VERSION + ":runner"));
@@ -448,12 +472,14 @@ class InitServiceTest {
         DistributionConfig distribution = DistributionConfig.load(properties);
 
         InitResult result = new InitService().initialize(
-                request(targetDir, "bob2", "4.9.2", distribution, InitProgress.noop(), InitReporter.noop()));
+                request(targetDir, "bob2", "4.9.2", distribution, true, true,
+                        InitProgress.noop(), InitReporter.noop()));
 
         assertEquals("4.9.2", result.citrusVersion());
         String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
         assertTrue(config.contains("citrus.version=4.9.2"));
         assertTrue(config.contains("citrus.mcp.version=4.10.1"));
+        assertTrue(config.contains("citrus.mcp.enabled=true"));
         String mcp = Files.readString(targetDir.resolve(".bob/mcp.json"));
         assertTrue(mcp.contains("org.citrusframework:citrus-mcp-server:4.10.1:runner"));
         assertFalse(mcp.contains("org.citrusframework:citrus-mcp-server:4.9.2:runner"));
@@ -553,6 +579,7 @@ class InitServiceTest {
                 targetDir,
                 "default",
                 true,
+                false,
                 "mulesoft",
                 "camel-kit",
                 "5.0.1",
@@ -578,6 +605,23 @@ class InitServiceTest {
         return entries;
     }
 
+    private InitRequest requestWithCitrusMcp(Path targetDir, String agentName) {
+        return new InitRequest(
+                "orders",
+                agentName,
+                targetDir,
+                "default",
+                true,
+                true,
+                "mulesoft",
+                "camel-kit",
+                "5.0.1",
+                CamelKitMain.distribution(),
+                Printer.noop(),
+                InitProgress.noop(),
+                InitReporter.noop());
+    }
+
     private InitRequest request(
             Path targetDir,
             String agentName,
@@ -594,7 +638,7 @@ class InitServiceTest {
             DistributionConfig distribution,
             InitProgress progress,
             InitReporter reporter) {
-        return request(targetDir, agentName, citrusVersion, distribution, true, progress, reporter);
+        return request(targetDir, agentName, citrusVersion, distribution, true, false, progress, reporter);
     }
 
     private InitRequest request(
@@ -605,12 +649,25 @@ class InitServiceTest {
             boolean noFetch,
             InitProgress progress,
             InitReporter reporter) {
+        return request(targetDir, agentName, citrusVersion, distribution, noFetch, false, progress, reporter);
+    }
+
+    private InitRequest request(
+            Path targetDir,
+            String agentName,
+            String citrusVersion,
+            DistributionConfig distribution,
+            boolean noFetch,
+            boolean withCitrusMcp,
+            InitProgress progress,
+            InitReporter reporter) {
         return new InitRequest(
                 "orders",
                 agentName,
                 targetDir,
                 citrusVersion,
                 noFetch,
+                withCitrusMcp,
                 "mulesoft",
                 "camel-kit",
                 "5.0.1",

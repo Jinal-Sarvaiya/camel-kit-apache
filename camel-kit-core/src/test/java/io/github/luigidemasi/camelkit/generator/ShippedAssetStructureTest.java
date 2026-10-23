@@ -1200,8 +1200,13 @@ class ShippedAssetStructureTest {
             assertInstanceOf(TomlTable.class, servers.get("camel"), agentName + " MCP config missing camel server");
             assertInstanceOf(TomlTable.class, servers.get("camel-knowledge"),
                     agentName + " MCP config missing camel-knowledge server");
-            assertInstanceOf(TomlTable.class, servers.get("citrus"),
-                    agentName + " MCP config missing citrus server");
+            if (ctx.withCitrusMcp()) {
+                assertInstanceOf(TomlTable.class, servers.get("citrus"),
+                        agentName + " MCP config missing citrus server");
+            } else {
+                assertNull(servers.get("citrus"),
+                        agentName + " MCP config must not contain citrus server when not opted in");
+            }
             return;
         }
 
@@ -1210,7 +1215,12 @@ class ShippedAssetStructureTest {
         assertNotNull(servers, agentName + " MCP config missing " + ctx.agent().mcpServerContainerKey());
         assertTrue(servers.has("camel"), agentName + " MCP config missing camel server");
         assertTrue(servers.has("camel-knowledge"), agentName + " MCP config missing camel-knowledge server");
-        assertTrue(servers.has("citrus"), agentName + " MCP config missing citrus server");
+        if (ctx.withCitrusMcp()) {
+            assertTrue(servers.has("citrus"), agentName + " MCP config missing citrus server");
+        } else {
+            assertFalse(servers.has("citrus"),
+                    agentName + " MCP config must not contain citrus server when not opted in");
+        }
     }
 
     private static InitContext createContext(String agentName, Path projectDir) {

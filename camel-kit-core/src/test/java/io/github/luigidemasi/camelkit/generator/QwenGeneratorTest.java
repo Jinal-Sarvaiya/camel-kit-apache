@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import io.github.luigidemasi.camelkit.config.AgentConfig;
 import io.github.luigidemasi.camelkit.config.AgentDescriptor;
 import io.github.luigidemasi.camelkit.config.AgentRegistry;
+import io.github.luigidemasi.camelkit.config.DistributionConfig;
 import io.github.luigidemasi.camelkit.output.Printer;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -30,7 +31,8 @@ class QwenGeneratorTest {
         Path skillsDir = tempDir.resolve(agentBaseFolder + "/skills");
         return new InitContext(
                 agent, "qwen", commandsDir, skillsDir, tempDir,
-                "camel-kit", Printer.noop());
+                "camel-kit", DistributionConfig.loadFromClasspathOrDefaults(),
+                true, Printer.noop());
     }
 
     @Test

@@ -263,7 +263,7 @@ order-processing/
 
 The init command checks prerequisites (Java, JBang, Camel JBang, test plugin), copies skill files, configures MCP, and sets up the Maven wrapper so you can start designing immediately. If the target directory already contains a camel-kit project (`AGENTS.md` or `.camel-kit/`), init warns and exits — use `--force` to overwrite.
 
-With `--ai codex`, both `camel-kit init` and the Camel JBang plugin form `camel kit init` generate repository-scoped Codex resources. Trust the repository so Codex can load `.codex/config.toml`; Codex also skips any user-added project hooks until trust. Then start with `$camel-start`; `/skills` lists project skills and `/mcp` shows the three configured servers. Camel-Kit preserves unrelated valid project config, does not create `.codex/commands/`, and does not change global Codex settings, authentication, or hooks.
+With `--ai codex`, both `camel-kit init` and the Camel JBang plugin form `camel kit init` generate repository-scoped Codex resources. Trust the repository so Codex can load `.codex/config.toml`; Codex also skips any user-added project hooks until trust. Then start with `$camel-start`; `/skills` lists project skills and `/mcp` shows the configured servers (two by default; three with `--with-citrus-mcp`). Camel-Kit preserves unrelated valid project config, does not create `.codex/commands/`, and does not change global Codex settings, authentication, or hooks.
 
 ### Validating the Workspace
 

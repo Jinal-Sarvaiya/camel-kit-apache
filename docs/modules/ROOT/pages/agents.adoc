@@ -19,9 +19,9 @@ workflow is the same everywhere and only the way you invoke it differs.
 |===
 
 The generated assets and the MCP configuration file of each target are listed in
-xref:index.adoc#agents[the overview]. Every target gets the same three MCP servers, `camel` (catalog, route
-validation, migration and security analysis), `camel-knowledge` (documentation, CVE, release and component search)
-and `citrus` (test actions, endpoints and schemas), configured as local JBang processes whose versions come from the
+xref:index.adoc#agents[the overview]. Every target gets two MCP servers by default — `camel` (catalog, route
+validation, migration and security analysis) and `camel-knowledge` (documentation, CVE, release and component search)
+— with an optional third, `citrus` (test actions, endpoints and schemas), enabled via `--with-citrus-mcp`. All are configured as local JBang processes whose versions come from the
 Camel Kit distribution. See xref:mcp.adoc[].
 
 The pipeline skills delegate independent implementation and review tasks to fresh subagent contexts where the agent
@@ -72,7 +72,7 @@ camel-kit init my-integration --ai antigravity
 `init` writes `AGENTS.md`, the skills under `.agents/skills/`, two custom agents under `.agents/agents/`
 (`camel-worker` with file and sandboxed command tools, `camel-reviewer` with read and search tools plus the
 inherited MCP access), the role
-personas under `.agents/camel-kit-personas/` and the three MCP servers in `.agents/mcp_config.json`. Open the
+personas under `.agents/camel-kit-personas/` and the MCP servers in `.agents/mcp_config.json` (two by default; three with `--with-citrus-mcp`). Open the
 project root in Antigravity and invoke `/camel-start` in the CLI, or ask it to use the `camel-start` skill by name;
 `/skills` lists the native skills and `/mcp` the connections.
 
@@ -93,7 +93,7 @@ codex
 
 `init` writes `AGENTS.md`, the skills under `.agents/skills/`, the custom agent roles under `.codex/agents/`
 (planner, implementer, tester, validator, migrator, catalog researcher and security reviewer; the development
-snapshot adds a Ship worker) and the three MCP servers in `.codex/config.toml`. It does not create `.codex/commands/`: Codex discovers the skills
+snapshot adds a Ship worker) and the MCP servers in `.codex/config.toml` (two by default; three with `--with-citrus-mcp`). It does not create `.codex/commands/`: Codex discovers the skills
 directly, so you start with `$camel-start` after trusting the repository, and inspect skills with `/skills` and
 servers with `/mcp`.
 
@@ -105,7 +105,7 @@ is blocked: repository trust lets the project configuration load, it is not a re
 `default_tools_approval_mode = "prompt"`. If `.codex/config.toml` already exists with valid unrelated settings they
 are preserved; invalid TOML or a conflicting server table makes `init` fail without changing the file.
 
-`camel-kit doctor` validates the TOML, the three server tables and their allowlists, the prompt approval defaults,
+`camel-kit doctor` validates the TOML, the server tables and their allowlists, the prompt approval defaults,
 the skills, the required custom-agent fields and the read-only sandbox of the research and security agents.
 
 [[copilot]]

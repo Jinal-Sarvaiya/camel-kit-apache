@@ -18,8 +18,8 @@ Open the initialized project root in Antigravity. Invoke `/camel-start` in the C
 name skills; some clients expose a different picker or support activation by name. Codex uses `$camel-start`.
 
 Camel-Kit installs shared skills under `.agents/skills/`, two custom agents under `.agents/agents/`, complete role
-personas under `.agents/camel-kit-personas/`, project routing in `AGENTS.md`, and three MCP servers in
-`.agents/mcp_config.json`: Camel, Camel Knowledge, and Citrus. Inspect connections in Antigravity's MCP settings
+personas under `.agents/camel-kit-personas/`, project routing in `AGENTS.md`, and MCP servers in
+`.agents/mcp_config.json`: Camel and Camel Knowledge by default, plus Citrus when `--with-citrus-mcp` is passed. Inspect connections in Antigravity's MCP settings
 or `/mcp` in the CLI. Existing unrelated MCP servers, settings, and comments are preserved on reinitialization. Tool calls
 remain subject to Antigravity's permissions; Camel-Kit does not generate MCP auto-approval policies.
 

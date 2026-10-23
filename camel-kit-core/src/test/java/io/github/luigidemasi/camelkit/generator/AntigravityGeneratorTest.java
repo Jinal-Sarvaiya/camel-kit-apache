@@ -12,6 +12,7 @@ import io.github.luigidemasi.camelkit.output.Printer;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
+import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
@@ -24,11 +25,15 @@ class AntigravityGeneratorTest {
     Path tempDir;
 
     private InitContext context(String prefix) {
+        return context(prefix, true);
+    }
+
+    private InitContext context(String prefix, boolean withCitrusMcp) {
         var agent = AgentRegistry.get("antigravity");
         Path skills = tempDir.resolve(agent.skillsDirectory());
         return new InitContext(
                 agent, "antigravity", skills, skills, tempDir, prefix,
-                DistributionConfig.loadFromClasspathOrDefaults(), true, Printer.noop());
+                DistributionConfig.loadFromClasspathOrDefaults(), withCitrusMcp, Printer.noop());
     }
 
     @ParameterizedTest
@@ -165,5 +170,21 @@ class AntigravityGeneratorTest {
         new AntigravityGenerator().generate(context("camel-kit"));
 
         assertEquals(kept, Files.readString(context));
+    }
+
+    @Test
+    void regenerationWithoutCitrusRemovesPreviousCitrusServer() throws Exception {
+        new AntigravityGenerator().generate(context("camel-kit", true));
+        Path mcpFile = tempDir.resolve(".agents/mcp_config.json");
+        ObjectMapper mapper = new ObjectMapper();
+        JsonNode withCitrus = mapper.readTree(Files.readString(mcpFile));
+        assertTrue(withCitrus.path("mcpServers").has("citrus"), "citrus must be present after opt-in init");
+
+        new AntigravityGenerator().generate(context("camel-kit", false));
+        JsonNode withoutCitrus = mapper.readTree(Files.readString(mcpFile));
+        assertFalse(withoutCitrus.path("mcpServers").has("citrus"),
+                "citrus must be removed after opt-out regeneration");
+        assertTrue(withoutCitrus.path("mcpServers").has("camel"), "camel must remain");
+        assertTrue(withoutCitrus.path("mcpServers").has("camel-knowledge"), "camel-knowledge must remain");
     }
 }

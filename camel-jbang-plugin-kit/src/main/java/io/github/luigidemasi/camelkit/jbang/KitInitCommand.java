@@ -53,6 +53,10 @@ public class KitInitCommand extends CamelCommand {
             description = "Override config property: -p key=value (repeatable)")
     List<String> properties;
 
+    @Option(names = {"--with-citrus-mcp"},
+            description = "Include the Citrus MCP server in agent configuration (default: off)")
+    boolean withCitrusMcp;
+
     @Option(names = {"--source-platform"},
             description = "Source platform for migration graph analysis: mulesoft, camel, biztalk, auto (default: auto)")
     String sourcePlatform;
@@ -81,6 +85,7 @@ public class KitInitCommand extends CamelCommand {
         initCommand.silent = this.silent;
         initCommand.configFile = this.configFile;
         initCommand.properties = this.properties;
+        initCommand.withCitrusMcp = this.withCitrusMcp;
         initCommand.sourcePlatform = this.sourcePlatform;
 
         return initCommand.call();

@@ -20,7 +20,7 @@ camel-kit init order-processing --ai claude
 cd order-processing
 ----
 
-The agent now has the Camel Kit skills and the three MCP servers. The first pipeline run needs an active pipeline
+The agent now has the Camel Kit skills and the MCP servers (two by default; three with `--with-citrus-mcp`). The first pipeline run needs an active pipeline
 ID, which `init` does not create; `/camel-brainstorm` asks you to create it when none exists:
 
 [source,bash]

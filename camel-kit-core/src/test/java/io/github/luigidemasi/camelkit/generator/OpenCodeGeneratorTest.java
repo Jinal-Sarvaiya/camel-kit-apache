@@ -45,6 +45,10 @@ class OpenCodeGeneratorTest {
     }
 
     private InitContext createContext(String commandPrefix) {
+        return createContext(commandPrefix, true);
+    }
+
+    private InitContext createContext(String commandPrefix, boolean withCitrusMcp) {
         AgentConfig agent = AgentRegistry.get("opencode");
         String agentBaseFolder = agent.folder().substring(0, agent.folder().lastIndexOf("/"));
         Path commandsDir = tempDir.resolve(agent.folder());
@@ -52,7 +56,7 @@ class OpenCodeGeneratorTest {
         return new InitContext(
                 agent, "opencode", commandsDir, skillsDir, tempDir,
                 commandPrefix, DistributionConfig.loadFromClasspathOrDefaults(),
-                true, Printer.noop());
+                withCitrusMcp, Printer.noop());
     }
 
     @Test
@@ -653,7 +657,7 @@ class OpenCodeGeneratorTest {
                       "permission": {"camel_*": "ask"},
                       "mcp": {"camel": {"type": "local"}}
                     }
-                    """));
+                    """, true));
         } finally {
             Files.setPosixFilePermissions(higherDirectory, originalPermissions);
         }
@@ -815,5 +819,23 @@ class OpenCodeGeneratorTest {
 
         // MCP config exists
         assertTrue(Files.exists(tempDir.resolve("opencode.json")));
+    }
+
+    @Test
+    void regenerationWithoutCitrusRemovesPreviousCitrusEntries() throws Exception {
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+        Path configFile = tempDir.resolve("opencode.json");
+        String withCitrus = Files.readString(configFile);
+        assertTrue(withCitrus.contains("\"citrus\""), "citrus mcp must be present after opt-in init");
+        assertTrue(withCitrus.contains("\"citrus_*\""), "citrus_* permission must be present after opt-in init");
+
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+        String withoutCitrus = Files.readString(configFile);
+        assertFalse(withoutCitrus.contains("\"citrus\""),
+                "citrus mcp must be removed after opt-out regeneration");
+        assertFalse(withoutCitrus.contains("\"citrus_*\""),
+                "citrus_* permission must be removed after opt-out regeneration");
+        assertTrue(withoutCitrus.contains("\"camel\""), "camel mcp must remain");
+        assertTrue(withoutCitrus.contains("\"camel_*\""), "camel_* permission must remain");
     }
 }

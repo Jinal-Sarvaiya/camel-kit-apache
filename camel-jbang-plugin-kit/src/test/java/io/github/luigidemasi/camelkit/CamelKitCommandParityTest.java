@@ -58,6 +58,55 @@ class CamelKitCommandParityTest {
         }
     }
 
+    @Test
+    void pluginForwardsWithCitrusMcpOption() throws Exception {
+        CamelKitMain standaloneMain = new CamelKitMain();
+        standaloneMain.disableTui();
+        CommandLine standalone = CamelKitMain.commandLine(standaloneMain);
+        CamelJBangMain main = new CamelJBangMain();
+        CommandLine plugin = new CommandLine(main);
+        new CamelKitPlugin().customize(plugin, main);
+
+        Path standaloneDefault = tempDir.resolve("standalone-default");
+        Path pluginDefault = tempDir.resolve("plugin-default");
+        Path standaloneCitrus = tempDir.resolve("standalone-citrus");
+        Path pluginCitrus = tempDir.resolve("plugin-citrus");
+
+        assertEquals(0, standalone.execute("init", standaloneDefault.toString(), "--ai", "bob2",
+                "--silent", "--no-fetch"));
+        assertEquals(0, plugin.execute("kit", "init", pluginDefault.toString(), "--ai", "bob2",
+                "--silent", "--no-fetch"));
+        assertEquals(0, standalone.execute("init", standaloneCitrus.toString(), "--ai", "bob2",
+                "--silent", "--no-fetch", "--with-citrus-mcp"));
+        assertEquals(0, plugin.execute("kit", "init", pluginCitrus.toString(), "--ai", "bob2",
+                "--silent", "--no-fetch", "--with-citrus-mcp"));
+
+        Properties defaultProps = loadConfig(standaloneDefault);
+        Properties pluginDefaultProps = loadConfig(pluginDefault);
+        Properties citrusProps = loadConfig(standaloneCitrus);
+        Properties pluginCitrusProps = loadConfig(pluginCitrus);
+
+        assertEquals("false", defaultProps.getProperty("citrus.mcp.enabled"));
+        assertEquals("false", pluginDefaultProps.getProperty("citrus.mcp.enabled"));
+        assertEquals("true", citrusProps.getProperty("citrus.mcp.enabled"));
+        assertEquals("true", pluginCitrusProps.getProperty("citrus.mcp.enabled"));
+
+        String defaultMcp = Files.readString(standaloneDefault.resolve(".bob/mcp.json"));
+        String citrusMcp = Files.readString(standaloneCitrus.resolve(".bob/mcp.json"));
+        String pluginCitrusMcp = Files.readString(pluginCitrus.resolve(".bob/mcp.json"));
+        assertFalse(defaultMcp.contains("\"citrus\""), "Default init must not include citrus MCP server");
+        assertTrue(citrusMcp.contains("\"citrus\""), "Standalone --with-citrus-mcp must include citrus");
+        assertTrue(pluginCitrusMcp.contains("\"citrus\""), "Plugin --with-citrus-mcp must include citrus");
+    }
+
+    private Properties loadConfig(Path workspace) throws Exception {
+        Properties config = new Properties();
+        try (var input = Files.newInputStream(workspace.resolve(".camel-kit/config.properties"))) {
+            config.load(input);
+        }
+        return config;
+    }
+
     @ParameterizedTest
     @CsvSource({"false,bob2", "true,bob2", "false,copilot", "true,copilot", "false,claude", "true,claude"})
     void nativeInitAndRegenerationDetectThePrefixInSeparateProcesses(boolean plugin, String agent) throws Exception {

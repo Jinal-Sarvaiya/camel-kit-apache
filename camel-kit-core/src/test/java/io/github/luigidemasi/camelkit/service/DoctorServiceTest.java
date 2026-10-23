@@ -1321,6 +1321,36 @@ class DoctorServiceTest {
     }
 
     @Test
+    void malformedCodexCitrusEntryFailsWhenOptInAbsent() throws Exception {
+        createHealthyWorkspace(tempDir, CODEX);
+        Path config = tempDir.resolve(".codex/config.toml");
+        Files.writeString(config, Files.readString(config) + "\n[mcp_servers]\ncitrus = \"invalid-server\"\n");
+
+        DoctorResult result = new DoctorService().inspect(new DoctorRequest(tempDir));
+
+        assertTrue(result.hasFailures(), result.findings().toString());
+        assertTrue(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "Codex MCP server 'citrus' is missing",
+                "camel-kit init --here --ai codex --force"));
+    }
+
+    @Test
+    void malformedCodexCitrusEntryFailsWhenOptInExplicitlyFalse() throws Exception {
+        createHealthyWorkspace(tempDir, CODEX);
+        Path props = tempDir.resolve(".camel-kit/config.properties");
+        Files.writeString(props, Files.readString(props) + "citrus.mcp.enabled=false\n");
+        Path config = tempDir.resolve(".codex/config.toml");
+        Files.writeString(config, Files.readString(config) + "\n[mcp_servers]\ncitrus = \"invalid-server\"\n");
+
+        DoctorResult result = new DoctorService().inspect(new DoctorRequest(tempDir));
+
+        assertTrue(result.hasFailures(), result.findings().toString());
+        assertTrue(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "Codex MCP server 'citrus' is missing",
+                "camel-kit init --here --ai codex --force"));
+    }
+
+    @Test
     void missingCodexCustomAgentProducesActionableFailure() throws Exception {
         createHealthyWorkspace(tempDir, CODEX);
         Files.delete(tempDir.resolve(".codex/agents/camel-implementer.toml"));

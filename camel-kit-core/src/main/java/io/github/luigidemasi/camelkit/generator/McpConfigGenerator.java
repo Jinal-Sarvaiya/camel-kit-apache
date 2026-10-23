@@ -36,24 +36,34 @@ class McpConfigGenerator {
             if ("toml".equals(ctx.agent().mcpConfigFormat())) {
                 new CodexConfigMerger().merge(configFile, processed, ctx.withCitrusMcp());
             } else if ("opencode".equals(ctx.agentName())) {
-                new OpenCodeConfigMerger().merge(configFile, processed);
+                new OpenCodeConfigMerger().merge(configFile, processed, ctx.withCitrusMcp());
             } else if ("antigravity".equals(ctx.agentName())) {
                 ObjectNode config = readAntigravityConfig(configFile);
                 ObjectNode generated = (ObjectNode) JSON_MAPPER.readTree(processed).path("mcpServers");
                 if (!Files.exists(configFile)) {
                     AtomicFileWriter.write(configFile, processed);
-                } else if (!generated.properties().stream()
-                        .allMatch(server -> server.getValue().equals(config.path("mcpServers").get(server.getKey())))) {
-                    String original = Files.readString(configFile);
-                    String bom = original.startsWith("\uFEFF") ? "\uFEFF" : "";
-                    JsoncObjectEditor editor = new JsoncObjectEditor(original.substring(bom.length()));
-                    if (!config.has("mcpServers")) {
-                        editor.upsertRootMember("mcpServers", generated);
-                    } else {
-                        editor.removeObjectMembers("mcpServers", generated.fieldNames());
-                        editor.appendObjectMembers("mcpServers", generated);
+                } else {
+                    boolean needsUpdate = !generated.properties().stream()
+                            .allMatch(server -> server.getValue()
+                                    .equals(config.path("mcpServers").get(server.getKey())));
+                    boolean needsCitrusRemoval = !ctx.withCitrusMcp()
+                            && config.path("mcpServers").has("citrus");
+                    if (needsUpdate || needsCitrusRemoval) {
+                        String original = Files.readString(configFile);
+                        String bom = original.startsWith("\uFEFF") ? "\uFEFF" : "";
+                        JsoncObjectEditor editor = new JsoncObjectEditor(original.substring(bom.length()));
+                        if (!config.has("mcpServers")) {
+                            editor.upsertRootMember("mcpServers", generated);
+                        } else {
+                            editor.removeObjectMembers("mcpServers", generated.fieldNames());
+                            if (needsCitrusRemoval) {
+                                editor.removeObjectMembers("mcpServers",
+                                        java.util.Collections.singletonList("citrus").iterator());
+                            }
+                            editor.appendObjectMembers("mcpServers", generated);
+                        }
+                        AtomicFileWriter.write(configFile, bom + editor.content());
                     }
-                    AtomicFileWriter.write(configFile, bom + editor.content());
                 }
             } else {
                 Files.writeString(configFile, processed);

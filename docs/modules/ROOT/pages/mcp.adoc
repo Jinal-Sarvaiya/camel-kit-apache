@@ -1,7 +1,7 @@
 = MCP servers
 
 Camel Kit uses the Model Context Protocol to verify Camel configuration, to guide Citrus test generation and to
-search documentation without loading whole catalogs into the agent's context. `init` configures three local servers
+search documentation without loading whole catalogs into the agent's context. `init` configures two local servers by default (three with `--with-citrus-mcp`)
 in the agent's MCP configuration file (see xref:agents.adoc[] for the file of each target); the agent starts each
 one with JBang when a skill first needs it, and JBang resolves the runner and the catalog artifacts from the
 configured repositories.

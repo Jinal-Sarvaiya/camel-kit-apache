@@ -22,7 +22,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Make Citrus MCP server opt-in (#109)** — `camel-kit init` no longer writes Citrus MCP server
   configuration by default. Pass `--with-citrus-mcp` to include it. Workspaces created before this
   change that have `citrus.mcp.version` but no `citrus.mcp.enabled` are treated as implicitly opted
-  in for backward compatibility. `camel-kit doctor` skips Citrus health checks when not opted in.
+  in for backward compatibility. `camel-kit doctor` permits an absent Citrus server when not opted in,
+  but validates any present Citrus server regardless of the opt-in setting. Regeneration without
+  `--with-citrus-mcp` removes previously generated Citrus entries from OpenCode and Antigravity configs.
 - **Claude Code native skill discovery (#243)** — skills are now installed to `.claude/skills/` with
   `user-invocable` and `description` frontmatter so Claude Code discovers them natively without command stubs.
   Legacy `.claude/commands/camel-*.md` stubs are cleaned up on regeneration; user-created commands are preserved.

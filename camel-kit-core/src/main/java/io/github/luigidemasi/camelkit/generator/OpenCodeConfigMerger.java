@@ -27,7 +27,7 @@ final class OpenCodeConfigMerger {
         }
     }
 
-    void merge(Path configFile, String renderedConfig) throws IOException {
+    void merge(Path configFile, String renderedConfig, boolean withCitrusMcp) throws IOException {
         ObjectNode generated = readObject(renderedConfig, "generated OpenCode configuration", false);
         requireGeneratedObject(generated, "permission");
         requireGeneratedObject(generated, "mcp");
@@ -47,21 +47,23 @@ final class OpenCodeConfigMerger {
         List<PendingWrite> writes = new ArrayList<>();
         for (int i = 0; i < configurations.size() - 1; i++) {
             ExistingConfiguration configuration = configurations.get(i);
-            String updated = removeManagedEntries(configuration.content(), generated);
+            String updated = removeManagedEntries(configuration.content(), generated, withCitrusMcp);
             if (!updated.equals(configuration.content())) {
                 writes.add(new PendingWrite(configuration.path(), updated));
             }
         }
 
         ExistingConfiguration highest = configurations.get(configurations.size() - 1);
-        String merged = mergeGenerated(highest, generated);
+        String merged = mergeGenerated(highest, generated, withCitrusMcp);
         if (!merged.equals(highest.content())) {
             writes.add(new PendingWrite(highest.path(), merged));
         }
         writeAll(writes);
     }
 
-    private String removeManagedEntries(String content, ObjectNode generated) throws IOException {
+    private String removeManagedEntries(
+            String content, ObjectNode generated, boolean withCitrusMcp)
+            throws IOException {
         String body = contentWithoutBom(content);
         if (body.isBlank()) {
             return content;
@@ -69,6 +71,9 @@ final class OpenCodeConfigMerger {
         JsoncObjectEditor editor = new JsoncObjectEditor(body);
         removeObjectEntries(editor, generated, "permission");
         removeObjectEntries(editor, generated, "mcp");
+        if (!withCitrusMcp) {
+            removeCitrusEntries(editor);
+        }
         return bom(content) + editor.content();
     }
 
@@ -77,7 +82,15 @@ final class OpenCodeConfigMerger {
         editor.removeObjectMembers(field, generatedObject.fieldNames());
     }
 
-    private String mergeGenerated(ExistingConfiguration existing, ObjectNode generated) throws IOException {
+    private void removeCitrusEntries(JsoncObjectEditor editor) {
+        editor.removeObjectMembers("mcp", java.util.Collections.singletonList("citrus").iterator());
+        editor.removeObjectMembers("permission",
+                List.of("citrus_*").iterator());
+    }
+
+    private String mergeGenerated(
+            ExistingConfiguration existing, ObjectNode generated, boolean withCitrusMcp)
+            throws IOException {
         if (isCurrentAndOrdered(existing, generated)) {
             return existing.content();
         }
@@ -100,6 +113,9 @@ final class OpenCodeConfigMerger {
         });
         mergeObject(editor, existing.config(), generated, "permission");
         mergeObject(editor, existing.config(), generated, "mcp");
+        if (!withCitrusMcp) {
+            removeCitrusEntries(editor);
+        }
         return prefix + editor.content();
     }
 

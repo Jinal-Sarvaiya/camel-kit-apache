@@ -735,7 +735,7 @@ public class DoctorService {
             codexCitrusEnabled = true;
         }
         boolean citrusOk;
-        if (codexCitrusEnabled || servers.get("citrus") instanceof TomlTable) {
+        if (codexCitrusEnabled || servers.contains("citrus")) {
             citrusOk = checkCodexMcpServer(
                     root, mcpFile, servers, "citrus", expectations.citrusMcpTools(), findings);
         } else {

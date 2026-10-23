@@ -293,7 +293,7 @@ questions, arguments, and phase handoffs. Users can also invoke bounded subagent
 |------|---------|
 | `templates/shared/agents-md.md` | Shared `AGENTS.md` bootstrap rendered by `AgentsMdGenerator` (includes Camel 4.22 YAML DSL rules) |
 | `templates/opencode/agents/*.md` | 9 agent definitions with per-type permissions and agent-owned step limits |
-| `templates/mcp-configs/opencode-mcp.json` | Supported MCP server fields plus top-level `ask` patterns for all three server tool namespaces |
+| `templates/mcp-configs/opencode-mcp.json` | Supported MCP server fields plus top-level `ask` patterns for all configured server tool namespaces |
 
 Camel-Kit generates `AGENTS.md` through the shared generator flow. Its compact bootstrap points to `/camel-start`, which loads the full context through progressive skill loading.
 When any supported project configuration already exists (`opencode.json`, `opencode.jsonc`,

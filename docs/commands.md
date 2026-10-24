@@ -283,6 +283,13 @@ internal helpers remain hidden. Empty public skill files and unparseable metadat
 
 `doctor` validates `.camel-kit/config.properties`, selected agent command stubs when that target uses them, skill directories and `SKILL.md` files, registered workspace templates, user-invocable command exposure, runtime-supported MCP filtering and permission fields, graph availability, command prefix configuration, Java/Maven/JBang prerequisites, and common stale references in active generated files. For Codex, it parses `.codex/config.toml`, checks the exact MCP allowlists and prompt approval modes, and verifies that every generated custom-agent TOML file declares `name`, `description`, and `developer_instructions`. For Qwen it checks `includeTools` and prompt-preserving `trust`; for OpenCode it checks the generated server-tool `ask` patterns. Legacy Qwen/OpenCode configurations that predate those fields produce upgrade warnings rather than failures, while malformed current configurations fail. Internal skills such as `camel-verify` must exist as skills, but must not be exposed as user command stubs.
 
+In the development snapshot, Citrus MCP configuration is optional. When the project has not opted in,
+`doctor` accepts a missing `citrus` entry; when opted in, a missing entry is a failure. Any existing Citrus
+entry is validated, including the tool filtering and permission fields supported by the target. An invalid
+entry produces a `FAIL` finding and exit code 1 even when the project has not opted in. These checks inspect
+configuration without starting the Citrus server or testing its availability. For compatibility,
+projects with `citrus.mcp.version` but no `citrus.mcp.enabled` are treated as opted in.
+
 Findings are printed as `PASS`, `WARN`, or `FAIL`. Missing external prerequisites are warnings so automated checks do not depend on the local machine having every optional tool installed. Broken generated workspace artifacts are failures and produce a non-zero exit code.
 
 ### camel-kit graph

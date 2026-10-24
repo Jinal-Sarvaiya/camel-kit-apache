@@ -71,6 +71,13 @@ evaluates all configuration layers as one and names the file that defines each r
 current filter and permission fields produce upgrade warnings; malformed current ones fail. Internal skills must
 exist as skills but must not be exposed as command stubs.
 
+In the development snapshot, Citrus MCP configuration is optional. When the project has not opted in,
+`doctor` accepts a missing `citrus` entry; when opted in, a missing entry is a failure. Any existing Citrus
+entry is validated, including the tool filtering and permission fields supported by the target. An invalid
+entry produces a `FAIL` finding and exit code 1 even when the project has not opted in. These checks inspect
+configuration without starting the Citrus server or testing its availability. For compatibility,
+projects with `citrus.mcp.version` but no `citrus.mcp.enabled` are treated as opted in.
+
 [[nextid]]
 === nextId
 

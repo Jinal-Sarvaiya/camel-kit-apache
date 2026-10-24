@@ -19,7 +19,7 @@ workflow is the same everywhere and only the way you invoke it differs.
 |===
 
 The generated assets and the MCP configuration file of each target are listed in
-xref:index.adoc#agents[the overview]. Every target gets two MCP servers by default — `camel` (catalog, route
+xref:index.adoc#agents[the overview]. Every target gets two MCP servers by default _(development snapshot; released versions include all three)_ — `camel` (catalog, route
 validation, migration and security analysis) and `camel-knowledge` (documentation, CVE, release and component search)
 — with an optional third, `citrus` (test actions, endpoints and schemas), enabled via `--with-citrus-mcp`. All are configured as local JBang processes whose versions come from the
 Camel Kit distribution. See xref:mcp.adoc[].

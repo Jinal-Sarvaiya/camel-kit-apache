@@ -31,8 +31,9 @@ camel-kit init --here [options]
 | `--source-platform` | `auto` | Source platform of a migration: `mulesoft`, `biztalk`, `camel` or `auto`
 | `--citrus-version` | the configured `citrus.version` ({citrus-version}) | Citrus version for the test schemas
   and the generated test dependencies
-| `--with-citrus-mcp` | `false` | Include the Citrus MCP server in agent configuration. When omitted, no Citrus
-  server is generated; use this flag if your project needs Citrus test integration.
+| `--with-citrus-mcp` | `false` | _(development snapshot only)_ Include the Citrus MCP server in agent
+  configuration. When omitted, no Citrus server is generated; use this flag if your project needs
+  Citrus test integration. Released versions (0.4.1 and earlier) include Citrus by default.
 | `--no-fetch` | `false` | Skip the external catalog fetch
 | `-p`, `--property` | | Override a configuration property, repeatable: `-p "camel.main.version=4.18.4"`
 | `-c`, `--config` | `~/.camel-kit/config.properties` | Configuration properties file

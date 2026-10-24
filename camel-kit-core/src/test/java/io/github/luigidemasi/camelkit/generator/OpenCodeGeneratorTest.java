@@ -838,4 +838,81 @@ class OpenCodeGeneratorTest {
         assertTrue(withoutCitrus.contains("\"camel\""), "camel mcp must remain");
         assertTrue(withoutCitrus.contains("\"camel_*\""), "camel_* permission must remain");
     }
+
+    @Test
+    void regenerationRemovesCitrusWhenPermissionsReorderedBeforeGenerated() throws Exception {
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+        Path configFile = tempDir.resolve("opencode.json");
+        String current = Files.readString(configFile);
+        assertTrue(current.contains("\"citrus_*\""), "citrus_* must be present after opt-in init");
+        int camelPos = current.indexOf("\"camel_*\"");
+        int citrusPos = current.indexOf("\"citrus_*\"");
+        assertTrue(camelPos < citrusPos, "camel_* must appear before citrus_* in generated output");
+
+        String reordered = current
+                .replaceFirst("\"camel_\\*\" : \"ask\",", "")
+                .replaceFirst("\"camel-knowledge_\\*\" : \"ask\",", "")
+                .replace("\"citrus_*\" : \"ask\"",
+                        "\"citrus_*\" : \"ask\",\n    \"camel_*\" : \"ask\",\n    \"camel-knowledge_*\" : \"ask\"");
+        assertTrue(reordered.indexOf("\"citrus_*\"") < reordered.indexOf("\"camel_*\""),
+                "citrus_* must now appear before camel_*");
+        Files.writeString(configFile, reordered);
+
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+        String result = Files.readString(configFile);
+        assertFalse(result.contains("\"citrus\""), "citrus mcp must be removed");
+        assertFalse(result.contains("\"citrus_*\""), "citrus_* permission must be removed");
+        assertTrue(result.contains("\"camel\""), "camel mcp must remain");
+        assertTrue(result.contains("\"camel_*\""), "camel_* permission must remain");
+    }
+
+    @Test
+    void regenerationRemovesCitrusFromLowerLayerWithHigherLayer() throws Exception {
+        Files.writeString(tempDir.resolve("opencode.json"), """
+                {
+                  "permission": {"citrus_*": "ask", "camel_*": "ask"},
+                  "mcp": {
+                    "citrus": {"type": "local", "command": "jbang"},
+                    "camel": {"type": "local", "command": "jbang"}
+                  }
+                }
+                """);
+        Files.writeString(tempDir.resolve("opencode.jsonc"), """
+                {
+                  "permission": {"custom_rule": "deny"},
+                  "mcp": {"custom": {"type": "remote", "url": "https://example.test/mcp"}}
+                }
+                """);
+
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        JsonNode lower = readOpenCodeConfig(tempDir.resolve("opencode.json"));
+        assertFalse(lower.path("mcp").has("citrus"), "citrus must be removed from lower layer");
+        assertFalse(lower.path("permission").has("citrus_*"),
+                "citrus_* permission must be removed from lower layer");
+
+        JsonNode higher = readOpenCodeConfig(tempDir.resolve("opencode.jsonc"));
+        assertEquals("deny", higher.path("permission").path("custom_rule").asText(),
+                "unrelated user config must be preserved");
+        assertTrue(higher.path("mcp").has("custom"), "unrelated user mcp must be preserved");
+        assertTrue(higher.path("mcp").has("camel"), "camel mcp must remain in higher layer");
+    }
+
+    @Test
+    void regenerationRemovesCitrusOnlyFromPermissionWhenServerAlreadyGone() throws Exception {
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+        Path configFile = tempDir.resolve("opencode.json");
+        String current = Files.readString(configFile);
+        assertTrue(current.contains("\"citrus_*\""), "citrus_* permission must be present");
+        String noServer = current.replaceAll("(?s)\"citrus\"\\s*:\\s*\\{[^}]*\\},?\\s*", "");
+        assertFalse(noServer.contains("\"citrus\""), "citrus server must be removed manually");
+        assertTrue(noServer.contains("\"citrus_*\""), "citrus_* permission must still be present");
+        Files.writeString(configFile, noServer);
+
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+        String result = Files.readString(configFile);
+        assertFalse(result.contains("\"citrus_*\""),
+                "citrus_* permission must be removed after opt-out regeneration");
+        assertTrue(result.contains("\"camel\""), "camel mcp must remain");
+    }
 }

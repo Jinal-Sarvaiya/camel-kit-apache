@@ -66,7 +66,7 @@ camel kit init --here [options]
 | `--no-fetch` | `false` | Skip external catalog fetching |
 | `-p`, `--property` | -- | Override a config property (repeatable). Example: `-p "camel.main.version=4.18.4"` |
 | `-c`, `--config` | `~/.camel-kit/config.properties` | Path to a custom config properties file |
-| `--with-citrus-mcp` | `false` | Include the Citrus MCP server in agent configuration. When omitted, no Citrus server is generated; use this flag if your project needs Citrus test integration. |
+| `--with-citrus-mcp` | `false` | _(development snapshot only)_ Include the Citrus MCP server in agent configuration. When omitted, no Citrus server is generated; use this flag if your project needs Citrus test integration. Released versions (0.4.1 and earlier) include Citrus by default. |
 | `--source-platform` | `auto` | Source platform for migration: `mulesoft`, `camel`, `biztalk`, `auto` |
 | `--force` | `false` | Overwrite existing project without prompting (skips overwrite detection) |
 | `--silent` | `false` | Suppress all output (no banner, no TUI, no progress, no summary) -- useful for CI/scripted environments |

@@ -88,10 +88,16 @@ final class OpenCodeConfigMerger {
                 List.of("citrus_*").iterator());
     }
 
+    private boolean hasCitrusEntries(ObjectNode config) {
+        return config.path("mcp").has("citrus")
+                || config.path("permission").has("citrus_*");
+    }
+
     private String mergeGenerated(
             ExistingConfiguration existing, ObjectNode generated, boolean withCitrusMcp)
             throws IOException {
-        if (isCurrentAndOrdered(existing, generated)) {
+        boolean needsCitrusRemoval = !withCitrusMcp && hasCitrusEntries(existing.config());
+        if (isCurrentAndOrdered(existing, generated) && !needsCitrusRemoval) {
             return existing.content();
         }
 

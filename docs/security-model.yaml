@@ -8,6 +8,7 @@ version: 0.4.2-SNAPSHOT
 commit: 70796c02
 date: "2026-10-22"
 status: draft
+last_review_round: "2026-10-27"
 canonical: docs/security-model.md
 umbrella_model: https://camel.apache.org/manual/security-model.html
 reporting:
@@ -103,7 +104,7 @@ entry_points:
   - entry: camel-kit graph <sub> [root]
     input: file bodies, names and link targets under root
     attacker_controllable: true
-    caller_must_enforce: No symlink or size guard is claimed (Q2).
+    caller_must_enforce: Confinement to root and bounded time and memory are claimed by P1; enforcement status tracked in Q2.
   - entry: .camel-kit/project-graph.json (graph output consumed by skills)
     attacker_controllable: derived-from-tree
     caller_must_enforce: Treat as data in prompts.
@@ -121,13 +122,18 @@ entry_points:
     input: context for the model
     attacker_controllable: developer-supplied-but-loaded-context
     caller_must_enforce: Do not pass secrets; third-party documents can carry instruction-like text.
-  - entry: camel-kit ship worker result (Pi RPC output, native --result envelope)
+  - entry: camel-kit ship native result envelope (--result PATH; bob2-native, copilot-native, claude-native, codex-native)
     input: stage result JSON and file proposals
     attacker_controllable: true
-    controller_enforces: [strict JSON schema, approved path set only, size limits, tree policy, expression gate, secret scan, deterministic validation]
+    controller_enforces: [strict JSON schema, approved path set only (route and test paths, pom.xml, .camel-kit/config.properties), known-secret scan before any write, then the Pi candidate checks]
+  - entry: camel-kit ship Pi RPC result and the staged candidate the worker edited (pi backend, default)
+    input: stage result JSON; files written in the staging workspace
+    attacker_controllable: true
+    controller_enforces: [strict JSON schema, tree policy, artifact validation (manifest, declared routes and tests, pom policy, Camel Main Java policy, Citrus dependency policy, launch surface), secret scan of changed material files, expression gate, deterministic validation]
+    note: Ordinary additional material files are accepted and published (P5).
   - entry: camel-kit ship staged workspace / candidate tree
     attacker_controllable: derived
-    controller_enforces: [tree policy]
+    controller_enforces: [tree policy, publication of every changed material file]
   - entry: Ship resolver
     input: Maven Central responses
     attacker_controllable: true
@@ -149,10 +155,11 @@ configuration_variants:
     effect: Selects which generated harness controls exist (allow-lists, read-only worker definitions, hooks, guard policies).
     security_relevant: true
     stance: open (Q3) - proposed supported posture
-  - knob: MCP autoApprove / alwaysAllow / directTools / enabled_tools
-    default: workflow manifest allowed_tools (read-only and generation helpers)
+  - knob: Generated MCP tool lists and Claude settings.json MCP rules
+    default: workflow manifest allowed_tools (read-only and generation helpers, no runtime mutation or control tools)
+    effect: Availability filter - Codex enabled_tools, Copilot tools, Pi directTools, Qwen includeTools. Approval only - Bob 2 alwaysAllow/autoApprove = manifest list; Claude Code settings.json permissions.allow mcp__camel__*, mcp__camel-knowledge__*, mcp__citrus__* = every tool of each server (.mcp.json autoApprove/alwaysAllow keys are not a Claude Code filter). Prompt before every call - Codex default_tools_approval_mode prompt, OpenCode permission ask, Qwen and Copilot prompts. Antigravity - full tool set, no generated approval.
     security_relevant: true
-    stance: open (Q3)
+    stance: open (Q3) for the Claude Code wildcard grant; other postures documented
   - knob: camel.mcp.repos, knowledge.mcp.repos, citrus.mcp.repos, camel.catalog.repos, JBang //REPOS
     default: Maven Central, ASF public, ASF snapshots, Central snapshots
     effect: Snapshot repositories serve mutable artifacts.
@@ -202,10 +209,10 @@ configuration_variants:
 
 claimed_properties:
   - id: P1
-    property: Source-reading contract for graph analysis - no code execution, class loading, placeholder/secret resolution or network; output is data (inherited from the umbrella model).
-    violation_symptom: Child process, class loaded or defined from the source, outbound connection, read outside the tree, or placeholder resolved during graph analysis.
-    severity: security-critical
-    provenance: documented (umbrella, SecureXml, BizTalk parsers); inferred for Java, Groovy, YAML, DataWeave, properties (Q1)
+    property: Source-reading contract for graph analysis, inherited in full from the umbrella model - no code execution, class loading, placeholder/secret resolution or network; always finishes in bounded time and memory; output is data. Bound in place - GraphBuilder 60-second timeout per parser other than the POM parser. Not yet verified - POM parser bound, memory or file-size bound, confinement of reads to the analysed root when the tree contains symbolic links (Q2).
+    violation_symptom: Child process, class loaded or defined from the source, outbound connection, read of a file outside the analysed root (including through a symbolic link), placeholder resolved, non-termination, or unbounded memory during graph analysis.
+    severity: security-critical (VALID regardless of the enforcement status recorded in Q2)
+    provenance: documented (umbrella, SecureXml, BizTalk parsers, GraphBuilder); inferred for Java, Groovy, YAML, DataWeave, properties (Q1); enforcement of confinement and resource clauses inferred (Q2); inheritance in full is a maintainer decision of 2026-10-27
   - id: P2
     property: Hardened XML parsing at every XML entry point, including Ship pom.xml validation.
     violation_symptom: XXE, SSRF or local file read through XML.
@@ -222,10 +229,10 @@ claimed_properties:
     severity: security-critical
     provenance: documented (mcp-setup.md, distribution.properties, ShipMavenResolver, ShipJvmPayloadBootstrap)
   - id: P5
-    property: Ship controller alone writes run state and commits transitions; proposals accepted only for the approved path set; publication journaled, atomic, verified against the validated candidate, recoverable.
-    violation_symptom: Worker output changes a stage, pause or publication decision; proposal lands outside the approved set; published tree differs from the validated candidate; torn publication left unrecovered.
+    property: Ship controller alone writes run state, commits transitions and decides what is accepted and published. Native backends (bob2-native, copilot-native, claude-native, codex-native) - proposals written only for the approved route and test paths, pom.xml and .camel-kit/config.properties, after a known-secret scan; other paths rejected (ShipNativeWorker.applyProposals). Pi backend (default) - the worker edits the staged candidate directly; acceptance through tree policy, artifact validation (manifest, declared routes and tests, pom policy, Camel Main Java policy FORBIDDEN, Citrus dependency policy, launch-surface validation), secret scan of changed material files and deterministic validation; ordinary additional material files are permitted and published. Publication journaled, atomic, verified against the validated candidate, recoverable.
+    violation_symptom: Worker output changes a stage, pause or publication decision; a native proposal is written outside the approved set or without the secret check; a Pi candidate is accepted despite a tree-policy denial, a failing artifact or launch-surface check, or a verbatim secret; published tree differs from the validated candidate; torn publication left unrecovered.
     severity: security-critical
-    provenance: documented (docs/commands.md, docs/ship-native.md, ShipPublicationService)
+    provenance: documented (docs/commands.md, docs/ship-native.md, ShipNativeWorker, ArtifactValidator, ShipCamelMainBootstrap.validateLaunchSurface, ShipPublicationService); Pi acceptance and extra material files - maintainer, 2026-10-22 (review of #6)
   - id: P6
     property: Ship tree policy - denied credential and state paths, protected and volatile classes, rejection of symlinks, hard links and special files, quotas (20000 entries, 64 MiB per file, 1 GiB aggregate, depth 128, 4096-char paths).
     violation_symptom: Denied path enters a snapshot, workspace, prompt or publication; a link is followed.
@@ -247,12 +254,12 @@ claimed_properties:
     severity: hardening
     provenance: documented (ShipExpressionPolicy)
   - id: P10
-    property: Generated harness assets carry their documented least-privilege posture (read-only Ship workers, read-only Codex roles, Copilot deny hook, Pi guard policy, MCP allow-lists without runtime control tools, no HTTP port for MCP servers). Claim is about the generated artifact; enforcement is the harness's.
-    violation_symptom: Generated asset grants more than documented.
+    property: Generated harness assets carry their documented least-privilege posture - read-only Ship workers, read-only Codex roles, Copilot deny hook, Pi guard policy, no HTTP port for the Camel and Citrus MCP servers, and the per-target MCP grants - the manifest allowed_tools (no runtime mutation or control tools) is an availability filter for Codex (enabled_tools), Copilot (tools), Pi (directTools) and Qwen (includeTools) and an auto-approval list for Bob 2 (alwaysAllow/autoApprove); Codex (prompt), Copilot, Qwen and OpenCode (permission ask) prompt before MCP calls; Antigravity gets the full tool set with no generated approval; Claude Code gets the full tool set and its settings.json pre-approves every tool of the three servers through mcp__<server>__* rules (the autoApprove/alwaysAllow keys in its .mcp.json are not a Claude Code filter). Claim is about the generated artifact; enforcement is the harness's.
+    violation_symptom: Generated asset grants more than this documented posture - a worker with edit or shell tools, a filter or auto-approval list containing a tool outside the manifest allowed_tools, a prompt-mode target generated with auto-approval, a hook or guard that fails open on a documented pattern.
     severity: hardening; security-critical when the widened grant reaches a credential or destructive action without a prompt
-    provenance: documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates)
+    provenance: documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates/mcp-configs/*, templates/claude/settings.json, Claude Code permissions reference); Claude grant description - maintainer, 2026-10-22 (review of #6)
   - id: P11
-    property: Stated resource bounds - route/Citrus YAML 2 MiB, native result 16 MiB and 1000 files, Pi prompt 1 MiB, Pi log 16 MiB, session 64 MiB, evidence log 64 MiB, stage timeout 10m, resolver 64 roots/512 artifacts/128 MiB JAR/4 MiB POM, tree quotas, migration-context depth 3 and 50 nodes.
+    property: Stated resource bounds - route/Citrus YAML 2 MiB, native result 16 MiB and 1000 files, Pi prompt 1 MiB, Pi log 16 MiB, session 64 MiB, evidence log 64 MiB, stage timeout 10m, resolver 64 roots/512 artifacts/128 MiB JAR/4 MiB POM, tree quotas, migration-context depth 3 and 50 nodes; graph parsers other than the POM parser 60 s each (serves P1).
     violation_symptom: A limit not enforced at its documented value.
     severity: hardening
     provenance: documented (ShipArtifactLimits, ShipNativeWorker, PiWorker, EvidenceRunner, ShipMavenResolver, ShipTreePolicy, docs/commands.md)
@@ -272,8 +279,6 @@ disclaimed_properties:
     statement: No signature or checksum verification for init-time downloads (TLS only, redirects followed) (Q7).
   - id: D7
     statement: Snapshot repositories are mutable; no reproducibility or integrity claim (Q4).
-  - id: D8
-    statement: No resource bound or symlink guard for graph analysis of a hostile tree (Q2).
   - id: D9
     statement: Validation of generated routes is a static quality gate, not a security audit.
   - id: D10
@@ -297,6 +302,8 @@ false_friends:
     reality: They cannot write, but they read what the parent's permissions allow and return text; a fresh context is not an OS sandbox.
   - claim: camel_route_harden_context / camel_security_scan passed
     reality: MCP output is supplemental candidate evidence, never the canonical result.
+  - claim: Ship validated it, so only the declared route, test, pom.xml and config changed
+    reality: With the Pi backend the worker may create other material files; they pass validation as ordinary material files and are published with the candidate (P5). Review the whole publication set.
 attack_classes_left_downstream:
   - prompt injection through repository content, documentation, logs and MCP responses
   - MCP tool poisoning and rug-pulls
@@ -335,8 +342,11 @@ known_non_findings:
   - pattern: followRedirects(NORMAL) in init downloaders
     why: HTTPS-to-HTTPS redirects expected; NORMAL never downgrades to HTTP (verification gap is Q7).
     disposition: KNOWN-NON-FINDING
-  - pattern: Generated Claude settings.json pre-approving mvn
-    why: Documented posture (Q3).
+  - pattern: Generated Claude settings.json pre-approving mvn, ./mvnw and every tool of the three MCP servers (mcp__<server>__*)
+    why: Documented per-target posture (4.5a, P10); whether it is the supported posture is Q3.
+    disposition: KNOWN-NON-FINDING
+  - pattern: A Pi-backend Ship run publishing an ordinary additional material file (documentation, test data)
+    why: Documented acceptance behaviour of P5; validation bounds the launch surface and the declared artifacts, not every material file.
     disposition: KNOWN-NON-FINDING
   - pattern: Ship state inside the project (.camel-kit/ship/state)
     why: Controller-owned, denied by tree policy, self-ignored for git.
@@ -376,6 +386,16 @@ issue_5_category_mapping:
   user_directed_insecure_route_design: OUT-OF-MODEL:trusted-input
   local_operator_environment_misconfiguration: OUT-OF-MODEL:adversary-not-in-scope or OUT-OF-MODEL:non-default-build
 
+triage_notes:
+  - Outside-root read, non-termination or unbounded memory during graph analysis is VALID under P1 regardless of the enforcement status in Q2 - neither BY-DESIGN nor MODEL-GAP.
+  - A Pi-backend Ship run publishing an ordinary additional material file is documented P5 behaviour, not a violation.
+maintainer_decisions:
+  - date: "2026-10-27"
+    decision: Graph source-reading contract inherited in full from the Apache Camel Security Model; enforcement gaps are tracked in Q2, not disclaimed.
+    sections: ["4.1", "4.8 P1", "4.8 P11", "4.13", "Q2"]
+  - date: "2026-10-22"
+    decision: Review of #6 - the proposal allowlist applies to native backends only; Pi candidates are accepted through tree, artifact and launch-surface validation with ordinary extra material files permitted and published; the generated Claude settings.json wildcards grant every MCP tool and the .mcp.json autoApprove/alwaysAllow keys are not a Claude Code filter.
+    sections: ["4.5a", "4.6", "4.8 P5", "4.8 P10", "4.9", "4.11a"]
 open_questions:
   - id: Q1
     wave: 1
@@ -383,12 +403,12 @@ open_questions:
     proposed: Umbrella source-reading contract applies to all nine parsers; graph analysis spawns no process; Java AST-only; Groovy CONVERSION phase only.
   - id: Q2
     wave: 1
-    sections: ["4.6", "4.8 P1", "4.9"]
-    proposed: No termination or memory bound claimed; hang is VALID-HARDENING; read through a symlink outside the root is VALID.
+    sections: ["4.6", "4.8 P1", "4.8 P11"]
+    proposed: Contract inherited in full (maintainer, 2026-10-27); confirm enforcement - (a) file reads stay inside the analysed root when the tree contains symbolic links, or add that check; (b) the POM parser is brought under the parser timeout; (c) a memory or file-size bound is added. Until confirmed each item is a tracked implementation gap and a demonstrated case is VALID.
   - id: Q3
     wave: 1
     sections: ["4.5a", "4.8 P10"]
-    proposed: Generated Claude allow-list and MCP auto-approval are the supported posture.
+    proposed: The generated Claude allow-list (Read, Bash(mvn *), Bash(./mvnw *), mcp__<server>__* for all three MCP servers including runtime control tools) is the supported posture; Bob 2 auto-approves only the manifest list; other targets prompt or filter.
   - id: Q4
     wave: 1
     sections: ["4.5a", "4.9"]
@@ -416,7 +436,7 @@ open_questions:
   - id: Q10
     wave: 3
     sections: ["4.1"]
-    proposed: Additive sub-project expansion of the umbrella model; register in apache/security-site project-coordinates.json.
+    proposed: Additive sub-project expansion of the umbrella model; register in apache/security-site project-coordinates.json and on camel.apache.org/security. Tracked in apache/camel-kit#131.
   - id: Q11
     wave: 3
     sections: ["4.3", "4.12"]
@@ -432,6 +452,7 @@ open_questions:
 
 revision_triggers:
   - New CLI command, parser or input format reading external content; parser moving to later compilation phase or symbol resolution.
+  - Change to the graph parser timeout or the POM parser path, or addition of size, memory or symbolic-link checks in camel-kit-graph (closes Q2 items).
   - Camel-Kit gaining a network listener (e.g. merging the Knowledge MCP server, apache/camel-kit#2).
   - Change to default oversight mode, default backend, Pi tool lists or flags, tree policy rules/quotas, expression gate, secret-scan rules, resolver origin/checksum/redirect policy.
   - init writing outside the target directory or under $HOME; Ship state moving to a user-level default.

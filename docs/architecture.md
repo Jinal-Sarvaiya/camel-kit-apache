@@ -886,6 +886,13 @@ purpose, and both the umbrella model and Camel K ship one). Generated workspace 
 link to the model; they carry the operative rules themselves (Iron Laws, `context-authority.md`, the security
 checklist).
 
+After review round 2 (2026-10-27) the maintainers answered the model's thirteen questions: the graph source-reading
+contract is inherited in full from the umbrella model, Knowledge is covered by a dedicated section of the same document
+rather than a companion model (rejected: a separate Knowledge model, which would have split the triage reference for
+one repository), the side-effect inventory is kept per process rather than as blanket statements, and acceptance is
+gated on verification items (tested parser guarantees, graph confinement and bounds, narrower Claude MCP defaults, a
+verified inventory, init and download path controls, Knowledge verification).
+
 ---
 
 ## 10. How to Add a Skill

@@ -315,12 +315,17 @@ See [Antigravity setup and migration from Gemini or Bob v1](../docs/antigravity.
 - **[Command Reference](../docs/commands.md)** — CLI options, AI-agent workflows, graph subcommands
 - **[Architecture Guide](../docs/architecture.md)** — skills, MCP, graph intelligence, pipeline internals
 - **[Contributing](../CONTRIBUTING.md)** — development setup, how to add skills
+- **[Security Model](../docs/security-model.md)** — trust boundaries, threat model, triage dispositions
 
 Workflow contributors should treat `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml` as the source of truth for command, skill, stage, artifact, and MCP tool metadata before updating generated templates or reference docs.
 
 ---
 
 See [Releasing](../docs/releasing.md) for the maintainer publication procedure.
+
+## Security
+
+To report a suspected vulnerability, follow [SECURITY.md](../SECURITY.md) — never a public issue or pull request. The [Security Model](../docs/security-model.md) documents who is trusted, where the trust boundaries sit, and what counts as a Camel-Kit vulnerability.
 
 ## License
 

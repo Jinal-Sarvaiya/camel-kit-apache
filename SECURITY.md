@@ -4,7 +4,7 @@
 
 Apache Camel Kit is developed and released under the Apache Camel umbrella. Security fixes are made on `main` and
 shipped in the next release; only the latest release line is supported. See the
-[release channels](README.md#release-channels) in the README and the
+[Kit release channels](kit/README.md#release-channels) in the product README and the
 [GitHub releases](https://github.com/apache/camel-kit/releases) for the current version.
 
 Camel Ship is a **Technology Preview**. Preview status does not exclude it from this policy: a report that breaks a
@@ -44,7 +44,7 @@ Before submitting a report, please read the project's
 - **which categories are out of scope** — a malicious process already running as the developer, prompt injection
   that steers the model without a shipped hard control failing, insecure designs the developer approved, the runtime
   behaviour of the generated integration (governed by the
-  [Apache Camel Security Model](https://camel.apache.org/manual/security-model.html)), the MCP servers' own code,
+  [Apache Camel Security Model](https://camel.apache.org/manual/security-model.html)), external MCP servers' own code,
   behaviour reachable only under a widened or non-default configuration, and shipped-but-unsupported code.
 
 The Camel-Kit security model is the additive sub-project expansion of the umbrella Apache Camel Security Model for
@@ -56,8 +56,8 @@ automated tooling. Reports outside the documented scope will be closed with a re
 
 - Suspected vulnerabilities in the **Camel JBang MCP server** (`camel-jbang-mcp`) or in **Apache Camel** itself are
   reported to Apache Camel through the same process above.
-- The **Camel-Kit Knowledge MCP server** lives in
-  [`luigidemasi/camel-kit-knowledge`](https://github.com/luigidemasi/camel-kit-knowledge); report issues in its
-  code to that project.
+- The **Camel-Kit Knowledge MCP server** now lives in [`knowledge/`](knowledge/). Report suspected vulnerabilities
+  through the same private Apache Camel process above. Its model coverage remains an open question (Q11);
+  missing coverage must not be used to reject a report as belonging to an external project.
 - The **Citrus MCP server**, **JBang**, **Maven**, **Pi**, **Node** and the **AI coding harnesses** Camel-Kit targets
   belong to their respective projects.

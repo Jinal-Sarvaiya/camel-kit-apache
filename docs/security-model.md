@@ -12,7 +12,8 @@
 | Field | Value |
 | --- | --- |
 | Project | Apache Camel Kit (`apache/camel-kit`) |
-| Version / commit | `0.4.2-SNAPSHOT`, commit `70796c02` (`main`) |
+| Version / source baseline | `0.4.2-SNAPSHOT`, commit `70796c02` |
+| Repository layout | Rebased onto monorepo commit `9c8173cb`; this draft still requires maintainer review |
 | Date | 2026-10-22 |
 | Author(s) | Camel-Kit maintainers; drafted with the threat-model-producer procedure in draft-first mode for [apache/camel-kit#5](https://github.com/apache/camel-kit/issues/5) |
 | Status | **DRAFT — under maintainer review.** Claims tagged *(inferred)* are hypotheses until the matching §4.14 question is answered. |
@@ -42,6 +43,12 @@ structure or the absence of a feature; every *(inferred)* tag names its §4.14 q
 
 **Draft confidence.** 132 documented / 6 maintainer / 22 inferred tags. Update as §4.14 questions are
 answered.
+
+**Monorepo coverage gap.** This draft describes the Kit product in `kit/`. Knowledge now lives in
+`knowledge/` following [apache/camel-kit#2](https://github.com/apache/camel-kit/issues/2). Its server and index
+boundaries still need a companion model or inclusion here (Q11). Until that coverage is agreed, route Knowledge
+reports through the same private reporting process and treat missing coverage as `MODEL-GAP`, not as an
+unsupported external component *(inferred — Q11)*. References to the product README below mean `kit/README.md`.
 
 **Purpose (one paragraph).** Camel-Kit is a developer tool that adds structured workflows ("skills", Markdown
 instruction files) to AI coding assistants so they design, implement, verify and migrate Apache Camel integrations
@@ -87,10 +94,10 @@ model.
   | --- | --- | --- | --- |
   | **A. Workspace CLI** — `init`, `doctor`, `doc`, `nextId`, `plan analyze`, `graph *` (`camel-kit-core` commands, services, generators, catalog downloaders; `camel-kit-main` JBang launcher; `camel-jbang-plugin-kit`) | picocli commands | Writes the target workspace; reads `~/.camel-kit/config.properties`; `init` downloads catalogs over HTTPS unless `--no-fetch`; version probes spawn `java`, `jbang`, `camel`, `mvn`/`mvnw`, `pi` | **In** |
   | **B. Graph analysis** (`camel-kit-graph`: Pom, Java, Groovy, XML route, Mule XML, DataWeave, BizTalk, YAML route, Config parsers plus the cross-linker and property-binding post-processors) | `camel-kit graph …`; `init --here` auto-analysis | Reads the analysed tree; writes `.camel-kit/project-graph.json`; no network, no child process *(inferred — Q1)* | **In** — the analysed tree is untrusted input |
-  | **C. Skills, templates, traits, agent registry, workflow manifest** (`camel-kit-core/src/main/resources/{skills,templates,agents,workflow}`) | installed by `init` into the workspace | Nothing by itself; the harness executes the instructions with its own permissions; generated MCP configs make the harness launch MCP servers through `jbang` at pinned coordinates | **In** as shipped instructions and generated configuration; the harness and the model are out (§4.3) |
+  | **C. Skills, templates, traits, agent registry, workflow manifest** (`kit/camel-kit-core/src/main/resources/{skills,templates,agents,workflow}`) | installed by `init` into the workspace | Nothing by itself; the harness executes the instructions with its own permissions; generated MCP configs make the harness launch MCP servers through `jbang` at pinned coordinates | **In** as shipped instructions and generated configuration; the harness and the model are out (§4.3) |
   | **D. Ship controller** (Technology Preview; `camel-kit-core` `ship/**`, `command/ship`) | `camel-kit ship`, `/camel-ship` delegates | Spawns `pi`/`node` (Pi backend), `/usr/bin/setsid`, `/bin/kill`, its own `java`; writes `.camel-kit/ship/state` or `$CAMEL_KIT_SHIP_STATE_HOME`; publishes into the live project; HTTPS to Maven Central through family E | **In** |
   | **E. Ship resolver and evidence payloads** (`camel-kit-ship-resolver`; `ship/evidence/**` launchers) | controller-only | HTTPS to Maven Central; private local Maven repository; private tmp/home | **In** |
-  | **F. MCP servers** — Camel JBang MCP (`camel-jbang-mcp`), Camel-Kit Knowledge MCP (`camel-kit-knowledge`), Citrus MCP | launched by the harness from the generated config | Network; whatever the server does | **Out** — separately owned (§4.3). Camel-Kit's responsibility ends at the generated configuration: pinned coordinate, named repositories, allowed-tool list. |
+  | **F. External MCP servers** — Camel JBang MCP (`camel-jbang-mcp`), Citrus MCP | launched by the harness from the generated config | Network; whatever the server does | **Out** — separately owned (§4.3). Camel-Kit's responsibility ends at the generated configuration: pinned coordinate, named repositories, allowed-tool list. |
   | **G. Generated integration projects** (routes, `pom.xml`, Citrus tests, Maven wrapper, agent configuration) | output of the agent and of Ship | Run wherever the developer runs them | **Out** as running software — Apache Camel's model (§4.3). **In** only for what Camel-Kit's gates *claim* about them (§4.8 P10, §4.9). |
   | **H. Shipped but unsupported** — `examples/` (pointer README), `tools/` (release and mirror scripts), `camel-kit-dispatch/` (not in the Maven reactor), `src/test/**` fixtures, `.idea/`, `camel-kit.gif`, GitHub workflows | n/a | n/a | **Out** (§4.3) |
 
@@ -123,10 +130,10 @@ model.
 - **The runtime behaviour of generated integrations.** Header handling, deserialisation, expression evaluation,
   component defaults and operator hardening of a route Camel-Kit helped write are governed by the Apache Camel
   Security Model and by the route author and operator, exactly as for a hand-written route.
-- **Vulnerabilities in the MCP servers' own code and in the tools Camel-Kit invokes.** `camel-jbang-mcp` is Apache
-  Camel's (the umbrella model covers its tooling); `camel-kit-knowledge` is a separate repository without a model of
-  its own yet *(inferred — Q11)*; `citrus-mcp-server` belongs to Citrus; JBang, Maven, Pi, Node, Docker and the coding
-  harnesses belong to their projects. Camel-Kit's generated configuration for them is in (§4.8 P4, P10).
+- **Vulnerabilities in external MCP servers' own code and in the tools Kit invokes.** `camel-jbang-mcp` is Apache
+  Camel's (the umbrella model covers its tooling); `citrus-mcp-server` belongs to Citrus; JBang, Maven, Pi, Node,
+  Docker and the coding harnesses belong to their projects. Kit's generated configuration for them is in
+  (§4.8 P4, P10). Knowledge is maintained in this repository and is the coverage gap described in §4.1 and Q11.
 - **Vulnerabilities in transitive dependencies not reachable through Camel-Kit code**, as in the umbrella model
   *(documented — Apache Camel Security Model, "Out of scope")*.
 - **Ship non-goals.** Ship "will not require: a dedicated service account, system service, TPM, biometric approval,
@@ -195,7 +202,8 @@ trusted")*.
   unpinned coordinate or an unnamed repository. The model disobeying an instruction is not a finding (§4.3).
 - **D/E (Ship):** in-model if reachable from worker or native-result output, from the staged or analysed tree, from a
   Maven Central response, or by another local account — never when it requires the developer's own OS account.
-- **F, G, H:** out; route to the owning project or to the Apache Camel Security Model.
+- **F, G, H:** out; route to the owning project or to the Apache Camel Security Model. Knowledge is not family F;
+  its missing model coverage is `MODEL-GAP` (Q11).
 
 ---
 
@@ -336,7 +344,8 @@ constants)*.
 - A hostile Maven Central, ASF repository or GitHub origin the project pins to (supply-chain trust the installer
   accepts), and authors of transitive dependencies *(documented — Apache Camel Security Model, "Out of scope")*.
 - A model that hallucinates or proposes an insecure design the developer then approves (§4.3).
-- MCP servers' internals, Pi, Node, JBang, Maven, Docker and the harnesses (§4.3).
+- External MCP servers' internals, Pi, Node, JBang, Maven, Docker and the harnesses (§4.3). Knowledge coverage
+  remains the model gap in Q11.
 
 ---
 
@@ -680,8 +689,8 @@ Suitable as a suppression or negative-prompt list for scanners and AI-assisted t
   phase or to symbol resolution against the analysed tree's classpath.
 - A change to the graph parser timeout or the POM parser path, or the addition of size, memory or symbolic-link
   checks in `camel-kit-graph` (which closes Q2 items and promotes P1 tags).
-- Camel-Kit gaining a network listener of its own — in particular, merging the Knowledge MCP server into this
-  repository (apache/camel-kit#2) would make family F an in-model component.
+- The Knowledge MCP server has moved into `knowledge/` (apache/camel-kit#2), triggering the coverage review in
+  Q11. Any new listener or change to Knowledge server/index boundaries must also trigger a model review.
 - A change to the default oversight mode, default backend, Pi tool lists or launch flags, the tree policy rules or
   quotas (its schema version), the expression gate, the secret-scan rules, or the resolver's origin, checksum or
   redirect policy.
@@ -708,7 +717,7 @@ match the Apache Camel Security Model so a triager can cite either document.
 | `VALID-HARDENING` | No §4.8 property is violated, but a §4.11 misuse is easy enough, or a §4.11 limit fails its documented value, that the project elects to harden. Reported privately; usually no CVE. | §4.11, §4.8 P9, P11 |
 | `OUT-OF-MODEL: trusted-input` | Requires control of a trusted input: CLI flags, config files, the developer's approval of a design, or the developer's own OS account. Covers "the user asked for an insecure route". | §4.6, §4.2 |
 | `OUT-OF-MODEL: adversary-not-in-scope` | Requires an actor §4.7 excludes: the developer or a same-user process, a compromised harness or provider, a hostile pinned origin, a transitive-dependency author. Covers operator misconfiguration of the host or harness. | §4.7 |
-| `OUT-OF-MODEL: unsupported-component` | Lands in family F (MCP servers — route to Apache Camel, camel-kit-knowledge or Citrus), G (the generated integration's runtime — route to the Apache Camel Security Model) or H (shipped-but-unsupported code). | §4.3, §4.2 |
+| `OUT-OF-MODEL: unsupported-component` | Lands in family F (external MCP servers — route to Apache Camel or Citrus; Knowledge coverage is Q11), G (the generated integration's runtime — route to the Apache Camel Security Model) or H (shipped-but-unsupported code). | §4.3, §4.2 |
 | `OUT-OF-MODEL: non-default-build` | Only manifests under a discouraged or non-default §4.5a knob (a widened allow-list, `--accept-experimental`, a repointed repository, a disabled hook or guard). | §4.5a |
 | `BY-DESIGN: property-disclaimed` | Concerns a property §4.9 explicitly does not provide: sandboxing of the agent, prompt-injection resistance by instruction, model output quality ("the LLM hallucinated"), attestation, verification of `init` downloads, security of a validated route. | §4.9 |
 | `KNOWN-NON-FINDING` | Matches a §4.11a entry. | §4.11a |
@@ -781,8 +790,11 @@ strike it. Answers promote the matching tags to *(maintainer, date)* and retire 
   `apache/security-site` `project-coordinates.json` under Apache Camel as "Apache Camel Kit", and the Camel website
   security page lists Camel Kit among the sub-projects with their own model. Registration is tracked in
   [apache/camel-kit#131](https://github.com/apache/camel-kit/issues/131).
-- **Q11 — Knowledge MCP → §4.3, §4.12.** *Proposed:* `camel-kit-knowledge` stays out of this model while it is a
-  separate repository; it gains its own model there, or is folded in here if apache/camel-kit#2 merges it.
+- **Q11 — Knowledge MCP after consolidation → §4.1, §4.3, §4.12.** Knowledge now lives in `knowledge/` after
+  apache/camel-kit#2. *Open decision:* extend this model to cover its server and index boundaries, or add a
+  companion model for the independently released Knowledge product. Until maintainers decide, missing coverage is
+  `MODEL-GAP`; reports use this repository's private process and are not rejected because Knowledge was formerly
+  maintained elsewhere. Kit's generated Knowledge configuration remains covered by P4 and P10.
 - **Q12 — Supported versions and preview status → `SECURITY.md`.** *Proposed:* fixes land on `main` and ship in the
   next release; only the latest release line is supported; a Ship finding that breaks a §4.8 property is `VALID`
   despite Technology Preview status.
@@ -818,7 +830,7 @@ file changes.
 | `docs/ship-native.md`, `docs/ship-claude.md` (native handoff, read-only workers, approved path set, recovery) | §4.4, §4.8 P5, P10, §4.9, §4.10, §4.11 |
 | `skills/shared/context-authority.md`, `skills/shared/mcp-setup.md` | §4.2, §4.4, §4.6, §4.9 |
 | `skills/shared/iron-laws.md`, `docs/constitution.md`, `skills/shared/camel-security-checklist.md`, `camel-validate/guides/security-analysis.md` | §4.3, §4.9, §4.10 |
-| `distribution.properties`, `camel-kit-main/.../CamelKit.java` (pinned versions, named repositories, snapshots) | §4.4, §4.5a, §4.8 P4, Q4 |
+| `distribution.properties`, `kit/camel-kit-main/.../CamelKit.java` (pinned versions, named repositories, snapshots) | §4.4, §4.5a, §4.8 P4, Q4 |
 | Templates: `claude/settings.json`, `claude/agents/camel-ship-worker.md`, `copilot/hooks/camel-kit-safety.json`, `pi/extensions/camel-kit-guard-policy.json`, `codex/agents/*.toml`, `mcp-configs/*` | §4.5a, §4.8 P10, Q3 |
 | Source Javadoc and constants: `SecureXml`, `BizTalk*Parser`, `ArtifactValidator`, `GeneratedAssetCleaner`, `AtomicFileWriter`, `DistributionConfig`, `CatalogDownloader`, `CitrusSchemaDownloader`, `ForageCatalogService`, `ShipTreePolicy`, `ShipSecureFilesystem`, `ShipMavenResolver`, `ShipJvmPayloadBootstrap`, `EvidenceRunner`, `ShipCamelMainBootstrap`, `ShipExpressionPolicy`, `ShipArtifactLimits`, `ShipNativeWorker`, `PiWorker`, `LocalCommandRunner`, `ChangedWorkspaceSecretScanner`, `ShipPublicationService` | §4.4, §4.5, §4.6, §4.7, §4.8 P1–P11, §4.9, §4.11a |
 | Claude Code permissions reference (`mcp__<server>__*` matches every tool of that server) | §4.5a, §4.8 P10 |

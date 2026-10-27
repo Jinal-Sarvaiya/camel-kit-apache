@@ -91,5 +91,5 @@ Work is finished only when all of these hold:
 8. Independent releases follow `docs/releasing.md`; never deploy the whole reactor for a product release.
 9. Nothing was skipped, disabled, or weakened to get green — if a check fails, report
    the output rather than claiming done.
-9. Security-relevant change (see §4.12 of `docs/security-model.md`): the security model and its
+10. Security-relevant change (see §4.12 of `docs/security-model.md`): the security model and its
    `docs/security-model.yaml` sidecar are updated.

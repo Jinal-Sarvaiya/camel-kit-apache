@@ -6,10 +6,17 @@ project: Apache Camel Kit
 repository: apache/camel-kit
 version: 0.4.2-SNAPSHOT
 commit: 70796c02
+repository_layout_commit: 9c8173cb
 date: "2026-10-22"
 status: draft
 last_review_round: "2026-10-27"
 canonical: docs/security-model.md
+model_gaps:
+  - component: Knowledge MCP server and index
+    paths: [knowledge/]
+    question: Q11
+    disposition: MODEL-GAP
+    note: Now maintained in this repository; use the same private reporting process pending a companion model or inclusion here.
 umbrella_model: https://camel.apache.org/manual/security-model.html
 reporting:
   policy: SECURITY.md
@@ -44,36 +51,36 @@ roles:
 component_families:
   - id: A
     name: Workspace CLI
-    paths: ["camel-kit-core (command, service, generator, catalog, config)", camel-kit-main, camel-jbang-plugin-kit]
+    paths: ["kit/camel-kit-core (command, service, generator, catalog, config)", kit/camel-kit-main, kit/camel-jbang-plugin-kit]
     entry_points: [init, doctor, doc, nextId, plan analyze, graph]
     in_model: true
     reachability: Reachable from a non-operator input (analysed tree via init --here, downloaded catalog content, model-authored pipeline artifact, another local account).
   - id: B
     name: Graph analysis
-    paths: [camel-kit-graph]
+    paths: [kit/camel-kit-graph]
     entry_points: [camel-kit graph, init --here auto-analysis]
     in_model: true
     reachability: Reachable from the contents of the analysed tree (file bodies, names, symbolic links) without building or running the project.
   - id: C
     name: Skills, templates, traits, agent registry, workflow manifest
-    paths: [camel-kit-core/src/main/resources/skills, camel-kit-core/src/main/resources/templates, camel-kit-core/src/main/resources/agents, camel-kit-core/src/main/resources/workflow]
+    paths: [kit/camel-kit-core/src/main/resources/skills, kit/camel-kit-core/src/main/resources/templates, kit/camel-kit-core/src/main/resources/agents, kit/camel-kit-core/src/main/resources/workflow]
     in_model: true
     reachability: Only when a shipped instruction or generated artifact itself crosses a boundary it documents holding (allow-list, worker tool list, hook or guard, MCP coordinate or repository). The model disobeying an instruction is not a finding.
   - id: D
     name: Ship controller (Technology Preview)
-    paths: [camel-kit-core ship/**, camel-kit-core command/ship]
+    paths: [kit/camel-kit-core ship/**, kit/camel-kit-core command/ship]
     entry_points: [camel-kit ship, /camel-ship delegates]
     in_model: true
     reachability: Reachable from worker or native-result output, the staged or analysed tree, a Maven Central response, or another local account; never when it requires the developer's own OS account.
   - id: E
     name: Ship resolver and evidence payloads
-    paths: [camel-kit-ship-resolver, camel-kit-core ship/evidence/**]
+    paths: [kit/camel-kit-ship-resolver, kit/camel-kit-core ship/evidence/**]
     in_model: true
     reachability: Same as D.
   - id: F
-    name: MCP servers (Camel JBang MCP, Camel-Kit Knowledge MCP, Citrus MCP)
+    name: External MCP servers (Camel JBang MCP, Citrus MCP)
     in_model: false
-    route_to: ["apache/camel (Apache Camel Security Model)", luigidemasi/camel-kit-knowledge, Citrus]
+    route_to: ["apache/camel (Apache Camel Security Model)", Citrus]
     note: Camel-Kit's responsibility ends at the generated configuration (pinned coordinate, named repositories, allowed-tool list).
   - id: G
     name: Generated integration projects
@@ -439,8 +446,8 @@ open_questions:
     proposed: Additive sub-project expansion of the umbrella model; register in apache/security-site project-coordinates.json and on camel.apache.org/security. Tracked in apache/camel-kit#131.
   - id: Q11
     wave: 3
-    sections: ["4.3", "4.12"]
-    proposed: camel-kit-knowledge stays out while a separate repository.
+    sections: ["4.1", "4.3", "4.12"]
+    proposed: Knowledge now lives in knowledge/; decide between extending this model and a companion model. Missing coverage is MODEL-GAP and reports use this repository's private process; generated Knowledge configuration remains covered by P4 and P10.
   - id: Q12
     wave: 3
     sections: ["SECURITY.md"]
@@ -453,7 +460,7 @@ open_questions:
 revision_triggers:
   - New CLI command, parser or input format reading external content; parser moving to later compilation phase or symbol resolution.
   - Change to the graph parser timeout or the POM parser path, or addition of size, memory or symbolic-link checks in camel-kit-graph (closes Q2 items).
-  - Camel-Kit gaining a network listener (e.g. merging the Knowledge MCP server, apache/camel-kit#2).
+  - Knowledge consolidation under knowledge/ (apache/camel-kit#2) triggers Q11; any new listener or change to its server/index boundaries requires model review.
   - Change to default oversight mode, default backend, Pi tool lists or flags, tree policy rules/quotas, expression gate, secret-scan rules, resolver origin/checksum/redirect policy.
   - init writing outside the target directory or under $HOME; Ship state moving to a user-level default.
   - New or changed generated harness asset granting permissions, installing hooks or auto-approving tools.

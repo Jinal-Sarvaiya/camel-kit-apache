@@ -770,7 +770,7 @@ class ShippedAssetStructureTest {
                 agentName + " Ship skill must not receive an orchestration trait");
         assertFalse(skillContent.contains("## Dispatch"),
                 agentName + " Ship skill must not receive an orchestration dispatch block");
-        if (Set.of("bob2", "copilot", "claude", "codex").contains(agentName)) {
+        if (Set.of("bob2", "copilot", "claude", "codex", "antigravity").contains(agentName)) {
             assertTrue(skillContent.contains(ctx.commandPrefix() + " ship --backend " + agentName + "-native --json"));
             assertTrue(skillContent.contains("For every Ship invocation (new, submit, resume, status and abort)"));
             assertTrue(skillContent.contains("individually shell-quoted"));
@@ -813,6 +813,18 @@ class ShippedAssetStructureTest {
                 String worker = Files.readString(ctx.projectDir().resolve(".codex/agents/camel-ship-worker.toml"));
                 assertTrue(worker.contains("sandbox_mode = \"read-only\""));
                 assertFalse(worker.contains("[mcp_servers"));
+                return;
+            }
+            if ("antigravity".equals(agentName)) {
+                assertTrue(skillContent.contains("invoke_subagent"));
+                assertTrue(skillContent.contains("name: \"camel-ship-worker\""));
+                String worker = Files.readString(
+                        ctx.projectDir().resolve(".agents/agents/camel-ship-worker.md"));
+                assertTrue(worker.contains("commandExecutionPolicy: \"off\""));
+                assertTrue(worker.contains("mainAgent: false"));
+                assertTrue(worker.contains("inheritMcp: true"));
+                assertFalse(worker.contains("write_to_file"));
+                assertFalse(worker.contains("run_command"));
                 return;
             }
             assertTrue(skillContent.contains("fork_context: false"));

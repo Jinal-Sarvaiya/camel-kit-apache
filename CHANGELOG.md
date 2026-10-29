@@ -22,6 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Google Antigravity native Ship (#95)** — eligible sessions relay controller-issued stages through a dedicated
+  `camel-ship-worker` agent with `commandExecutionPolicy: "off"` and read-only tools.
+  `--backend antigravity-native` reuses the native task/result, recovery, oversight and deterministic publication
+  contract while preserving Antigravity's permission prompts, sandbox settings and existing session permissions.
+  Fresh and regenerated workspaces receive the native skill and worker; runs retain their recorded host.
 - **OpenAI Codex CLI native Ship (#225)** — eligible sessions relay controller-issued stages through the dedicated
   `camel_ship_worker` custom agent with `sandbox_mode = "read-only"` and instruction-level restrictions.
   `--backend codex-native` reuses the native task/result, recovery, oversight and deterministic publication contract

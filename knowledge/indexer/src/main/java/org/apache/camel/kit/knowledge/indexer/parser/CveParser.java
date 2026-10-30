@@ -26,7 +26,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * Parses Apache Camel CVE advisories from Markdown files with YAML frontmatter. Optionally enriches with NVD data (CVSS
@@ -326,7 +328,8 @@ public class CveParser {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> parseYamlFrontmatter(String frontmatter) {
         try {
-            Object parsed = new Yaml().load(frontmatter);
+            // Frontmatter is plain data; SafeConstructor refuses arbitrary type tags (!!type).
+            Object parsed = new Yaml(new SafeConstructor(new LoaderOptions())).load(frontmatter);
             return parsed instanceof Map ? (Map<String, Object>) parsed : null;
         } catch (Exception e) {
             LOG.warn("  Frontmatter is not valid YAML, falling back to line-based extraction: {}", e.getMessage());

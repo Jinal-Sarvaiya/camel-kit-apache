@@ -24,7 +24,9 @@ import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
+import org.yaml.snakeyaml.constructor.SafeConstructor;
 
 /**
  * Resolves active Apache Camel versions, their Git tags across three repos (camel, camel-spring-boot, camel-quarkus),
@@ -92,7 +94,8 @@ public class VersionResolver {
         }
 
         List<CamelRelease> releases = new ArrayList<>();
-        Yaml yaml = new Yaml();
+        // Frontmatter is plain data (maps/lists/scalars); SafeConstructor refuses arbitrary type tags.
+        Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
 
         // Only top-level release files (not subdirectories like q/, sb/, etc.)
         try (DirectoryStream<Path> stream = Files.newDirectoryStream(releasesDir, "release-*.md")) {

@@ -2,13 +2,13 @@
 
 This file contains metadata about the camel-kit project for use by OSS AI Helper commands.
 
-- Remote pattern: luigidemasi/camel-kit
-- GitHub repo: luigidemasi/camel-kit
+- Remote pattern: apache/camel-kit
+- GitHub repo: apache/camel-kit
 - Issue tracker type: GitHub
-- Issue tracker URL: https://github.com/luigidemasi/camel-kit/issues
+- Issue tracker URL: https://github.com/apache/camel-kit/issues
 - Issue ID format: numeric
 - SonarCloud component key: (none)
-- Documentation URL: https://github.com/luigidemasi/camel-kit/tree/main/docs
+- Documentation URL: https://github.com/apache/camel-kit/tree/main/docs
 - Related repositories: (none)
 - Create-issue supported: yes
 

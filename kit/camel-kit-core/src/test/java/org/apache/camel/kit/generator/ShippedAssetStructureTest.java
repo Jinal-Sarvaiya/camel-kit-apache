@@ -833,6 +833,16 @@ class ShippedAssetStructureTest {
             assertFalse(skillContent.contains(guide),
                     agentName + " Ship skill must not reference retired guide " + guide);
         }
+        if ("pi".equals(agentName)) {
+            assertFalse(skillContent.contains("--backend pi-native"),
+                    "Pi Ship skill must not reference a pi-native backend");
+            assertFalse(skillContent.contains("spawn_subagent"),
+                    "Pi Ship skill must not dispatch native subagents");
+            assertFalse(skillContent.contains("invoke_subagent"),
+                    "Pi Ship skill must not dispatch native subagents");
+            assertFalse(skillContent.contains("fork_context"),
+                    "Pi Ship skill must not reference fork_context");
+        }
 
         if (!ctx.agent().generatesCommandStubs()) {
             return;

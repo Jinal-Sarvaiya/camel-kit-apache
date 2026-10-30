@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   while preserving Codex CLI sandbox, approval policies and existing session permissions. Host-enforced tool restriction
   depends on the Codex CLI version. Fresh and regenerated workspaces receive the native skill and worker; runs retain
   their recorded host.
+- **Pi execution and run-state compatibility verification (#100)** — focused non-regression tests confirm
+  that Pi runs reject native backends on resume, round-trip `executionMode: PI` through the store, preserve
+  Pi execution mode across the full coordinator lifecycle (run, resume, abort, recovery, interruption), and
+  that the Pi Ship skill contains no native dispatch language.
 
 ### Changed
 

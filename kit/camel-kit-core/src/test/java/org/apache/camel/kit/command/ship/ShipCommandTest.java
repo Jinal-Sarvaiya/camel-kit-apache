@@ -196,6 +196,40 @@ class ShipCommandTest {
     }
 
     @Test
+    void piRunRejectsNativeBackendOnResumeAndSubmit() throws Exception {
+        Path project = Files.createDirectory(tempDir.resolve("project"));
+        ShipController controller = controller("state");
+        RecordingLauncher launcher = RecordingLauncher.passThrough(controller);
+
+        RunResult started = run(controller, launcher, "--project-dir", project.toString());
+        assertEquals(0, started.exitCode(), started.error());
+        String id = runId(started.output());
+        assertEquals(ShipRun.ExecutionMode.PI, controller.status(id).executionMode());
+
+        RunResult mismatch = run(controller, rejectingLauncher(),
+                "--project-dir", project.toString(),
+                "--resume", id, "--backend", "bob2-native");
+        assertEquals(1, mismatch.exitCode());
+        assertTrue(mismatch.error().contains("execution-mode-mismatch"), mismatch.error());
+
+        RunResult mismatchClaude = run(controller, rejectingLauncher(),
+                "--project-dir", project.toString(),
+                "--resume", id, "--backend", "claude-native");
+        assertEquals(1, mismatchClaude.exitCode());
+        assertTrue(mismatchClaude.error().contains("execution-mode-mismatch"), mismatchClaude.error());
+
+        Path fakeResult = Files.writeString(tempDir.resolve("fake.json"), "{}");
+        RunResult submitted = run(controller, RecordingLauncher.passThrough(controller),
+                "--project-dir", project.toString(),
+                "--submit", id, "--result", fakeResult.toString());
+        assertEquals(1, submitted.exitCode());
+        assertTrue(submitted.error().contains("execution-mode-mismatch")
+                || submitted.error().contains("no-pending-task")
+                || submitted.error().contains("requires a native backend"),
+                "Pi run must reject --submit: " + submitted.error());
+    }
+
+    @Test
     void continuationCommandsCarryTheProjectDirectoryOfTheProjectLocalStore() throws Exception {
         Assumptions.assumeTrue(System.getenv("CAMEL_KIT_SHIP_STATE_HOME") == null,
                 "CAMEL_KIT_SHIP_STATE_HOME overrides the project-local store");
@@ -239,12 +273,15 @@ class ShipCommandTest {
 
         assertEquals(0, result.exitCode(), result.error());
         assertEquals("", result.error());
-        assertEquals(summary(id, "RUNNING", "DISCOVERY", "SMART"), result.output());
-        assertEquals(List.of("run:" + id), launcher.invocations);
 
         ShipRun run = controller.status(id);
+        assertEquals(ShipRun.ExecutionMode.PI, run.executionMode(),
+                "A bare start without --backend must default to PI");
         assertEquals(project.toAbsolutePath().normalize().toString(), run.projectDirectory());
         assertTrue(run.context().sources().isEmpty());
+
+        assertEquals(summary(id, "RUNNING", "DISCOVERY", "SMART"), result.output());
+        assertEquals(List.of("run:" + id), launcher.invocations);
     }
 
     @Test

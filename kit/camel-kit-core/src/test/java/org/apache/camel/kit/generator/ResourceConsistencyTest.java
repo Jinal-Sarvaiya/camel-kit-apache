@@ -1279,6 +1279,19 @@ class ResourceConsistencyTest {
     }
 
     @Test
+    void mainRunScriptPinsTheProjectCamelVersion() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String runScript = Files.readString(root.resolve("camel-implement/guides/run-script.md"));
+        String orchestrator = Files.readString(root.resolve("camel-implement/guides/orchestrator.md"));
+        String greenfield = Files.readString(root.resolve("camel-plan/guides/task-template-greenfield.md"));
+
+        assertTrue(runScript.contains("--camel-version={CAMEL_VERSION}"));
+        assertTrue(runScript.contains("`project.camelVersion`"));
+        assertTrue(orchestrator.contains("`MODULE_DIR`, `CAMEL_VERSION`, `ROUTE_FILES`"));
+        assertTrue(greenfield.contains("--camel-version=[CAMEL_VERSION]"));
+    }
+
+    @Test
     void migrationContractsPreserveRuntimeAndCanonicalTransformationEngine() throws IOException {
         Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
         String migrate = Files.readString(root.resolve("camel-migrate/SKILL.md"));

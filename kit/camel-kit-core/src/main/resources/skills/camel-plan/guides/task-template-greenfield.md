@@ -221,13 +221,14 @@ their Maven launch commands and must not receive `run.sh`.
 
 - [ ] Inventory every module `.camel.yaml` route as `ROUTE_FILES`
 - [ ] Inventory every module XSLT DataMapper file as `XSL_FILES` (the list may be empty)
-- [ ] Generate one `run.sh` whose single Camel command lists every `ROUTE_FILES` and `XSL_FILES` entry
+- [ ] Read `CAMEL_VERSION` from `project.camelVersion` in `.camel-kit/config.properties`
+- [ ] Generate one `run.sh` whose single Camel command lists every `ROUTE_FILES` and `XSL_FILES` entry and passes `--camel-version=[CAMEL_VERSION]`
 - [ ] Make the script executable with `chmod +x [MODULE_DIR]run.sh`
-- [ ] Verify: `test -x [MODULE_DIR]run.sh` exits 0 and the command contains every inventoried route/XSL file
+- [ ] Verify: `test -x [MODULE_DIR]run.sh` exits 0, the command contains every inventoried route/XSL file and `grep -q -- '--camel-version=' [MODULE_DIR]run.sh` succeeds
 
 **Review:**
 - [ ] Spec compliance: the script launches the complete module, not one flow
-- [ ] Code quality: JBang alias, properties argument, and strict shell flags match the run-script guide
+- [ ] Code quality: JBang alias, Camel version pin, properties argument, and strict shell flags match the run-script guide
 ```
 
 ### Task Template: Generate Docker Compose (consolidated)

@@ -116,7 +116,7 @@ The properties validation gate (properties-generation.md §5.4) is part of this 
 
 **Main runtime:**
 - Load `guides/run-script.md`
-- Pass: `MODULE_NAME`, `MODULE_DIR`, `ROUTE_FILES` (every module route), `XSL_FILES` (every module XSLT file)
+- Pass: `MODULE_NAME`, `MODULE_DIR`, `CAMEL_VERSION`, `ROUTE_FILES` (every module route), `XSL_FILES` (every module XSLT file)
 
 **Spring Boot / Quarkus:**
 - Load `guides/maven-dependencies.md`

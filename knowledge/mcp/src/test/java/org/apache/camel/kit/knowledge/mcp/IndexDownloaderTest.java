@@ -188,6 +188,24 @@ class IndexDownloaderTest {
     }
 
     @Test
+    void nonLoopbackHttpManifestIsRejected() throws Exception {
+        publishDir = tmp.resolve("publish");
+        Files.createDirectories(publishDir);
+        cacheDir = tmp.resolve("cache");
+
+        IOException e = assertThrows(IOException.class,
+                () -> downloader(null, "http://example.org/index.json").resolve());
+        boolean refused = false;
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t.getMessage() != null && t.getMessage().contains("cleartext http")) {
+                refused = true;
+                break;
+            }
+        }
+        assertTrue(refused, "A remote http manifest must be refused over cleartext: " + e);
+    }
+
+    @Test
     void newVersionReplacesOldAndPrunes() throws Exception {
         String url = publish("2026.07.01", "old-bytes", null);
         downloader(null, url).resolve();

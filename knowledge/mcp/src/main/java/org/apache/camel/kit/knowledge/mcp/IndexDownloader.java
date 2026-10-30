@@ -268,9 +268,12 @@ public class IndexDownloader {
 
     private ManifestLocation discoverManifest() throws IOException, InterruptedException {
         if (config.url().isPresent()) {
-            return new ManifestLocation(URI.create(config.url().get()), config.version().orElse(null));
+            URI manifestUri = URI.create(config.url().get());
+            requireFetchableUri(manifestUri);
+            return new ManifestLocation(manifestUri, config.version().orElse(null));
         }
         URI endpoint = URI.create(config.releasesUrl());
+        requireFetchableUri(endpoint);
         if (config.version().isPresent()) {
             URI pinned = URI.create(endpoint.toString().replaceAll("/+$", "")
                                     + "/tags/" + RELEASE_PREFIX + config.version().get());
@@ -330,9 +333,7 @@ public class IndexDownloader {
             if ("index.json".equals(asset.path("name").asText())) {
                 try {
                     URI uri = URI.create(asset.path("browser_download_url").asText());
-                    if (!Set.of("https", "http", "file").contains(uri.getScheme())) {
-                        throw new IOException("Unsupported index manifest URI: " + uri);
-                    }
+                    requireFetchableUri(uri);
                     return Optional.of(uri);
                 } catch (IllegalArgumentException e) {
                     throw new IOException("Invalid index manifest download URL", e);
@@ -370,6 +371,37 @@ public class IndexDownloader {
                 || lower.matches("(con|prn|aux|nul|com[1-9]|lpt[1-9])(\\..*)?")) {
             throw new IOException("Index version must be a safe directory name: " + version);
         }
+    }
+
+    /**
+     * The manifest carries the sha256 that verifies the archive, so fetching the manifest (or the asset) over cleartext
+     * would let a man-in-the-middle rewrite both the content and its expected hash. Allow {@code https} and local
+     * {@code file} URIs anywhere; allow {@code http} only to a loopback host, which has no network attacker and keeps
+     * local testing working.
+     */
+    private static void requireFetchableUri(URI uri) throws IOException {
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        switch (scheme) {
+            case "https", "file" -> {
+            }
+            case "http" -> {
+                if (!isLoopbackHost(uri.getHost())) {
+                    throw new IOException(
+                            "Refusing to fetch the knowledge index over cleartext http from a non-loopback host; "
+                                          + "use https, since the manifest's sha256 cannot protect a manifest served over http: "
+                                          + uri);
+                }
+            }
+            default -> throw new IOException("Unsupported index URI scheme (expected https or file): " + uri);
+        }
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        if (host == null) {
+            return false;
+        }
+        String h = host.toLowerCase(Locale.ROOT);
+        return h.equals("localhost") || h.equals("::1") || h.equals("[::1]") || h.matches("127(\\.\\d{1,3}){3}");
     }
 
     private static Path versionDirectory(Path cacheDir, String version) throws IOException {
@@ -506,6 +538,7 @@ public class IndexDownloader {
         } catch (IllegalArgumentException e) {
             throw new IOException("Invalid index asset URI: " + manifest.asset(), e);
         }
+        requireFetchableUri(assetUri);
         LOG.info("Downloading knowledge index {} from {} ...", manifest.version(), assetUri);
 
         Path zipFile = Files.createTempFile(cacheDir, "index-", ".zip.part");

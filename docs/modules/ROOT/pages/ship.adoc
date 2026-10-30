@@ -198,7 +198,8 @@ certification.
 
 | Google Antigravity
 | `/camel-ship` from the generated skill in a session that exposes `invoke_subagent` and the `camel-ship-worker`
-  custom agent, which declares `commandExecutionPolicy: "off"`, `inheritMcp: true` and only read and search tools.
+  custom agent, which declares `commandExecutionPolicy: "off"`, `inheritMcp: false` and only read and search tools.
+  Unlike the general `camel-worker` and `camel-reviewer` agents, the Ship worker does not inherit MCP servers.
   The skill respects Antigravity's permission prompts and sandbox settings.
 |===
 

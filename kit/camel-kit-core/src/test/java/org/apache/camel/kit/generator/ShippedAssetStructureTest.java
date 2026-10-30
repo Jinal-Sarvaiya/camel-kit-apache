@@ -771,7 +771,7 @@ class ShippedAssetStructureTest {
                 agentName + " Ship skill must not receive an orchestration trait");
         assertFalse(skillContent.contains("## Dispatch"),
                 agentName + " Ship skill must not receive an orchestration dispatch block");
-        if (Set.of("bob2", "copilot", "claude", "codex", "antigravity", "qwen").contains(agentName)) {
+        if (Set.of("bob2", "copilot", "claude", "codex", "antigravity", "qwen", "opencode").contains(agentName)) {
             assertTrue(skillContent.contains(ctx.commandPrefix() + " ship --backend " + agentName + "-native --json"));
             assertTrue(skillContent.contains("For every Ship invocation (new, submit, resume, status and abort)"));
             assertTrue(skillContent.contains("individually shell-quoted"));
@@ -866,6 +866,25 @@ class ShippedAssetStructureTest {
                 assertTrue(worker.contains("context-authority.md"));
                 assertTrue(worker.contains("canonical-envelope data"));
                 assertTrue(worker.contains("NEEDS_USER_CONFIRMATION"));
+                return;
+            }
+            if ("opencode".equals(agentName)) {
+                assertTrue(skillContent.contains("subagent_type: \"camel-ship-worker\""));
+                assertTrue(skillContent.contains("OPENCODE_NATIVE"));
+                assertTrue(skillContent.contains("`run.status` is `RUNNING`"));
+                String worker = Files.readString(
+                        ctx.projectDir().resolve(".opencode/agents/camel-ship-worker.md"));
+                assertFalse(worker.contains("edit: allow"));
+                assertFalse(worker.contains("bash: allow"));
+                assertFalse(worker.contains("task: allow"));
+                assertFalse(worker.contains("mcp"));
+                // OpenCode still generates a command stub (generatesCommandStubs: true)
+                // For native agents the stub delegates to SKILL.md, not the one-shot relay
+                Path command = ctx.commandsDir().resolve("camel-ship.md");
+                assertTrue(Files.exists(command));
+                String commandContent = Files.readString(command);
+                assertTrue(commandContent.contains("camel-ship/SKILL.md"),
+                        "opencode native ship command stub must delegate to SKILL.md");
                 return;
             }
             assertTrue(skillContent.contains("fork_context: false"));

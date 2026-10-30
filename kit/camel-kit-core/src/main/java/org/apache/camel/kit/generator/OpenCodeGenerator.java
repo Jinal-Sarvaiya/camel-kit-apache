@@ -12,7 +12,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
     private static final String[] AGENTS = {
             "brainstormer", "planner", "implementer",
             "validator", "tester", "migrator", "executor",
-            "researcher", "reviewer"
+            "researcher", "reviewer", "camel-ship-worker"
     };
 
     private final QuteTemplateEngine templateEngine = new QuteTemplateEngine();

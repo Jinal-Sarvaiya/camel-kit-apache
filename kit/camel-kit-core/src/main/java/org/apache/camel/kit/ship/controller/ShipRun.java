@@ -249,7 +249,8 @@ public record ShipRun(
         CLAUDE_NATIVE("claude"),
         CODEX_NATIVE("codex"),
         ANTIGRAVITY_NATIVE("antigravity"),
-        QWEN_NATIVE("qwen");
+        QWEN_NATIVE("qwen"),
+        OPENCODE_NATIVE("opencode");
 
         private final String host;
 

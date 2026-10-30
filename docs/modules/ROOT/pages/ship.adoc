@@ -60,7 +60,7 @@ the discovery input before any question, and open points come back as grouped un
 | `--status RUN_ID` | | Read the latest durable state without starting the workflow runtime
 | `--abort RUN_ID` | | Abort a run that has not completed; aborted runs cannot be resumed
 | `--start-from STAGE` | | Start a new run at `discovery`, `design` or `plan`
-| `--backend MODE` | `pi` | `pi`, `bob2-native`, `copilot-native`, `claude-native`, `antigravity-native`, `qwen-native` or, in the
+| `--backend MODE` | `pi` | `pi`, `bob2-native`, `copilot-native`, `claude-native`, `antigravity-native`, `qwen-native`, `opencode-native` or, in the
   development snapshot, `codex-native`; a run keeps its mode for its lifetime
 | `--json` | off | Structured run state and any pending native task
 | `--submit RUN_ID --result PATH` | | Relay one native child result
@@ -147,8 +147,8 @@ is trusted.
 [[native]]
 == Native subagents
 
-With the Pi backend, Ship runs an external Pi worker. Eligible IBM Bob 2, GitHub Copilot CLI, Claude Code and
-Google Antigravity and Qwen Code sessions can instead relay the controller's stage tasks to their own read-only
+With the Pi backend, Ship runs an external Pi worker. Eligible IBM Bob 2, GitHub Copilot CLI, Claude Code,
+Google Antigravity, Qwen Code and OpenCode sessions can instead relay the controller's stage tasks to their own read-only
 native subagents; OpenAI Codex CLI joins them in the development snapshot. The contract is the same for every host:
 
 . The controller creates one pending task with its run, stage, attempt, input digest, deadline and a unique task ID,
@@ -156,7 +156,7 @@ native subagents; OpenAI Codex CLI joins them in the development snapshot. The c
 . The parent dispatches a fresh `camel-ship-worker` child with the controller's complete prompt, copied verbatim,
   and submits the observed result through `ship --submit RUN_ID --result PATH --json`.
 . The worker never edits project files, writes to the candidate or the state directory, calls MCP servers, delegates
-  or publishes. On Bob 2, Copilot CLI, Claude Code, Antigravity and Qwen Code it has read and search tools only; on Codex CLI it may use
+  or publishes. On Bob 2, Copilot CLI, Claude Code, Antigravity, Qwen Code and OpenCode it has read and search tools only; on Codex CLI it may use
   the host's file-reading means, shell commands included, for the named inputs and sources, under the host's
   permissions. For execute it returns complete text proposals for the approved route and test paths, `pom.xml` and
   `.camel-kit/config.properties`; arbitrary extra resources, binary files and deletions are outside the contract.
@@ -208,6 +208,13 @@ certification.
   uses `fork` or `fork_turns`; dispatch is through the named-agent mechanism. If `--backend qwen-native` is requested
   and dispatch is unavailable the skill stops without starting a run. Generated skill and worker assets verified on
   Qwen Code 0.25.3 (parser/command-loader probe); live child execution acceptance is pending.
+
+| OpenCode
+| `/camel-ship` command stub in `.opencode/commands/` that invokes the native skill, which uses the `task` tool to
+  dispatch a `camel-ship-worker` child with `edit: deny`, `bash: deny` and `task: deny`. The child has no MCP
+  server access. The entry point is the generated `/camel-ship` command stub; the native skill is installed in
+  `.opencode/skills/camel-ship/SKILL.md` and the worker in `.opencode/agents/camel-ship-worker.md`.
+  If native dispatch is absent or disabled the skill falls back to the existing CLI execution model.
 |===
 
 A fresh context is not an OS sandbox: read access follows the parent's permitted paths. Do not broaden permissions,
@@ -232,7 +239,8 @@ error, including `stale-stage-input` or a permission denial, and wait for a new 
   worker via `invoke_subagent`.
 * *Qwen Code* exposes `/camel-ship` through its skills directory and relays eligible runs to its read-only worker
   via named-agent dispatch.
-* *OpenCode* generates a `/camel-ship` command stub that forwards the options once.
+* *OpenCode* exposes `/camel-ship` through its command directory and relays eligible runs to its read-only
+  `camel-ship-worker` child agent via the `task` tool.
 * *Pi* exposes Ship only as `/skill:camel-ship`; there is deliberately no `/camel-ship` prompt, because Pi's prompt
   expansion flattens quoted option values.
 

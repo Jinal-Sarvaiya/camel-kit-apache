@@ -31,6 +31,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--backend qwen-native` reuses the native task/result, recovery, oversight and deterministic publication
   contract while preserving Qwen's named-agent dispatch model. Dispatch never uses `fork` or `fork_turns`.
   Fresh and regenerated workspaces receive the native skill and worker; runs retain their recorded host.
+- **OpenCode native Ship (#99)** — eligible sessions relay controller-issued stages through a dedicated
+  `camel-ship-worker` agent with `edit: deny`, `bash: deny` and `task: deny` permissions and no MCP server
+  configuration. `--backend opencode-native` reuses the native task/result, recovery, oversight and deterministic
+  publication contract while preserving OpenCode's `task` tool dispatch model. Fresh and regenerated workspaces
+  receive the native skill, worker and command stub; runs retain their recorded host.
 - **OpenAI Codex CLI native Ship (#225)** — eligible sessions relay controller-issued stages through the dedicated
   `camel_ship_worker` custom agent with `sandbox_mode = "read-only"` and instruction-level restrictions.
   `--backend codex-native` reuses the native task/result, recovery, oversight and deterministic publication contract

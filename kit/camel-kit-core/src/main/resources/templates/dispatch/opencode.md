@@ -21,6 +21,7 @@ arguments, and phase handoffs. Use OpenCode's `task` tool only for a bounded ste
 - `planner` for the bounded re-plan loop
 - `brainstormer` only for bounded non-interactive discovery or design analysis
 - `validator` only for a bounded report-producing validation task
+- `camel-ship-worker` only for a controller-issued Ship stage task (dispatched by the Ship skill, never by other workflows)
 
 Do not delegate a complete brainstorm, plan, migrate, start, or chained workflow to a child. OpenCode's `task` call must
 include `subagent_type`; omit `background` for every result that gates the next step. Agent definitions own their step

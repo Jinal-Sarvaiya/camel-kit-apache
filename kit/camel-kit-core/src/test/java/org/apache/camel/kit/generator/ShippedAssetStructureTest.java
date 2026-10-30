@@ -448,6 +448,7 @@ class ShippedAssetStructureTest {
                     ".github/agents/camel-migrator.agent.md",
                     ".github/agents/camel-catalog-researcher.agent.md",
                     ".github/agents/camel-security-reviewer.agent.md");
+            case "opencode" -> List.of(".opencode/agents/camel-ship-worker.md");
             case "qwen" -> List.of(".qwen/agents/camel-ship-worker.md");
             default -> List.of();
         };
@@ -872,14 +873,22 @@ class ShippedAssetStructureTest {
                 assertTrue(skillContent.contains("subagent_type: \"camel-ship-worker\""));
                 assertTrue(skillContent.contains("OPENCODE_NATIVE"));
                 assertTrue(skillContent.contains("`run.status` is `RUNNING`"));
+                assertTrue(skillContent.contains(
+                        "If the user explicitly chose `--backend opencode-native` but native dispatch is unavailable, report that this session\n"
+                                                 + "cannot service the requested native backend and stop without starting a run. Do not fall through to the CLI with an\n"
+                                                 + "explicit native backend that has no dispatcher.\n"
+                                                 + "If native dispatch is absent or disabled and the user did not explicitly choose a native backend, retain the existing\n"
+                                                 + "CLI execution model:"),
+                        "OpenCode Ship skill must contain the complete explicit-backend guard and fallback-restriction block");
+                assertFalse(skillContent.contains(
+                        "If native dispatch is absent or disabled, retain the existing\nCLI execution model:"),
+                        "OpenCode Ship skill must not have an unconditional CLI fallback that includes explicit-native requests");
                 String worker = Files.readString(
                         ctx.projectDir().resolve(".opencode/agents/camel-ship-worker.md"));
                 assertFalse(worker.contains("edit: allow"));
                 assertFalse(worker.contains("bash: allow"));
                 assertFalse(worker.contains("task: allow"));
                 assertFalse(worker.contains("mcp"));
-                // OpenCode still generates a command stub (generatesCommandStubs: true)
-                // For native agents the stub delegates to SKILL.md, not the one-shot relay
                 Path command = ctx.commandsDir().resolve("camel-ship.md");
                 assertTrue(Files.exists(command));
                 String commandContent = Files.readString(command);

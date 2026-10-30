@@ -89,6 +89,7 @@ class OpenCodeGeneratorTest {
         assertTrue(Files.exists(agentsDir.resolve("executor.md")));
         assertTrue(Files.exists(agentsDir.resolve("researcher.md")));
         assertTrue(Files.exists(agentsDir.resolve("reviewer.md")));
+        assertTrue(Files.exists(agentsDir.resolve("camel-ship-worker.md")));
 
         AgentDescriptor descriptor = AgentRegistry.descriptor("opencode");
         Set<String> registeredAgents = descriptor.templates().stream()
@@ -97,6 +98,7 @@ class OpenCodeGeneratorTest {
                 .collect(Collectors.toSet());
         assertEquals(Set.of(
                 ".opencode/agents/brainstormer.md",
+                ".opencode/agents/camel-ship-worker.md",
                 ".opencode/agents/executor.md",
                 ".opencode/agents/implementer.md",
                 ".opencode/agents/migrator.md",
@@ -113,7 +115,7 @@ class OpenCodeGeneratorTest {
         new OpenCodeGenerator().generate(ctx);
 
         for (String name : new String[]{
-                "brainstormer", "executor", "implementer", "migrator", "planner",
+                "brainstormer", "camel-ship-worker", "executor", "implementer", "migrator", "planner",
                 "researcher", "reviewer", "tester", "validator"
         }) {
             String content = Files.readString(tempDir.resolve(".opencode/agents/" + name + ".md"));
@@ -205,6 +207,18 @@ class OpenCodeGeneratorTest {
             assertTrue(content.contains("bash: deny"));
             assertTrue(content.contains("task: deny"));
         }
+    }
+
+    @Test
+    void shipWorkerIsReadOnlyAndCannotRedispatch() throws Exception {
+        InitContext ctx = createContext();
+        new OpenCodeGenerator().generate(ctx);
+
+        String content = Files.readString(
+                tempDir.resolve(".opencode/agents/camel-ship-worker.md"));
+        assertTrue(content.contains("edit: deny"));
+        assertTrue(content.contains("bash: deny"));
+        assertTrue(content.contains("task: deny"));
     }
 
     @Test

@@ -838,16 +838,15 @@ class ShippedAssetStructureTest {
                 assertTrue(skillContent.contains("QWEN_NATIVE"));
                 assertTrue(skillContent.contains("`run.status` is `RUNNING`"));
                 assertTrue(skillContent.contains(
-                        "explicitly chose `--backend qwen-native` but native dispatch is unavailable"),
-                        "Qwen Ship skill must detect an explicit qwen-native request with no dispatcher");
-                assertTrue(skillContent.contains("stop without starting a run"),
-                        "Qwen Ship skill must stop before creating a run when dispatch is unavailable");
-                assertTrue(skillContent.contains("Do not fall through to the CLI with an\n"
-                                                 + "explicit native backend that has no dispatcher"),
-                        "Qwen Ship skill must exclude explicit native requests from the CLI fallback");
-                assertTrue(skillContent.contains(
-                        "user did not explicitly choose a native backend, retain the existing"),
-                        "Qwen Ship fallback must be limited to non-explicit-native requests");
+                        "If the user explicitly chose `--backend qwen-native` but native dispatch is unavailable, report that this session\n"
+                                                 + "cannot service the requested native backend and stop without starting a run. Do not fall through to the CLI with an\n"
+                                                 + "explicit native backend that has no dispatcher.\n"
+                                                 + "If native dispatch is absent or disabled and the user did not explicitly choose a native backend, retain the existing\n"
+                                                 + "CLI execution model:"),
+                        "Qwen Ship skill must contain the complete explicit-backend guard and fallback-restriction block");
+                assertFalse(skillContent.contains(
+                        "If native dispatch is absent or disabled, retain the existing\nCLI execution model:"),
+                        "Qwen Ship skill must not have an unconditional CLI fallback that includes explicit-native requests");
                 assertFalse(skillContent.contains("fork_context"));
                 assertFalse(skillContent.contains("invoke_subagent"));
                 assertFalse(skillContent.contains("spawn_subagent"));

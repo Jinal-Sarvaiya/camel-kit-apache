@@ -931,7 +931,7 @@ Validation is static and report-only: it does not modify routes or fix the findi
 
 The preview status applies to every Ship backend. `--accept-experimental` only permits unverified Pi/Node versions; it does not enable Ship or change its preview status. Tested runtime compatibility and passing validation checks do not imply production readiness.
 
-**Purpose:** Start or control the local Ship workflow through the configured Camel-Kit CLI. Harness skills delegate stage decisions and state to the CLI. Eligible Bob 2, Copilot CLI, Claude Code and OpenAI Codex CLI sessions relay pending work to native subagents; other execution models retain the single CLI invocation. See [Bob native Ship](ship-native.md), [Copilot native Ship](ship-copilot.md), [Claude Code native Ship](ship-claude.md) and [Codex CLI native Ship](ship-codex.md).
+**Purpose:** Start or control the local Ship workflow through the configured Camel-Kit CLI. Harness skills delegate stage decisions and state to the CLI. Eligible Bob 2, Copilot CLI, Claude Code, OpenAI Codex CLI and Qwen Code sessions relay pending work to native subagents; other execution models retain the single CLI invocation. See [Bob native Ship](ship-native.md), [Copilot native Ship](ship-copilot.md), [Claude Code native Ship](ship-claude.md) and [Codex CLI native Ship](ship-codex.md).
 
 The registered command is `camel-kit ship` when Camel-Kit is installed standalone and `camel kit ship` when it is installed as a Camel JBang plugin. Harness-native forms such as `/camel-ship`, `$camel-ship`, and `/skill:camel-ship` invoke that configured command prefix. Pi uses `/skill:camel-ship`; Camel-Kit intentionally does not generate a Pi `/camel-ship` prompt because that prompt surface flattens quoted option values.
 
@@ -958,7 +958,7 @@ The registered command is `camel-kit ship` when Camel-Kit is installed standalon
 | Argument | Default | Description |
 |---|---|---|
 | `--accept-experimental` | false | Continue after the warning for an experimental Pi or Node version. |
-| `--backend pi\|bob2-native\|copilot-native\|claude-native\|codex-native` | `pi` | Execution mode for a new run; resume retains the recorded mode. |
+| `--backend pi\|bob2-native\|copilot-native\|claude-native\|codex-native\|qwen-native` | `pi` | Execution mode for a new run; resume retains the recorded mode. |
 | `--json` | off | Structured run state and any pending native task. |
 | `--submit RUN_ID --result PATH` | none | Relay one native child result; mutually exclusive with other lifecycle operations. |
 | `--pi PATH` | discovered on `PATH` | Pi executable used by Pi stage workers. |

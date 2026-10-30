@@ -448,6 +448,7 @@ class ShippedAssetStructureTest {
                     ".github/agents/camel-migrator.agent.md",
                     ".github/agents/camel-catalog-researcher.agent.md",
                     ".github/agents/camel-security-reviewer.agent.md");
+            case "qwen" -> List.of(".qwen/agents/camel-ship-worker.md");
             default -> List.of();
         };
     }
@@ -539,7 +540,7 @@ class ShippedAssetStructureTest {
                 }
             }
             case "qwen" -> {
-                for (String role : List.of("camel-reviewer", "camel-validator")) {
+                for (String role : List.of("camel-reviewer", "camel-validator", "camel-ship-worker")) {
                     assertGeneratedContains(ctx, agentName, ".qwen/agents/" + role + ".md",
                             ".qwen/skills/shared/context-authority.md",
                             "canonical-envelope data",
@@ -745,7 +746,7 @@ class ShippedAssetStructureTest {
             Files.writeString(rulesDir.resolve("ship.md"), "legacy generated rule");
             Files.writeString(rulesDir.resolve("keep.md"), "user-owned neighboring file");
         }
-        if ("pi".equals(ctx.agentName())) {
+        if ("pi".equals(ctx.agentName()) || "qwen".equals(ctx.agentName())) {
             Files.createDirectories(ctx.commandsDir());
             Files.writeString(ctx.commandsDir().resolve("camel-ship.md"), "legacy lossy prompt");
             Files.writeString(ctx.commandsDir().resolve("keep.md"), "user-owned neighboring prompt");
@@ -770,7 +771,7 @@ class ShippedAssetStructureTest {
                 agentName + " Ship skill must not receive an orchestration trait");
         assertFalse(skillContent.contains("## Dispatch"),
                 agentName + " Ship skill must not receive an orchestration dispatch block");
-        if (Set.of("bob2", "copilot", "claude", "codex", "antigravity").contains(agentName)) {
+        if (Set.of("bob2", "copilot", "claude", "codex", "antigravity", "qwen").contains(agentName)) {
             assertTrue(skillContent.contains(ctx.commandPrefix() + " ship --backend " + agentName + "-native --json"));
             assertTrue(skillContent.contains("For every Ship invocation (new, submit, resume, status and abort)"));
             assertTrue(skillContent.contains("individually shell-quoted"));
@@ -830,6 +831,33 @@ class ShippedAssetStructureTest {
                 assertFalse(worker.contains("inheritMcp: true"));
                 assertFalse(worker.contains("write_to_file"));
                 assertFalse(worker.contains("run_command"));
+                return;
+            }
+            if ("qwen".equals(agentName)) {
+                assertTrue(skillContent.contains("named `camel-ship-worker` agent"));
+                assertTrue(skillContent.contains("QWEN_NATIVE"));
+                assertTrue(skillContent.contains("`run.status` is `RUNNING`"));
+                assertTrue(skillContent.contains("stop without starting a run"),
+                        "Qwen Ship skill must reject explicit qwen-native when dispatch is unavailable");
+                assertFalse(skillContent.contains("fork_context"));
+                assertFalse(skillContent.contains("invoke_subagent"));
+                assertFalse(skillContent.contains("spawn_subagent"));
+                assertTrue(skillContent.contains("Never use `fork` or `fork_turns`"));
+                String worker = Files.readString(
+                        ctx.projectDir().resolve(".qwen/agents/camel-ship-worker.md"));
+                assertTrue(worker.contains("approvalMode: default"));
+                assertTrue(worker.contains("read_file"));
+                assertTrue(worker.contains("grep_search"));
+                String workerTools = worker.substring(
+                        worker.indexOf("tools:"), worker.indexOf("disallowedTools:"));
+                assertFalse(workerTools.contains("write_file"));
+                assertFalse(workerTools.contains("edit"));
+                assertFalse(workerTools.contains("run_shell_command"));
+                assertTrue(worker.contains("disallowedTools:"));
+                assertTrue(worker.contains("  - agent"));
+                assertTrue(worker.contains("context-authority.md"));
+                assertTrue(worker.contains("canonical-envelope data"));
+                assertTrue(worker.contains("NEEDS_USER_CONFIRMATION"));
                 return;
             }
             assertTrue(skillContent.contains("fork_context: false"));

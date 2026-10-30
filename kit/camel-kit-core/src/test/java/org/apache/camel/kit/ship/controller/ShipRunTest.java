@@ -422,7 +422,8 @@ class ShipRunTest {
         assertEquals("claude", ShipRun.ExecutionMode.CLAUDE_NATIVE.host());
         assertEquals("codex", ShipRun.ExecutionMode.CODEX_NATIVE.host());
         assertEquals("antigravity", ShipRun.ExecutionMode.ANTIGRAVITY_NATIVE.host());
-        assertEquals(6, ShipRun.ExecutionMode.values().length,
+        assertEquals("qwen", ShipRun.ExecutionMode.QWEN_NATIVE.host());
+        assertEquals(7, ShipRun.ExecutionMode.values().length,
                 "A new execution mode must pin its host label here before it can persist runs");
     }
 

@@ -10,7 +10,7 @@ import org.apache.camel.kit.util.AnsiColors;
 public class QwenGenerator extends DefaultGenerator {
 
     private static final String[] SUB_AGENTS = {
-            "camel-implementer", "camel-reviewer", "camel-validator", "camel-tester"
+            "camel-implementer", "camel-reviewer", "camel-validator", "camel-tester", "camel-ship-worker"
     };
     private static final String[] RETIRED_SUB_AGENTS = {
             "camel-brainstormer", "camel-planner", "camel-migrator", "camel-executor"

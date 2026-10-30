@@ -25,6 +25,8 @@ templates:
     target: .qwen/agents/camel-tester.md
   - source: templates/qwen/agents/camel-validator.md
     target: .qwen/agents/camel-validator.md
+  - source: templates/qwen/agents/camel-ship-worker.md
+    target: .qwen/agents/camel-ship-worker.md
   - source: agents/acr-moderator.md
     target: .qwen/camel-kit-personas/acr-moderator.md
   - source: agents/catalog-researcher.md

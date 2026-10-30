@@ -137,10 +137,13 @@ and bring the findings back.
 [[qwen]]
 == Qwen Code
 
-`init` writes `QWEN.md`, the commands under `.qwen/commands/`, the skills under `.qwen/skills/`, four bounded leaf
-agents under `.qwen/agents/` (implementer, reviewer, tester, validator), the personas under
+`init` writes `QWEN.md`, the commands under `.qwen/commands/`, the skills under `.qwen/skills/`, five bounded leaf
+agents under `.qwen/agents/` (implementer, reviewer, tester, validator, ship-worker), the personas under
 `.qwen/camel-kit-personas/` and the MCP servers in `.qwen/settings.json`. Start with `/camel-start`. Interviews,
 approvals and phase handoffs stay in the primary session; only bounded work goes to the leaf agents.
+Eligible sessions relay Ship controller stages to the read-only `camel-ship-worker` named agent via
+`--backend qwen-native`; the worker returns structured results and artifact proposals without editing files or
+calling MCP tools.
 
 [[opencode]]
 == OpenCode

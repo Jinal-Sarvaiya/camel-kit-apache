@@ -32,7 +32,8 @@ class SkillResourceInstaller {
             AgentGeneratorStrategy.COPILOT.descriptorValue(),
             AgentGeneratorStrategy.CLAUDE.descriptorValue(),
             AgentGeneratorStrategy.CODEX.descriptorValue(),
-            AgentGeneratorStrategy.ANTIGRAVITY.descriptorValue());
+            AgentGeneratorStrategy.ANTIGRAVITY.descriptorValue(),
+            AgentGeneratorStrategy.QWEN.descriptorValue());
 
     private static final Set<String> MODEL_HIDDEN_INTERNAL_SKILLS = Set.of(
             "camel-design",

@@ -26,6 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `camel-ship-worker` agent with `commandExecutionPolicy: "off"` and read-only tools.
   `--backend antigravity-native` reuses the native task/result, recovery, oversight and deterministic publication
   contract while preserving Antigravity's permission prompts, sandbox settings and existing session permissions.
+- **Qwen Code native Ship (#98)** — eligible sessions relay controller-issued stages through the dedicated
+  `camel-ship-worker` named agent with `approvalMode: default`, read-only tools and `disallowedTools: [agent]`.
+  `--backend qwen-native` reuses the native task/result, recovery, oversight and deterministic publication
+  contract while preserving Qwen's named-agent dispatch model. Dispatch never uses `fork` or `fork_turns`.
   Fresh and regenerated workspaces receive the native skill and worker; runs retain their recorded host.
 - **OpenAI Codex CLI native Ship (#225)** — eligible sessions relay controller-issued stages through the dedicated
   `camel_ship_worker` custom agent with `sandbox_mode = "read-only"` and instruction-level restrictions.

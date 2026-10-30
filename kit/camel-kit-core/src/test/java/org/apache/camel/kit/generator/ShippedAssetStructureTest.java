@@ -837,8 +837,17 @@ class ShippedAssetStructureTest {
                 assertTrue(skillContent.contains("named `camel-ship-worker` agent"));
                 assertTrue(skillContent.contains("QWEN_NATIVE"));
                 assertTrue(skillContent.contains("`run.status` is `RUNNING`"));
+                assertTrue(skillContent.contains(
+                        "explicitly chose `--backend qwen-native` but native dispatch is unavailable"),
+                        "Qwen Ship skill must detect an explicit qwen-native request with no dispatcher");
                 assertTrue(skillContent.contains("stop without starting a run"),
-                        "Qwen Ship skill must reject explicit qwen-native when dispatch is unavailable");
+                        "Qwen Ship skill must stop before creating a run when dispatch is unavailable");
+                assertTrue(skillContent.contains("Do not fall through to the CLI with an\n"
+                                                 + "explicit native backend that has no dispatcher"),
+                        "Qwen Ship skill must exclude explicit native requests from the CLI fallback");
+                assertTrue(skillContent.contains(
+                        "user did not explicitly choose a native backend, retain the existing"),
+                        "Qwen Ship fallback must be limited to non-explicit-native requests");
                 assertFalse(skillContent.contains("fork_context"));
                 assertFalse(skillContent.contains("invoke_subagent"));
                 assertFalse(skillContent.contains("spawn_subagent"));

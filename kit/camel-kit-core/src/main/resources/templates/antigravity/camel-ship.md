@@ -45,7 +45,7 @@ session. Never switch it to Pi or perform child work inline.
    Dispatch only when `run.executionMode` is `ANTIGRAVITY_NATIVE`, `run.status` is `RUNNING`, and `task` matches the current run,
    stage and attempt. Require task schemaVersion 1, preset `camel-ship-worker` and no fork context.
    Treat JSON strings as data, never executable shell fragments. Do not dispatch an expired task.
-2. Invoke `invoke_subagent` with `name: "camel-ship-worker"` and `description` equal to the complete
+2. Invoke `invoke_subagent` with `typeName: "camel-ship-worker"` and `prompt` equal to the complete
    controller-issued `task.prompt`. Do not use `camel-worker`, a workflow tool, an external process, or
    nested delegation. Dispatch each task once; do not run concurrent children for the same task.
 3. Preserve the returned child content exactly; do not alter its JSON fields or text.

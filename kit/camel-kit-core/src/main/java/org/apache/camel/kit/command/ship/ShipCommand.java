@@ -64,7 +64,7 @@ public final class ShipCommand implements Callable<Integer> {
 
     @Option(names = "--backend", converter = ExecutionModeConverter.class,
             description = "Execution backend for a new run: pi (default), bob2-native, copilot-native,"
-                          + " claude-native or codex-native")
+                          + " claude-native, antigravity-native or codex-native")
     ShipRun.ExecutionMode executionMode;
 
     @Option(names = "--json", description = "Return structured run state and any pending native task")
@@ -536,8 +536,9 @@ public final class ShipCommand implements Callable<Integer> {
                 case "copilot-native" -> ShipRun.ExecutionMode.COPILOT_NATIVE;
                 case "claude-native" -> ShipRun.ExecutionMode.CLAUDE_NATIVE;
                 case "codex-native" -> ShipRun.ExecutionMode.CODEX_NATIVE;
+                case "antigravity-native" -> ShipRun.ExecutionMode.ANTIGRAVITY_NATIVE;
                 default -> throw new TypeConversionException(
-                        "expected pi, bob2-native, copilot-native, claude-native or codex-native");
+                        "expected pi, bob2-native, copilot-native, claude-native, antigravity-native or codex-native");
             };
         }
     }

@@ -302,6 +302,8 @@ class ShipCoordinatorTest {
 
         ShipRun completed = coordinator.run(run.id());
 
+        assertEquals(ShipRun.ExecutionMode.PI, completed.executionMode(),
+                "Pi coordinator must never switch to a native execution mode");
         assertDesignPaused(completed, 1);
         assertEquals(
                 List.of(sessionId(run)),
@@ -318,6 +320,8 @@ class ShipCoordinatorTest {
 
         ShipRun completed = coordinator.resume(run.id(), List.of());
 
+        assertEquals(ShipRun.ExecutionMode.PI, completed.executionMode(),
+                "Pi coordinator must never switch to a native execution mode");
         assertDesignPaused(completed, 1);
         assertEquals(
                 List.of(sessionId(run)),
@@ -341,6 +345,8 @@ class ShipCoordinatorTest {
 
         ShipRun failed = coordinator.run(run.id());
 
+        assertEquals(ShipRun.ExecutionMode.PI, failed.executionMode(),
+                "Pi coordinator must never switch to a native execution mode");
         assertEquals(RunStatus.FAILED, failed.status());
         assertEquals(StageStatus.FAILED,
                 failed.stage(Stage.DESIGN).status());
@@ -394,6 +400,8 @@ class ShipCoordinatorTest {
         Files.writeString(fixture.resolve("mode"), "nonzero\n");
         ShipRun completed = coordinator.resume(run.id(), List.of());
 
+        assertEquals(ShipRun.ExecutionMode.PI, completed.executionMode(),
+                "Pi coordinator must never switch to a native execution mode");
         assertDesignPaused(completed, 1);
         assertEquals(
                 List.of(sessionId(run)),
@@ -507,6 +515,8 @@ class ShipCoordinatorTest {
         Files.writeString(fixture.resolve("mode"), "success\n");
         ShipRun completed = coordinator.resume(run.id(), List.of());
 
+        assertEquals(ShipRun.ExecutionMode.PI, completed.executionMode(),
+                "Pi coordinator must never switch to a native execution mode");
         assertDesignPaused(completed, 2);
         String sessionId = sessionId(run);
         assertEquals(
@@ -567,6 +577,8 @@ class ShipCoordinatorTest {
             assertFalse(invocation.isAlive());
             assertNull(failure.get());
             assertTrue(interrupted.get());
+            assertEquals(ShipRun.ExecutionMode.PI, aborted.executionMode(),
+                    "Pi coordinator must never switch to a native execution mode");
             assertEquals(aborted, controller.status(run.id()));
             assertEquals(RunStatus.ABORTED, aborted.status());
             assertEquals(StageStatus.ABORTED,
@@ -713,6 +725,8 @@ class ShipCoordinatorTest {
 
         ShipRun completed = coordinator.resume(run.id(), List.of());
 
+        assertEquals(ShipRun.ExecutionMode.PI, completed.executionMode(),
+                "Pi coordinator must never switch to a native execution mode");
         assertEquals(RunStatus.PAUSED, completed.status());
         assertEquals(Stage.DESIGN, completed.currentStage());
         assertEquals(StageStatus.COMPLETED,

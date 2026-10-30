@@ -20,6 +20,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -49,6 +50,20 @@ class ShipRunStoreTest {
         legacy.put("executionMode", "BOB2_NATIVE");
         Files.writeString(state, mapper.writeValueAsString(legacy));
         assertCode("state-corrupt", () -> store.read(RUN_ID));
+    }
+
+    @Test
+    void piRunRetainsExecutionModeAfterRoundTrip() throws Exception {
+        ShipRunStore store = store();
+        ShipRun pi = run(RUN_ID);
+        assertEquals(ShipRun.ExecutionMode.PI, pi.executionMode());
+        store.create(pi);
+        ShipRun read = store.read(RUN_ID);
+        assertEquals(ShipRun.ExecutionMode.PI, read.executionMode());
+        for (ShipRun.StageRecord stage : read.stages()) {
+            assertNull(stage.nativeEvidence(),
+                    "PI stage " + stage.stage() + " must not carry native evidence");
+        }
     }
 
     @Test

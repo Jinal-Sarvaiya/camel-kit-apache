@@ -67,6 +67,8 @@ commands:
     chained: false
     # Pi prompt-file argument expansion flattens quoted option values; Pi exposes Ship
     # only through its quote-preserving native skill and gets no generated command stub.
+    # Qwen uses its native Ship skill for named-agent dispatch; a command stub would
+    # bypass the dispatch logic.
     skill_only_agents: [pi, qwen]
   - name: camel-knowledge
     aliases: [knowledge]

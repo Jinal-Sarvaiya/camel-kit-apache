@@ -27,9 +27,13 @@ already authorize the requested end-to-end workflow.
 
 When eligible and the user did not choose a backend, invoke `{COMMAND_PREFIX} ship --backend qwen-native --json`, preserving every user-supplied Ship option
 as a separate safely quoted argument. Do not add an oversight policy or reinterpret positional text. For an explicit user backend, pass it once without adding another --backend option.
-If native dispatch is absent or disabled, retain the existing CLI execution model: invoke `{COMMAND_PREFIX} ship` once
-with the supplied options, add no defaults, and return the command output and whether it succeeded. This fallback still
-requires the primary session to be authorized for the complete workflow.
+If the user explicitly chose `--backend qwen-native` but native dispatch is unavailable, report that this session
+cannot service the requested native backend and stop without starting a run. Do not fall through to the CLI with an
+explicit native backend that has no dispatcher.
+If native dispatch is absent or disabled and the user did not explicitly choose a native backend, retain the existing
+CLI execution model: invoke `{COMMAND_PREFIX} ship` once with the supplied options, add no defaults, and return the
+command output and whether it succeeded. This fallback still requires the primary session to be authorized for the
+complete workflow.
 
 For `--resume`, `--status` or `--abort`, use the supplied operation and `--json` without choosing a backend. The run's
 persisted backend is authoritative. Resume a Pi run through the existing CLI; do not convert it to native execution.

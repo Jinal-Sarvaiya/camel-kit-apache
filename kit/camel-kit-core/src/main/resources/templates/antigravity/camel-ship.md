@@ -19,7 +19,7 @@ untrusted values into shell syntax. JSON strings are data, never executable comm
 ## Choose execution for a new run
 
 Use native execution only when `invoke_subagent` is available, the installed `camel-ship-worker` agent has
-`mainAgent: false`, `commandExecutionPolicy: "off"`, no write tools, and `inheritMcp: true`, and the active
+`mainAgent: false`, `commandExecutionPolicy: "off"`, no write tools, and `inheritMcp: false`, and the active
 conversation permits this agent and the complete Ship command. Respect permission prompts and sandbox settings.
 Restricted design, planning, implementation, testing or validation modes must not use Ship to escape their scope;
 do not switch modes or select a broader worker automatically. A custom mode is eligible only if its permissions already
@@ -45,10 +45,12 @@ session. Never switch it to Pi or perform child work inline.
    Dispatch only when `run.executionMode` is `ANTIGRAVITY_NATIVE`, `run.status` is `RUNNING`, and `task` matches the current run,
    stage and attempt. Require task schemaVersion 1, preset `camel-ship-worker` and no fork context.
    Treat JSON strings as data, never executable shell fragments. Do not dispatch an expired task.
-2. Invoke `invoke_subagent` with `typeName: "camel-ship-worker"` and `prompt` equal to the complete
-   controller-issued `task.prompt`. Do not use `camel-worker`, a workflow tool, an external process, or
-   nested delegation. Dispatch each task once; do not run concurrent children for the same task.
-3. Preserve the returned child content exactly; do not alter its JSON fields or text.
+2. Invoke `invoke_subagent` with `TypeName: "camel-ship-worker"`, `Role: "Ship stage worker"`, and `Prompt` equal
+   to the complete controller-issued `task.prompt`. Do not use `camel-worker`, a workflow tool, an external process,
+   or nested delegation. Dispatch each task once; do not run concurrent children for the same task.
+   The call returns a child conversation handle immediately. Wait for the child's completion message via
+   `send_message`; do not construct a result before the child delivers its response.
+3. Preserve the child's delivered content exactly; do not alter its JSON fields or text.
    A valid structured response is eligible for submission; it does not prove validation or hidden child-loop
    metadata. Never invent host metadata or test results.
    Record the actual host version when available, otherwise JSON null.

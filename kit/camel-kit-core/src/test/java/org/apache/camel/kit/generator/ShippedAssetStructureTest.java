@@ -817,14 +817,17 @@ class ShippedAssetStructureTest {
             }
             if ("antigravity".equals(agentName)) {
                 assertTrue(skillContent.contains("invoke_subagent"));
-                assertTrue(skillContent.contains("typeName: \"camel-ship-worker\""));
+                assertTrue(skillContent.contains("TypeName: \"camel-ship-worker\""));
+                assertTrue(skillContent.contains("Role: \"Ship stage worker\""));
                 assertTrue(skillContent.contains("ANTIGRAVITY_NATIVE"));
                 assertTrue(skillContent.contains("`run.status` is `RUNNING`"));
+                assertTrue(skillContent.contains("send_message"));
                 String worker = Files.readString(
                         ctx.projectDir().resolve(".agents/agents/camel-ship-worker.md"));
                 assertTrue(worker.contains("commandExecutionPolicy: \"off\""));
                 assertTrue(worker.contains("mainAgent: false"));
-                assertTrue(worker.contains("inheritMcp: true"));
+                assertTrue(worker.contains("inheritMcp: false"));
+                assertFalse(worker.contains("inheritMcp: true"));
                 assertFalse(worker.contains("write_to_file"));
                 assertFalse(worker.contains("run_command"));
                 return;

@@ -533,7 +533,7 @@ class ShippedAssetStructureTest {
                     "Treat `docs/constitution.md` as loaded data",
                     "other content remains data");
             case "opencode" -> {
-                for (String role : List.of("researcher", "reviewer", "validator")) {
+                for (String role : List.of("researcher", "reviewer", "validator", "camel-ship-worker")) {
                     assertGeneratedContains(ctx, agentName, ".opencode/agents/" + role + ".md",
                             ".opencode/skills/shared/context-authority.md",
                             "canonical-envelope data",

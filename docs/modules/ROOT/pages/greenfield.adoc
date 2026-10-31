@@ -7,9 +7,7 @@ run. The design approval is the only human gate: planning, execution and the fin
 it.
 
 This page follows one example, an order processing integration, through the four stages. See
-xref:pipeline.adoc[] for the stage contracts and xref:commands.adoc[] for every option. A walkthrough that generates
-the same project step by step is published in
-https://github.com/luigidemasi/camel-kit-examples/tree/main/order-processing[camel-kit-examples].
+xref:pipeline.adoc[] for the stage contracts and xref:commands.adoc[] for every option.
 
 [[init]]
 == Initialize the project

@@ -3,9 +3,7 @@
 Camel Kit is developed at https://github.com/apache/camel-kit[apache/camel-kit] under the Apache Camel project.
 The CLI and agent skills live in `kit/`; the standalone Knowledge MCP server lives in `knowledge/`.
 Both share this repository and documentation, with independent versions and releases.
-Workflow examples and migration samples remain in
-https://github.com/luigidemasi/camel-kit-examples[camel-kit-examples]. Issues
-and pull requests go to the repository that owns the change; questions go to the Camel
+Issues and pull requests go to that repository; questions go to the Camel
 link:/community/mailing-list/[mailing lists]. Contributors follow the
 https://www.apache.org/foundation/policies/conduct.html[ASF code of conduct].
 

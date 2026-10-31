@@ -3,9 +3,7 @@
 Camel Kit migrates Microsoft BizTalk Server applications (2004 through 2020) to Camel 4 with YAML DSL routes. It
 parses orchestrations, maps, pipelines, schemas and port bindings into migration candidates; unsupported or ambiguous
 constructs are kept explicit for manual review. The shared steps, the migration package, the approval scope and the
-evidence rules are described in xref:migration.adoc[]; this page covers what is specific to BizTalk. A complete
-sample, an order processing orchestration migrated to Camel, is published in
-https://github.com/luigidemasi/camel-kit-examples/tree/main/biztalk-order-processing[camel-kit-examples].
+evidence rules are described in xref:migration.adoc[]; this page covers what is specific to BizTalk.
 
 [[parsed]]
 == What is parsed

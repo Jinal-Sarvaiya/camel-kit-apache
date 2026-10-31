@@ -1,5 +1,7 @@
 = Camel Kit
 
+image::camel-kit-logo.png[Camel Kit logo,220,220,float=right]
+
 Camel Kit adds structured workflows for Apache Camel integration development to AI coding assistants.
 It guides an assistant through the integration lifecycle: requirements and design, planning, implementation,
 testing, and runtime verification, and it checks every component and option against the Camel catalog while it

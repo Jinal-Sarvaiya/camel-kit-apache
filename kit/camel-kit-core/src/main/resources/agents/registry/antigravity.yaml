@@ -16,6 +16,8 @@ templates:
     target: .agents/agents/camel-worker.md
   - source: templates/antigravity/agents/camel-reviewer.md
     target: .agents/agents/camel-reviewer.md
+  - source: templates/antigravity/agents/camel-ship-worker.md
+    target: .agents/agents/camel-ship-worker.md
   - source: agents/acr-moderator.md
     target: .agents/camel-kit-personas/acr-moderator.md
   - source: agents/catalog-researcher.md

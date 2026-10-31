@@ -210,15 +210,15 @@ class WorkflowManifestTest {
     }
 
     @Test
-    void shipStubIsSkillOnlyForPi() throws Exception {
+    void shipStubIsSkillOnlyForPiAndQwen() throws Exception {
         WorkflowManifest manifest = WorkflowManifestLoader.loadDefault();
 
         WorkflowManifest.WorkflowCommand ship = manifest.generatedCommandStubs().stream()
                 .filter(command -> "camel-ship".equals(command.name()))
                 .findFirst()
                 .orElseThrow();
-        assertEquals(List.of("pi"), ship.skillOnlyAgents(),
-                "Pi prompt-file expansion flattens quoted values; Ship must stay skill-only for Pi");
+        assertEquals(List.of("pi", "qwen"), ship.skillOnlyAgents(),
+                "Ship must stay skill-only for Pi (prompt-file expansion) and Qwen (native dispatch via skill)");
         assertTrue(manifest.generatedCommandStubs().stream()
                 .filter(command -> !"camel-ship".equals(command.name()))
                 .allMatch(command -> command.skillOnlyAgents().isEmpty()),

@@ -69,9 +69,9 @@ Install Antigravity following https://antigravity.google/docs/getting-started[Go
 camel-kit init my-integration --ai antigravity
 ----
 
-`init` writes `AGENTS.md`, the skills under `.agents/skills/`, two custom agents under `.agents/agents/`
+`init` writes `AGENTS.md`, the skills under `.agents/skills/`, three custom agents under `.agents/agents/`
 (`camel-worker` with file and sandboxed command tools, `camel-reviewer` with read and search tools plus the
-inherited MCP access), the role
+inherited MCP access, `camel-ship-worker` with read and search tools for Ship stages), the role
 personas under `.agents/camel-kit-personas/` and the MCP servers in `.agents/mcp_config.json` (two by default; three with `--with-citrus-mcp`). Open the
 project root in Antigravity and invoke `/camel-start` in the CLI, or ask it to use the `camel-start` skill by name;
 `/skills` lists the native skills and `/mcp` the connections.
@@ -137,10 +137,13 @@ and bring the findings back.
 [[qwen]]
 == Qwen Code
 
-`init` writes `QWEN.md`, the commands under `.qwen/commands/`, the skills under `.qwen/skills/`, four bounded leaf
-agents under `.qwen/agents/` (implementer, reviewer, tester, validator), the personas under
+`init` writes `QWEN.md`, the commands under `.qwen/commands/`, the skills under `.qwen/skills/`, five bounded leaf
+agents under `.qwen/agents/` (implementer, reviewer, tester, validator, ship-worker), the personas under
 `.qwen/camel-kit-personas/` and the MCP servers in `.qwen/settings.json`. Start with `/camel-start`. Interviews,
 approvals and phase handoffs stay in the primary session; only bounded work goes to the leaf agents.
+Eligible sessions relay Ship controller stages to the read-only `camel-ship-worker` named agent via
+`--backend qwen-native`; the worker returns structured results and artifact proposals without editing files or
+calling MCP tools.
 
 [[opencode]]
 == OpenCode

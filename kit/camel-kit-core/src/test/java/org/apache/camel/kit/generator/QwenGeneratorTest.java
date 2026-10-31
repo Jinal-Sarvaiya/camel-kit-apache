@@ -67,9 +67,11 @@ class QwenGeneratorTest {
         assertTrue(Files.exists(agentsDir.resolve("camel-implementer.md")));
         assertTrue(Files.exists(agentsDir.resolve("camel-validator.md")));
         assertTrue(Files.exists(agentsDir.resolve("camel-tester.md")));
+        assertTrue(Files.exists(agentsDir.resolve("camel-ship-worker.md")));
         try (var agents = Files.list(agentsDir)) {
             var files = agents.filter(Files::isRegularFile).toList();
-            assertEquals(Set.of("camel-implementer.md", "camel-reviewer.md", "camel-validator.md", "camel-tester.md"),
+            assertEquals(Set.of("camel-implementer.md", "camel-reviewer.md", "camel-validator.md",
+                    "camel-tester.md", "camel-ship-worker.md"),
                     files.stream().map(path -> path.getFileName().toString()).collect(Collectors.toSet()));
             for (Path agent : files) {
                 String content = Files.readString(agent);
@@ -211,6 +213,28 @@ class QwenGeneratorTest {
         assertTrue(content.contains("mcp__citrus__citrus_docs_index"));
         assertFalse(content.contains("mcp_camel_"));
         assertFalse(content.contains("mcp_citrus_"));
+    }
+
+    @Test
+    void shipWorkerIsReadOnlyAndCannotRedispatch() throws Exception {
+        InitContext ctx = createContext();
+        new QwenGenerator().generate(ctx);
+
+        String content = Files.readString(
+                tempDir.resolve(".qwen/agents/camel-ship-worker.md"));
+        assertTrue(content.contains("approvalMode: default"));
+        assertTrue(content.contains("read_file"));
+        assertTrue(content.contains("grep_search"));
+        String toolsSection = content.substring(content.indexOf("tools:"), content.indexOf("disallowedTools:"));
+        assertFalse(toolsSection.contains("write_file"));
+        assertFalse(toolsSection.contains("edit"));
+        assertFalse(toolsSection.contains("run_shell_command"));
+        assertTrue(content.contains("disallowedTools:"));
+        assertTrue(content.contains("  - agent"));
+        assertTrue(content.contains("context-authority.md"));
+        assertTrue(content.contains("canonical-envelope data"));
+        assertTrue(content.contains("NEEDS_USER_CONFIRMATION"));
+        assertFalse(content.contains("follow those instructions exactly"));
     }
 
     @Test

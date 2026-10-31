@@ -11,3 +11,4 @@ They may delegate bounded work to these generated agents:
 - **camel-reviewer** — read-only catalog research and isolated review roles
 - **camel-validator** — read-only validation analysis that returns its complete report to the primary session
 - **camel-tester** — test creation and execution
+- **camel-ship-worker** — read-only Ship stage worker returning structured results and artifact proposals

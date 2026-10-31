@@ -11,6 +11,11 @@ on:
       - main
     types: [opened, synchronize, reopened]
 
+# Least-privilege default token; the build job only reads the repo. The comment-pr
+# job raises its own scope to pull-requests: write.
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build and Test (Java ${{ matrix.java }})

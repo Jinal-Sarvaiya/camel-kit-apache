@@ -16,6 +16,7 @@ approval gates, and chained phase handoffs. Delegate only bounded leaf work:
 - `camel-reviewer` for one read-only catalog, adversarial, specification, or quality review role
 - `camel-tester` for one isolated test task
 - `camel-validator` for one bounded, read-only validation analysis; the primary session writes the returned report
+- `camel-ship-worker` for one read-only Ship stage task; returns structured results and artifact proposals without editing files or calling MCP tools
 
 Never delegate the complete brainstorm, plan, migrate, execute, or start workflow to a child agent. Qwen child agents
 cannot ask the user questions or execute the primary session's next slash-command handoff. Encode the following data as

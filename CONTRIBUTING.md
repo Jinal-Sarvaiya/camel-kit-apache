@@ -104,10 +104,6 @@ Normal builds use the committed knowledge index; rebuilding is an explicit task.
 
 ## How to Contribute
 
-Workflow examples and migration samples are maintained in
-[camel-kit-examples](https://github.com/luigidemasi/camel-kit-examples).
-Submit example changes there; CLI and skill changes belong in this repository.
-
 ### Types of Contributions
 
 1. **Bug Reports** - Open an issue describing the bug

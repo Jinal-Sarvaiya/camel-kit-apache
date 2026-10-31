@@ -133,4 +133,3 @@ and `/camel-ship` only delegates to it. See xref:architecture.adoc[].
 * xref:greenfield.adoc[] and xref:migration.adoc[] walk through the two workflows end to end.
 * xref:ship.adoc[] describes the Technology Preview controller-owned workflow.
 * Source code and issue tracker: https://github.com/apache/camel-kit[apache/camel-kit].
-  Workflow examples and migration samples: https://github.com/luigidemasi/camel-kit-examples[camel-kit-examples].

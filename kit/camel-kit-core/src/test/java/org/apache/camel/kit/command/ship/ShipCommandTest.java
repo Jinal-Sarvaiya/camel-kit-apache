@@ -14,11 +14,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.ship.ShipDigest;
 import org.apache.camel.kit.ship.context.ShipContext;
 import org.apache.camel.kit.ship.context.ShipContext.Kind;
 import org.apache.camel.kit.ship.controller.ShipController;
 import org.apache.camel.kit.ship.controller.ShipControllerTestSupport;
+import org.apache.camel.kit.ship.controller.ShipCoordinator;
 import org.apache.camel.kit.ship.controller.ShipRun;
 
 import org.junit.jupiter.api.Assumptions;
@@ -222,15 +224,46 @@ class ShipCommandTest {
         assertEquals(1, mismatchClaude.exitCode());
         assertTrue(mismatchClaude.error().contains("execution-mode-mismatch"), mismatchClaude.error());
 
+        Assumptions.assumeTrue(
+                Files.getFileStore(tempDir).supportsFileAttributeView("posix"),
+                "Pi coordinator requires POSIX executable files");
+        Path fakePi = writeExecutable(tempDir.resolve("fake-pi"), "#!/bin/sh\nexit 1\n");
+        Path fakeNode = writeExecutable(tempDir.resolve("fake-node"), "#!/bin/sh\nexit 1\n");
+        ShipCoordinator coordinator = new ShipCoordinator(
+                tempDir.resolve("state"), fakePi, fakeNode,
+                tempDir.resolve("repo"),
+                DistributionConfig.loadBundled(),
+                Duration.ofMinutes(10), false);
+        ShipCommand.WorkflowLauncher coordinatorLauncher = settings -> new ShipCommand.Workflow() {
+            @Override
+            public ShipRun run(String runId) throws IOException, InterruptedException {
+                return coordinator.run(runId);
+            }
+
+            @Override
+            public ShipRun resume(String runId, List<? extends ShipContext.Input> additions)
+                    throws IOException, InterruptedException {
+                return coordinator.resume(runId, additions);
+            }
+
+            @Override
+            public ShipRun submit(String runId, Path resultFile) throws IOException, InterruptedException {
+                return coordinator.submit(runId, resultFile);
+            }
+        };
+
         Path fakeResult = Files.writeString(tempDir.resolve("fake.json"), "{}");
-        RunResult submitted = run(controller, RecordingLauncher.passThrough(controller),
+        RunResult submitted = run(controller, coordinatorLauncher,
                 "--project-dir", project.toString(),
                 "--submit", id, "--result", fakeResult.toString());
         assertEquals(1, submitted.exitCode());
-        assertTrue(submitted.error().contains("execution-mode-mismatch")
-                || submitted.error().contains("no-pending-task")
-                || submitted.error().contains("requires a native backend"),
-                "Pi run must reject --submit: " + submitted.error());
+        assertTrue(submitted.error().contains("requires a native Ship run"),
+                "Pi run must reject --submit through the production coordinator: " + submitted.error());
+        ShipRun afterSubmit = controller.status(id);
+        assertEquals(ShipRun.ExecutionMode.PI, afterSubmit.executionMode(),
+                "Run state must be unchanged after rejected submit");
+        assertEquals(ShipRun.RunStatus.RUNNING, afterSubmit.status(),
+                "Run status must be unchanged after rejected submit");
     }
 
     @Test

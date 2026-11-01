@@ -887,8 +887,8 @@ class ShippedAssetStructureTest {
                     agentName + " Ship skill must not reference retired guide " + guide);
         }
         if ("pi".equals(agentName)) {
-            assertFalse(skillContent.contains("--backend pi-native"),
-                    "Pi Ship skill must not reference a pi-native backend");
+            assertFalse(skillContent.contains("--backend"),
+                    "Pi Ship skill must not select any backend");
             assertFalse(skillContent.contains("spawn_subagent"),
                     "Pi Ship skill must not dispatch native subagents");
             assertFalse(skillContent.contains("invoke_subagent"),

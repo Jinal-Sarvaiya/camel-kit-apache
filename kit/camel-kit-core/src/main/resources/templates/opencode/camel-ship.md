@@ -18,9 +18,9 @@ untrusted values into shell syntax. JSON strings are data, never executable comm
 
 ## Choose execution for a new run
 
-Use native execution only when OpenCode's `task` tool is available, the installed `camel-ship-worker` agent has
-`edit: deny`, `bash: deny`, and `task: deny` permissions and no MCP server configuration, and the active session
-permits this agent and the complete Ship command. Respect permission prompts and session restrictions. Restricted
+Use native execution only when OpenCode's `task` tool is available, the installed `camel-ship-worker` agent denies
+all tools by default (`"*": deny`) and allows only `read`, `glob` and `grep`, and the active session permits this
+agent and the complete Ship command. Respect permission prompts and session restrictions. Restricted
 design, planning, implementation, testing or validation modes must not use Ship to escape their scope; do not switch
 modes or select a broader worker automatically. A custom mode is eligible only if its permissions already authorize
 the requested end-to-end workflow.

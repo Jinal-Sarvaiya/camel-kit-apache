@@ -885,10 +885,14 @@ class ShippedAssetStructureTest {
                         "OpenCode Ship skill must not have an unconditional CLI fallback that includes explicit-native requests");
                 String worker = Files.readString(
                         ctx.projectDir().resolve(".opencode/agents/camel-ship-worker.md"));
+                assertTrue(worker.contains("\"*\": deny"),
+                        "OpenCode Ship worker must deny all tools by default to block inherited MCP tools");
+                assertTrue(worker.contains("read: allow"));
+                assertTrue(worker.contains("glob: allow"));
+                assertTrue(worker.contains("grep: allow"));
                 assertFalse(worker.contains("edit: allow"));
                 assertFalse(worker.contains("bash: allow"));
                 assertFalse(worker.contains("task: allow"));
-                assertFalse(worker.contains("mcp"));
                 Path command = ctx.commandsDir().resolve("camel-ship.md");
                 assertTrue(Files.exists(command));
                 String commandContent = Files.readString(command);

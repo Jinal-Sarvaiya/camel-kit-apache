@@ -3,9 +3,10 @@ name: camel-ship-worker
 description: Read-only Camel Ship stage worker dispatched by the parent OpenCode session.
 mode: subagent
 permission:
-  edit: deny
-  bash: deny
-  task: deny
+  "*": deny
+  read: allow
+  glob: allow
+  grep: allow
 steps: 30
 ---
 

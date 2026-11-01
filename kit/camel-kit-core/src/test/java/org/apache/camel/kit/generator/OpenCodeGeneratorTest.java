@@ -216,9 +216,14 @@ class OpenCodeGeneratorTest {
 
         String content = Files.readString(
                 tempDir.resolve(".opencode/agents/camel-ship-worker.md"));
-        assertTrue(content.contains("edit: deny"));
-        assertTrue(content.contains("bash: deny"));
-        assertTrue(content.contains("task: deny"));
+        assertTrue(content.contains("\"*\": deny"),
+                "Ship worker must deny all tools by default to block inherited MCP tools");
+        assertTrue(content.contains("read: allow"));
+        assertTrue(content.contains("glob: allow"));
+        assertTrue(content.contains("grep: allow"));
+        assertFalse(content.contains("edit: allow"));
+        assertFalse(content.contains("bash: allow"));
+        assertFalse(content.contains("task: allow"));
     }
 
     @Test

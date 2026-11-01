@@ -211,8 +211,8 @@ certification.
 
 | OpenCode
 | `/camel-ship` command stub in `.opencode/commands/` that invokes the native skill, which uses the `task` tool to
-  dispatch a `camel-ship-worker` child with `edit: deny`, `bash: deny` and `task: deny`. The child has no MCP
-  server access. The entry point is the generated `/camel-ship` command stub; the native skill is installed in
+  dispatch a `camel-ship-worker` child that denies all tools by default (`"*": deny`) and allows only `read`,
+  `glob` and `grep`. Inherited MCP servers are blocked by the deny-by-default policy. The entry point is the generated `/camel-ship` command stub; the native skill is installed in
   `.opencode/skills/camel-ship/SKILL.md` and the worker in `.opencode/agents/camel-ship-worker.md`.
   If `--backend opencode-native` is requested and dispatch is unavailable the skill stops without starting a run.
   Generated skill and worker assets verified via a local OpenCode workspace probe; live child execution acceptance

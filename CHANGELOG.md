@@ -40,7 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Pi execution and run-state compatibility verification (#100)** — focused non-regression tests confirm
   that Pi runs reject native backends on resume, round-trip `executionMode: PI` through the store, preserve
   Pi execution mode across the full coordinator lifecycle (run, resume, abort, recovery, interruption), and
-  that the Pi Ship skill contains no native dispatch language.
+  that the Pi Ship skill contains no native dispatch language. `ShipStageResult.parse()` now extracts JSON
+  from markdown code fences as a fallback, handling Pi 0.84.2 wrapping stage output in prose despite the
+  prompt instruction to return raw JSON. Live Pi certification passed on Linux aarch64 with Pi 0.84.2 and
+  Node 22.22.2 (all five stages, single attempts, Stamp PASS).
 
 ### Changed
 

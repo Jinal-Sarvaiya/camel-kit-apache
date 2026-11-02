@@ -63,24 +63,27 @@ class CveParserTest {
 
     @Test
     void cveGlobalTagFallsBackToLineExtractionWithoutConstructing() {
-        Canary.constructed = false;
-        String content = "---\n"
-                         + "cve: CVE-2099-0001\n"
-                         + "severity: HIGH\n"
-                         + "summary: \"Canary advisory\"\n"
-                         + "pwn: !!" + Canary.class.getName() + " {}\n"
-                         + "fixed: \"4.0.4, 3.21.4\"\n"
-                         + "---\n"
-                         + "Body referencing CAMEL-12345.\n";
+        // Both the !! shorthand and the verbose !<tag:...> form of the same global tag.
+        for (String tag : java.util.List.of("!!" + Canary.class.getName() + " {}",
+                "!<tag:yaml.org,2002:" + Canary.class.getName() + "> {}")) {
+            Canary.constructed = false;
+            String content = "---\n"
+                             + "cve: CVE-2099-0001\n"
+                             + "severity: HIGH\n"
+                             + "summary: \"Canary advisory\"\n"
+                             + "pwn: " + tag + "\n"
+                             + "fixed: \"4.0.4, 3.21.4\"\n"
+                             + "---\n"
+                             + "Body referencing CAMEL-12345.\n";
 
-        // The global tag makes SafeConstructor throw; parseYamlFrontmatter catches it and falls
-        // back to line-based regex extraction, so the advisory still parses and nothing is constructed.
-        CveParser.CveAdvisory cve = CveParser.parse(content);
+            // The global tag makes SafeConstructor throw; parseYamlFrontmatter catches it and falls
+            // back to line-based regex extraction, so the advisory still parses and nothing is constructed.
+            CveParser.CveAdvisory cve = CveParser.parse(content);
 
-        assertFalse(Canary.constructed,
-                "SafeConstructor must not instantiate a globally tagged type in CVE frontmatter");
-        assertEquals("CVE-2099-0001", cve.cveId());
-        assertEquals("HIGH", cve.severity());
-        assertTrue(cve.fixedVersions().contains("4.0.4"));
+            assertFalse(Canary.constructed, "SafeConstructor must not instantiate a globally tagged type: " + tag);
+            assertEquals("CVE-2099-0001", cve.cveId());
+            assertEquals("HIGH", cve.severity());
+            assertTrue(cve.fixedVersions().contains("4.0.4"));
+        }
     }
 }

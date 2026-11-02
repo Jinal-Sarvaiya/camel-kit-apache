@@ -389,15 +389,19 @@ class VersionResolverTest {
 
     @Test
     void rejectsGloballyTaggedReleaseFrontmatterWithoutConstructing() throws Exception {
-        Canary.constructed = false;
         Path releasesDir = Files.createDirectories(tempDir.resolve("content/releases"));
-        Files.writeString(releasesDir.resolve("release-4.14.0.md"),
-                "---\ncategory: camel\ndate: 2026-01-15\npwn: !!" + Canary.class.getName() + " {}\n---\nBody.\n");
+        // Both the !! shorthand and the verbose !<tag:...> form of the same global tag.
+        for (String tag : List.of("!!" + Canary.class.getName() + " {}",
+                "!<tag:yaml.org,2002:" + Canary.class.getName() + "> {}")) {
+            Canary.constructed = false;
+            Files.writeString(releasesDir.resolve("release-4.14.0.md"),
+                    "---\ncategory: camel\ndate: 2026-01-15\npwn: " + tag + "\n---\nBody.\n");
 
-        // SafeConstructor refuses the global tag during composition, before any construction.
-        assertThrows(org.yaml.snakeyaml.error.YAMLException.class,
-                () -> VersionResolver.parseReleases(tempDir));
-        assertFalse(Canary.constructed,
-                "SafeConstructor must not instantiate a globally tagged type in release frontmatter");
+            // SafeConstructor refuses the global tag during composition, before any construction.
+            assertThrows(org.yaml.snakeyaml.error.YAMLException.class,
+                    () -> VersionResolver.parseReleases(tempDir));
+            assertFalse(Canary.constructed,
+                    "SafeConstructor must not instantiate a globally tagged type: " + tag);
+        }
     }
 }

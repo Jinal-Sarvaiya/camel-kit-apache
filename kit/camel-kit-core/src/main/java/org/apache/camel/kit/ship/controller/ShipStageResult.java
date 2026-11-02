@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.camel.kit.ship.artifact.ArtifactManifest.JavaPolicy;
@@ -47,6 +48,8 @@ record ShipStageResult(
     private static final int MAX_ASSISTANT_BYTES = 1024 * 1024;
     private static final int MAX_REPORT_BYTES = MAX_ASSISTANT_BYTES;
     private static final Pattern ROUTE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]{0,127}");
+    private static final Pattern JSON_FENCE = Pattern.compile(
+            "```(?:json)?\\s*\\n(\\{.*?\\})\\s*\\n```", Pattern.DOTALL);
     private static final Comparator<RouteContract> ROUTE_ORDER = Comparator
             .comparing(RouteContract::routeId)
             .thenComparing(RouteContract::routePath)
@@ -77,8 +80,9 @@ record ShipStageResult(
         WireResult wire;
         boolean legacy = false;
         try {
+            String normalized = extractJsonObject(assistantText);
             JsonNode document
-                    = JSON.readValue(utf8(assistantText, MAX_ASSISTANT_BYTES, "assistant response"), JsonNode.class);
+                    = JSON.readValue(utf8(normalized, MAX_ASSISTANT_BYTES, "assistant response"), JsonNode.class);
             if (document instanceof ObjectNode object && object.path("schemaVersion").isIntegralNumber()
                     && object.path("schemaVersion").intValue() == 1) {
                 legacy = true;
@@ -278,6 +282,26 @@ record ShipStageResult(
             throw new IOException("Pi stage report is invalid");
         }
         utf8(report, MAX_REPORT_BYTES, "stage report");
+    }
+
+    private static String extractJsonObject(String text) {
+        if (text == null) {
+            return text;
+        }
+        String stripped = text.strip();
+        if (stripped.startsWith("{")) {
+            return stripped;
+        }
+        Matcher m = JSON_FENCE.matcher(text);
+        if (m.find()) {
+            return m.group(1).strip();
+        }
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            return text.substring(start, end + 1);
+        }
+        return stripped;
     }
 
     static byte[] utf8(String value, int maximum, String label) throws IOException {

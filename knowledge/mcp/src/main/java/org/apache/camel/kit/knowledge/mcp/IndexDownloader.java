@@ -86,8 +86,10 @@ public class IndexDownloader {
     private final Duration manifestTimeout;
     private final Duration assetTimeout;
     private final ObjectMapper mapper = new ObjectMapper();
+    // NEVER, not NORMAL: redirects are followed manually in send() so each hop's transport is validated
+    // (requireFetchableUri) before it is fetched. NORMAL would follow a loopback->non-loopback-http hop first.
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .connectTimeout(CONNECT_TIMEOUT)
             .build();
 
@@ -601,9 +603,41 @@ public class IndexDownloader {
     }
 
     private HttpResponse<InputStream> send(HttpRequest request) throws IOException, InterruptedException {
+        final int maxRedirects = 5;
         long deadline = System.nanoTime() + request.timeout().orElseThrow().toNanos();
-        return httpClient.send(request, info -> HttpResponse.BodySubscribers.mapping(
-                HttpResponse.BodySubscribers.ofPublisher(), publisher -> new TimedBody(publisher, deadline)));
+        HttpRequest current = request;
+        for (int hop = 0;; hop++) {
+            HttpResponse<InputStream> response = httpClient.send(current, info -> HttpResponse.BodySubscribers.mapping(
+                    HttpResponse.BodySubscribers.ofPublisher(), publisher -> new TimedBody(publisher, deadline)));
+            int status = response.statusCode();
+            if (status != 301 && status != 302 && status != 303 && status != 307 && status != 308) {
+                return response;
+            }
+            // Validate the redirect target's transport BEFORE following it; a 304 is not a redirect and
+            // is returned above for the conditional-manifest path.
+            String target = response.headers().firstValue("Location").orElse(null);
+            response.body().close();
+            if (hop >= maxRedirects) {
+                throw new IOException("Too many index redirects starting from " + request.uri());
+            }
+            if (target == null) {
+                throw new IOException("Index redirect without a Location header from " + current.uri());
+            }
+            URI next;
+            try {
+                next = current.uri().resolve(target);
+            } catch (IllegalArgumentException e) {
+                throw new IOException("Invalid index redirect target: " + target, e);
+            }
+            requireFetchableUri(next);
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) {
+                throw new HttpTimeoutException("Index redirect handling timed out from " + request.uri());
+            }
+            HttpRequest.Builder builder = HttpRequest.newBuilder(next).timeout(Duration.ofNanos(remaining)).GET();
+            current.headers().firstValue("Accept").ifPresent(accept -> builder.header("Accept", accept));
+            current = builder.build();
+        }
     }
 
     /** Bounded HTTP buffering; only the resolving thread reads or writes index files. */

@@ -375,4 +375,29 @@ class VersionResolverTest {
         assertEquals("4.14", mapping.camelMinor());
         assertEquals("4.14.2", mapping.camelVersion());
     }
+
+    // ── 10. SafeConstructor rejects globally tagged frontmatter ─────────
+
+    /** Flips a flag if SnakeYAML ever constructs it; a SafeConstructor-backed parser must not. */
+    public static final class Canary {
+        static volatile boolean constructed = false;
+
+        public Canary() {
+            constructed = true;
+        }
+    }
+
+    @Test
+    void rejectsGloballyTaggedReleaseFrontmatterWithoutConstructing() throws Exception {
+        Canary.constructed = false;
+        Path releasesDir = Files.createDirectories(tempDir.resolve("content/releases"));
+        Files.writeString(releasesDir.resolve("release-4.14.0.md"),
+                "---\ncategory: camel\ndate: 2026-01-15\npwn: !!" + Canary.class.getName() + " {}\n---\nBody.\n");
+
+        // SafeConstructor refuses the global tag during composition, before any construction.
+        assertThrows(org.yaml.snakeyaml.error.YAMLException.class,
+                () -> VersionResolver.parseReleases(tempDir));
+        assertFalse(Canary.constructed,
+                "SafeConstructor must not instantiate a globally tagged type in release frontmatter");
+    }
 }

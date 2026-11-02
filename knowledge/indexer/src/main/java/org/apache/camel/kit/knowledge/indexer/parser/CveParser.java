@@ -328,7 +328,8 @@ public class CveParser {
     @SuppressWarnings("unchecked")
     private static Map<String, Object> parseYamlFrontmatter(String frontmatter) {
         try {
-            // Frontmatter is plain data; SafeConstructor refuses arbitrary type tags (!!type).
+            // Frontmatter is plain data. SnakeYAML 2.x already rejects custom global tags by default;
+            // SafeConstructor also strips arbitrary-object construction here (defense in depth).
             Object parsed = new Yaml(new SafeConstructor(new LoaderOptions())).load(frontmatter);
             return parsed instanceof Map ? (Map<String, Object>) parsed : null;
         } catch (Exception e) {

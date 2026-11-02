@@ -94,7 +94,8 @@ public class VersionResolver {
         }
 
         List<CamelRelease> releases = new ArrayList<>();
-        // Frontmatter is plain data (maps/lists/scalars); SafeConstructor refuses arbitrary type tags.
+        // Frontmatter is plain data. SnakeYAML 2.x already rejects custom global tags by default;
+        // SafeConstructor also strips arbitrary-object construction from this parser (defense in depth).
         Yaml yaml = new Yaml(new SafeConstructor(new LoaderOptions()));
 
         // Only top-level release files (not subdirectories like q/, sb/, etc.)

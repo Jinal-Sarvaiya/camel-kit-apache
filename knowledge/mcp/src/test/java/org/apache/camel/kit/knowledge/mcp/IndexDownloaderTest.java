@@ -306,6 +306,37 @@ class IndexDownloaderTest {
     }
 
     @Test
+    void manifestRedirectKeepsConditionalRevalidation() throws Exception {
+        publish("v1", "index-bytes", null);
+        try (HttpFixture http = new HttpFixture()) {
+            int backendPort = http.server.getAddress().getPort();
+            HttpServer redirector = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            redirector.createContext("/", exchange -> {
+                try (exchange) {
+                    exchange.getResponseHeaders()
+                            .set("Location", "http://127.0.0.1:" + backendPort + exchange.getRequestURI().getPath());
+                    exchange.sendResponseHeaders(302, -1);
+                }
+            });
+            redirector.start();
+            try {
+                String url = "http://127.0.0.1:" + redirector.getAddress().getPort() + "/index.json";
+                Path installed = downloader(null, url).resolve().dir();
+                assertEquals(1, http.downloads.get());
+                assertNull(http.ifNoneMatch, "The first resolution has no validator to send");
+
+                assertEquals(installed, downloader(null, url).resolve().dir(),
+                        "a 304 behind the redirect must reuse the installed index");
+                assertEquals("\"v1\"", http.ifNoneMatch, "If-None-Match must survive the validated redirect hop");
+                assertEquals(1, http.notModified.get(), "the redirect target must answer 304");
+                assertEquals(1, http.downloads.get(), "HTTP 304 must not download the archive again");
+            } finally {
+                redirector.stop(0);
+            }
+        }
+    }
+
+    @Test
     void releasesEndpointOverNonLoopbackHttpIsRejected() {
         IndexDownloader downloader = new IndexDownloader(discoveryConfig("http://example.org/releases"));
         assertRefusedCleartext(assertThrows(IOException.class, () -> downloader.resolve()));

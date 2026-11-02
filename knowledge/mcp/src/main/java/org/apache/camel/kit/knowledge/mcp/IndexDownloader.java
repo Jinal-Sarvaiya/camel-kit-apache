@@ -72,6 +72,8 @@ public class IndexDownloader {
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
     static final int FORMAT_VERSION = 1;
     static final String RELEASE_PREFIX = "knowledge-index-v" + FORMAT_VERSION + "-";
+    /** Request headers re-sent on a validated redirect hop; the downloader sets no others. */
+    private static final List<String> FORWARDED_REQUEST_HEADERS = List.of("Accept", "If-None-Match");
     private static final int MAX_RELEASE_PAGES = 10;
     private static final int MAX_RELEASE_PAGE_BYTES = 2 * 1024 * 1024;
 
@@ -635,7 +637,11 @@ public class IndexDownloader {
                 throw new HttpTimeoutException("Index redirect handling timed out from " + request.uri());
             }
             HttpRequest.Builder builder = HttpRequest.newBuilder(next).timeout(Duration.ofNanos(remaining)).GET();
-            current.headers().firstValue("Accept").ifPresent(accept -> builder.header("Accept", accept));
+            // Carry only the request headers this downloader sets: content negotiation and the manifest validator,
+            // so a redirected manifest still revalidates with If-None-Match. Nothing else crosses a hop.
+            for (String name : FORWARDED_REQUEST_HEADERS) {
+                current.headers().firstValue(name).ifPresent(value -> builder.header(name, value));
+            }
             current = builder.build();
         }
     }

@@ -20,7 +20,7 @@ repository_layout_commit: 9c8173cb
 revised_at_commit: a19d0529
 date: "2026-10-22"
 last_review_round: "2026-10-27"
-status: draft - policy ratified 2026-10-27; acceptance pending verification items V1-V6
+status: draft - policy ratified 2026-10-27; acceptance pending verification items V1-V6 (tracked in #153-#158); revised 2026-11-02 after review round 3
 canonical: docs/security-model.md
 umbrella_model: https://camel.apache.org/manual/security-model.html
 reporting:
@@ -51,7 +51,7 @@ roles:
     note: Camel Kit must not widen what they can read.
   - role: network-peer
     trust: untrusted
-    note: TLS assumed; redirects followed except HTTPS-to-HTTP.
+    note: TLS assumed; init redirects followed except HTTPS-to-HTTP; the Knowledge downloader validates each redirect target before the hop (#143).
 
 component_families:
   - id: A
@@ -184,7 +184,7 @@ entry_points:
     input: JSON release pages, index.json manifest, knowledge-index.zip
     attacker_controllable: network-peer-or-origin
     server_enforces: [release pages <= 2 MiB and <= 10 pages, tag pattern knowledge-index-v1-YYYY.MM.DD-HHMMSS, drafts and prereleases ignored, pagination must stay on the configured endpoint, manifest version must match the tag, format version 1 and embedding model and 384 dimensions checked, version name safety rules, SHA-256 of the archive compared with the manifest before unpacking, zip entries confined to the version staging directory, atomic activation, failed update keeps the previous version]
-    note: Trusted pinned origin (GitHub release of apache/camel-kit); a configured knowledge.index.url may use https, http or file.
+    note: Trusted pinned origin (GitHub release of apache/camel-kit); a configured knowledge.index.url may use https or file anywhere and http only to a loopback host; every redirect target is validated before the hop (#143).
   - entry: Knowledge configuration (knowledge.index.path/url/version/releases-url/cache-dir, KNOWLEDGE_INDEX_* environment, quarkus.http.*)
     attacker_controllable: false
     trust: operator
@@ -261,7 +261,7 @@ configuration_variants:
     stance: documented (air-gapped and development use)
   - knob: knowledge.index.url (KNOWLEDGE_INDEX_URL)
     default: unset (release discovery)
-    effect: Explicit manifest URL; https, http and file schemes are accepted, so a plaintext http manifest is possible when configured.
+    effect: Explicit manifest URL; https and file are accepted anywhere, http only to a loopback host; a plaintext manifest from a remote host, or a redirect to one, is refused before any request (#143).
     security_relevant: true
     stance: documented; operator-selected origin is trusted input
   - knob: knowledge.index.version (KNOWLEDGE_INDEX_VERSION)
@@ -327,7 +327,7 @@ claimed_properties:
     provenance: documented (ShipExpressionPolicy)
   - id: P10
     property: Generated harness assets carry the accepted least-privilege posture - read-only Ship workers, read-only Codex roles, Copilot deny hook, Pi guard policy, no HTTP port for the Camel and Citrus MCP servers, and MCP grants aligned with the manifest allowed_tools (no runtime mutation or control tools) - as availability filters for Codex (enabled_tools), Copilot (tools), Pi (directTools) and Qwen (includeTools), as Bob 2's auto-approval list, with Codex, Copilot, Qwen and OpenCode prompting before MCP calls and Antigravity receiving the full tool set without generated approval. Accepted Claude posture - explicit per-tool grants aligned with the manifest. Current generated Claude settings.json deviates - mcp__<server>__* pre-approves every tool of the three servers (V3). Claim is about the generated artifact; enforcement is the harness's.
-    violation_symptom: Generated asset grants more than the accepted posture - a worker with edit or shell tools, a filter or auto-approval list containing a tool outside the manifest allowed_tools, a prompt-mode target generated with auto-approval, a hook or guard that fails open on a documented pattern. The known Claude wildcard deviation is tracked as V3 and triaged VALID-HARDENING until the template changes.
+    violation_symptom: Generated asset grants more than the accepted posture - a worker with edit or shell tools, a filter or auto-approval list containing a tool outside the manifest allowed_tools, a prompt-mode target generated with auto-approval, a hook or guard that fails open on a documented pattern. The known Claude wildcard pre-approval is a documented deviation, not a breach - a report that only restates it is tracked under V3 (#155) as VALID-HARDENING until the template changes; a report that demonstrates a breach through the grant (a credential read or destructive action without a prompt, or any other in-scope boundary breach) is evaluated on that breach and its impact and is never downgraded to V3 or closed as its duplicate (maintainer, 2026-10-27, review of #6).
     severity: hardening; security-critical when the widened grant reaches a credential or destructive action without a prompt
     provenance: documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates/mcp-configs/*, templates/claude/settings.json, Claude Code permissions reference); current Claude grant - maintainer, 2026-10-22 (review of #6); accepted posture - maintainer, 2026-10-27 (Q3)
   - id: P11
@@ -341,10 +341,10 @@ claimed_properties:
     severity: security-critical
     provenance: documented (knowledge/README.md "Running the MCP Server"); no-listener claim for the default configuration inferred (V6)
   - id: P13
-    property: Knowledge index acquisition integrity - a local knowledge.index.path is used in place without network; otherwise a published knowledge-index-v1-* release (newest compatible, or the exact pinned version) or an explicitly configured manifest is fetched with bounded pages and deadlines, the manifest must match the release tag, format version 1, the bundled embedding model and 384 dimensions, the archive SHA-256 must equal the manifest value before unpacking, zip entries are confined to the per-download staging directory, the version directory is activated atomically and must be a real directory, a failed update keeps the previous working index, and a pinned client never falls back to another version.
-    violation_symptom: An archive accepted on SHA-256 mismatch; an entry written outside the staging or version directory; a version name outside the safe-name rules accepted; a pinned client using another version; a manifest from a different release tag accepted; activation of a partially unpacked version.
+    property: Knowledge index acquisition integrity - a local knowledge.index.path is used in place without network; otherwise a published knowledge-index-v1-* release (newest compatible, or the exact pinned version) or an explicitly configured manifest is fetched with bounded pages and deadlines, the manifest must match the release tag, format version 1, the bundled embedding model and 384 dimensions, the archive SHA-256 must equal the manifest value before unpacking, zip entries are confined to the per-download staging directory, the version directory is activated atomically and must be a real directory, a failed update keeps the previous working index, and a pinned client never falls back to another version. Remote manifest, discovery and asset URLs, and every redirect target checked before the hop, must be https, or http to a loopback host only (#143). An unpinned client whose resolution fails falls back to a classpath-bundled index extracted into a temporary knowledge-index* directory that is removed on orderly shutdown; a pinned client does not.
+    violation_symptom: An archive accepted on SHA-256 mismatch; an entry written outside the staging or version directory; a version name outside the safe-name rules accepted; a pinned client using another version or the classpath fallback; a manifest from a different release tag accepted; a remote fetch or redirect issued over non-loopback http; activation of a partially unpacked version.
     severity: security-critical (integrity and path escape)
-    provenance: documented (knowledge/README.md "Index Distribution", IndexDownloader)
+    provenance: documented (knowledge/README.md "Index Distribution", IndexDownloader, LuceneSearchService, apache/camel-kit#143)
   - id: P14
     property: Knowledge tool arguments are queries, not code - camel_docs_* arguments are used as escaped Lucene query text, structured field lookups, version strings and an endpoint URI validated against the bundled Camel catalog; no argument names a file path, URL or command; the server spawns no process and performs no network access other than index acquisition.
     violation_symptom: A tool argument reaching the filesystem, the network or a code path, or changing which index or files are read.
@@ -447,15 +447,15 @@ known_non_findings:
   - pattern: --no-approve in the Pi worker argument list
     why: Pi's prompt is replaced by controller oversight gates and deterministic validation.
     disposition: KNOWN-NON-FINDING
-  - pattern: followRedirects(NORMAL) in init downloaders and the Knowledge IndexDownloader
-    why: HTTPS-to-HTTPS redirects from Maven Central and GitHub are expected; NORMAL never downgrades to HTTP; absence of independent verification is the accepted boundary (D6, D15).
+  - pattern: followRedirects(NORMAL) in init downloaders
+    why: HTTPS-to-HTTPS redirects from Maven Central and GitHub are expected; NORMAL never downgrades to HTTP; absence of independent verification is the accepted boundary (D6, D15). The Knowledge IndexDownloader no longer relies on NORMAL - it follows redirects itself and validates each target's transport before the hop (#143).
     disposition: KNOWN-NON-FINDING
   - pattern: Generated Claude settings.json pre-approving mvn and ./mvnw
     why: Documented posture (4.5a).
     disposition: KNOWN-NON-FINDING
   - pattern: Generated Claude settings.json pre-approving every tool of the three MCP servers (mcp__<server>__*)
-    why: Known deviation from the accepted posture, tracked as V3; duplicates are closed against V3.
-    disposition: VALID-HARDENING (tracked)
+    why: Known deviation from the accepted posture, tracked as V3 (#155); duplicates of a report that only restates the configuration are closed against V3. A demonstrated breach through the grant is not a non-finding - it is triaged on the breach and its impact (P10).
+    disposition: VALID-HARDENING (tracked) for configuration-only reports; VALID when a breach through the grant is demonstrated
   - pattern: A Pi-backend Ship run publishing an ordinary additional material file (documentation, test data)
     why: Documented acceptance behaviour of P5; validation bounds the launch surface and the declared artifacts, not every material file.
     disposition: KNOWN-NON-FINDING
@@ -514,10 +514,13 @@ issue_5_category_mapping:
 triage_notes:
   - Outside-root read, non-termination or unbounded memory during graph analysis is VALID under P1 regardless of the verification status in V1/V2 - neither BY-DESIGN nor MODEL-GAP.
   - A Pi-backend Ship run publishing an ordinary additional material file is documented P5 behaviour, not a violation.
-  - A report matching an open verification item is triaged on the model's claim - a breach of a claimed property is VALID while the item is open; the Claude wildcard MCP grant (V3) is VALID-HARDENING until the generated default changes.
+  - A report matching an open verification item is triaged on the model's claim - a breach of a claimed property is VALID while the item is open. The Claude wildcard MCP grant (V3) is the one documented deviation - a report that only restates the configuration is VALID-HARDENING until the generated default changes, while a report that demonstrates a breach through the grant is evaluated on that breach and its impact under P10 and is never downgraded to V3 or closed as its duplicate (maintainer, 2026-10-27, review of #6).
   - Knowledge findings use the same dispositions; the indexer's inputs are trusted upstream sources, so a finding there needs hostile upstream content (adversary not in scope) unless the indexer breaks its own path or process boundary.
 
 maintainer_decisions:
+  - date: "2026-10-27"
+    decision: Review round 3 of #6 - a report that only restates the known Claude wildcard grant is VALID-HARDENING under V3, while a demonstrated breach through the grant is triaged on the breach and its impact; the Pi inventory row distinguishes intended writes from the worker's unconfined OS-account reach; the Knowledge classpath fallback (temporary knowledge-index* directory, pinned-version exception) is part of the inventory. Each verification item has a tracking issue (#153-#158).
+    sections: ["4.4a", "4.5", "4.8 P10", "4.8 P13", "4.11a", "4.13", "4.14.2"]
   - date: "2026-10-27"
     decision: Review round 2 answers to Q1-Q13 (see answered_questions). Policy ratified; acceptance pending V1-V6.
     sections: ["4.1", "4.3", "4.4a", "4.5", "4.5a", "4.7", "4.8", "4.9", "4.13", "4.14"]
@@ -571,6 +574,7 @@ answered_questions:
 
 verification_items:
   - id: V1
+    tracking: apache/camel-kit#153
     title: Per-parser regression coverage for the source-reading contract
     from: [Q1]
     sections: ["4.2", "4.8 P1"]
@@ -578,6 +582,7 @@ verification_items:
     interim_triage: A demonstrated breach is VALID under P1.
     status: open
   - id: V2
+    tracking: apache/camel-kit#154
     title: Graph confinement and resource bounds
     from: [Q2]
     sections: ["4.6", "4.8 P1", "4.8 P11"]
@@ -585,13 +590,15 @@ verification_items:
     interim_triage: A demonstrated outside-root read, non-termination or unbounded memory is VALID under P1.
     status: open
   - id: V3
+    tracking: apache/camel-kit#155
     title: Narrower Claude MCP grants in the generated settings.json
     from: [Q3]
     sections: ["4.5a", "4.8 P10", "4.11a"]
     work: Replace mcp__camel__*, mcp__camel-knowledge__* and mcp__citrus__* with explicit per-tool grants aligned with the workflow manifest allowed_tools, and verify the generated behaviour in Claude Code.
-    interim_triage: The current wildcard grant is a documented deviation triaged VALID-HARDENING; duplicates are closed against this item.
+    interim_triage: A report that only restates the current wildcard grant is VALID-HARDENING and is closed against this item; a report that demonstrates a breach through the grant is triaged on the breach and its impact under P10, never as a duplicate.
     status: open
   - id: V4
+    tracking: apache/camel-kit#156
     title: Verified per-process side-effect inventory
     from: [Q6]
     sections: ["4.5", "4.4a"]
@@ -599,6 +606,7 @@ verification_items:
     interim_triage: Code-inspected statements remain inferred; a breach of a claimed property is VALID.
     status: open
   - id: V5
+    tracking: apache/camel-kit#157
     title: Init and download path controls through symbolic links
     from: [Q7, Q9]
     sections: ["4.8 P3", "4.8 P4"]
@@ -606,17 +614,18 @@ verification_items:
     interim_triage: A redirected write or an extraction escape reachable from an untrusted tree or a downloaded artifact is VALID.
     status: open
   - id: V6
+    tracking: apache/camel-kit#158
     title: Knowledge section verification
     from: [Q11]
     sections: ["4.4a", "4.8 P12", "4.8 P13", "4.8 P14"]
-    work: Maintainer verification of the Knowledge statements drafted from code and README - no listener in the default configuration, no process execution and no network access other than index acquisition, tool-argument handling, cache permissions and the SSE posture.
+    work: Maintainer verification of the Knowledge statements drafted from code and README - no listener in the default configuration, no process execution and no network access other than index acquisition, tool-argument handling, cache permissions, the SSE posture, and the classpath fallback (temporary-directory permissions, no bundled index in the monorepo runner). Related hardening - #137 (PR #143), #139 (PR #142), #140.
     interim_triage: A breach of P12-P14 is VALID.
     status: open
 
 revision_triggers:
   - New CLI command, parser or input format reading external content; parser moving to later compilation phase or symbol resolution.
   - Change to the graph parser timeout or the POM parser path, or addition of size, memory or symbolic-link checks in kit/camel-kit-graph (closes V2 items).
-  - A new Knowledge tool, a tool argument that names a path, URL or command, the SSE transport enabled by default, a new download origin or manifest scheme, a new index format channel, authentication added to the transport, or the indexer promoted into the runtime server.
+  - A new Knowledge tool, a tool argument that names a path, URL or command, the SSE transport enabled by default, a new download origin or manifest scheme, a change to the IndexDownloader transport rule or redirect validation, a new index format channel, authentication added to the transport, or the indexer promoted into the runtime server.
   - Change to default oversight mode, default backend, Pi tool lists or flags, tree policy rules/quotas, expression gate, secret-scan rules, resolver origin/checksum/redirect policy.
   - init writing outside the target directory or under $HOME; Ship state moving to a user-level default.
   - New or changed generated harness asset granting permissions, installing hooks or auto-approving tools; completion of V3 (promotes P10 to the accepted posture).

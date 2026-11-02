@@ -14,9 +14,9 @@
 | Project | Apache Camel Kit — the Kit and Knowledge products (`apache/camel-kit`) |
 | Version / source baseline | Kit `0.4.2-SNAPSHOT` (source baseline commit `70796c02`); Knowledge `0.0.3-SNAPSHOT` (baseline commit `9c8173cb`) |
 | Repository layout | Monorepo since commit `9c8173cb`: `kit/` and `knowledge/` with independent release lines |
-| Date | 2026-10-22; revised 2026-10-27 after review round 2 |
+| Date | 2026-10-22; revised 2026-10-27 after review round 2; revised 2026-11-02 after review round 3 |
 | Author(s) | Camel-Kit maintainers; drafted with the threat-model-producer procedure in draft-first mode for [apache/camel-kit#5](https://github.com/apache/camel-kit/issues/5) |
-| Status | **DRAFT — policy ratified, acceptance pending verification.** All thirteen §4.14 questions were answered by a maintainer on 2026-10-27 (§4.14.1). Acceptance is blocked on the verification items V1–V6 of §4.14.2: tested parser guarantees, graph confinement and bounds, narrower Claude MCP defaults, a verified per-process side-effect inventory, init and download path controls, and verification of the Knowledge section. Claims tagged *(inferred)* name the verification item that will settle them. |
+| Status | **DRAFT — policy ratified, acceptance pending verification.** All thirteen §4.14 questions were answered by a maintainer on 2026-10-27 (§4.14.1). Acceptance is blocked on the verification items V1–V6 of §4.14.2: tested parser guarantees, graph confinement and bounds, narrower Claude MCP defaults, a verified per-process side-effect inventory, init and download path controls, and verification of the Knowledge section; each item has a tracking issue (#153–#158). Claims tagged *(inferred)* name the verification item that will settle them. The Knowledge transport statements describe `IndexDownloader` as changed by apache/camel-kit#143, which validates every redirect target and refuses remote cleartext. |
 
 **Version binding.** This model is versioned with the project. A report against Camel-Kit version *N* is triaged
 against the model as it stood at *N*, not at `HEAD`. Camel Ship is a Technology Preview *(documented — README,
@@ -42,7 +42,7 @@ cited. *(maintainer, date)* = stated by a maintainer in answer to a §4.14 quest
 apache/camel-kit#6, or as a recorded decision. *(inferred)* = reasoned from code structure or the absence of a
 feature; every *(inferred)* tag names the §4.14.2 verification item (`Vn`) that will settle it.
 
-**Draft confidence.** 192 documented / 30 maintainer / 20 inferred tags. Update as §4.14.2 items are
+**Draft confidence.** 200 documented / 33 maintainer / 21 inferred tags. Update as §4.14.2 items are
 verified.
 
 **Products covered.** This model covers both products of the monorepo: **Kit** in `kit/` (families A–E, G and H in
@@ -248,7 +248,15 @@ Knowledge README and code and await maintainer verification (V6).
 - *Index acquisition* (`IndexDownloader`): on the first query the server resolves the index — a local
   `knowledge.index.path` used in place, else a published `knowledge-index-v1-*` GitHub release (the newest compatible
   one, or the exact `knowledge.index.version`) or an explicit `knowledge.index.url` manifest — and caches it under
-  `~/.camel-kit/knowledge-index` *(documented — `knowledge/README.md`, "Index Distribution")*.
+  `~/.camel-kit/knowledge-index` *(documented — `knowledge/README.md`, "Index Distribution")*. Remote manifest,
+  discovery and asset URLs — and every redirect target, checked before the hop is issued — must be `https`, or `http`
+  to a loopback host only *(documented — `IndexDownloader.requireFetchableUri`; apache/camel-kit#143)*. When
+  resolution fails and no `knowledge.index.version` is pinned, `LuceneSearchService` falls back to a
+  classpath-bundled index, extracted into a fresh `knowledge-index*` directory under the JVM temporary directory
+  with the JDK's default temporary-directory permissions and removed on orderly shutdown; a pinned client receives
+  the error instead. The monorepo runner bundles no index, so the fallback serves legacy uber-jars that do
+  *(documented — `knowledge/README.md`, "Index Distribution" step 3; `LuceneSearchService.resolveIndex`; the
+  permission and bundling statements are inferred — V6)*.
 - *Bundled embedding model and reranker* (`knowledge/embedding`): ONNX models packaged at build time ("The MCP module
   downloads the ONNX embedding model from HuggingFace during `generate-resources`") and loaded at runtime from the
   classpath into a private `camel-kit-onnx-*` temporary directory *(documented — `knowledge/README.md`;
@@ -273,7 +281,9 @@ Knowledge README and code and await maintainer verification (V6).
    the version directory atomically (it must be a real directory, never a symbolic link) and keeps the previous working
    version when an update fails; a pinned version never falls back to another *(documented — `knowledge/README.md`,
    "Index Distribution"; `IndexDownloader`)*. Connections time out after 3 s, manifests after 5 s and archives after
-   5 min including the body; redirects are followed except HTTPS-to-HTTP *(documented — `IndexDownloader`)*.
+   5 min including the body; redirects are followed only after each target passes the same transport rule — `https`,
+   or `http` to a loopback host — for at most five hops, so no hop can downgrade to cleartext *(documented —
+   `IndexDownloader.send`; apache/camel-kit#143)*.
 3. *Index → results.* The index is "data, not code": it is regenerated on a branch, committed with a signed commit,
    reviewed through a pull request, built unchanged by the release workflow and published as a GitHub release asset
    *(documented — `knowledge/README.md`, "Index Distribution")*. Search results are the upstream authors' text and are
@@ -286,13 +296,16 @@ Knowledge README and code and await maintainer verification (V6).
 **What the Knowledge server does to its host** (row in the §4.5 inventory): no listening socket in the default
 configuration *(documented — README; the running-process claim is inferred — V6)*; no child process *(inferred —
 V6)*; network only to the configured release endpoint, manifest and asset URLs *(documented — `IndexDownloader`; "no
-other network" inferred — V6)*; writes only the cache directory — version directories, the `current` marker, the
-`etag` validator, staging files and an `.update.lock` — and the private ONNX temporary directory *(documented —
-`IndexDownloader`, `OnnxEmbeddingProvider`)*; reads `knowledge.index.*` properties and their `KNOWLEDGE_INDEX_*`
+other network" inferred — V6)*; writes the cache directory — version directories, the `current` marker, the `etag`
+validator, staging files and an `.update.lock` — and the private `camel-kit-onnx-*` temporary directory *(documented —
+`IndexDownloader`, `OnnxEmbeddingProvider`)*, plus, only when index resolution fails and no version is pinned, a
+`knowledge-index*` temporary directory holding the classpath-extracted fallback index, removed on orderly shutdown
+*(documented — `LuceneSearchService`)*; nothing else *(inferred — V6)*; reads `knowledge.index.*` properties and their
+`KNOWLEDGE_INDEX_*`
 environment equivalents *(documented — README)*; "No Docker. No Docling. No external tokens." *(documented — README)*.
 
-**Knobs** (also in §4.5a): `knowledge.index.path`; `knowledge.index.url`, which accepts `https`, `http` and `file`
-schemes; `knowledge.index.version`; `knowledge.index.releases-url`; `knowledge.index.cache-dir`;
+**Knobs** (also in §4.5a): `knowledge.index.path`; `knowledge.index.url`, which accepts `https` and `file`
+anywhere and `http` only to a loopback host (apache/camel-kit#143); `knowledge.index.version`; `knowledge.index.releases-url`; `knowledge.index.cache-dir`;
 `quarkus.http.host-enabled`, `host` and `port` for SSE; and Kit's pin of the server coordinate
 (`knowledge.mcp.group-id`, `knowledge.mcp.version`) — today the released `0.0.2` under the former
 `io.github.luigidemasi` coordinates, which "keeps its original download URL and does not support the new
@@ -338,9 +351,9 @@ a report against `0.0.2` is triaged on what that release documents.
 | **Kit CLI** `camel-kit` / `camel kit`: `init`, `doctor`, `doc`, `nextId`, `plan analyze`, `graph` | none (inspected) | version probes only: `java -version`, `jbang version`, `camel --version`, `mvn`/`mvnw`, `pi -a` *(documented — `PrerequisiteChecker`, `DoctorService`, `docs/agent-architectures.md`)* | `init` without `--no-fetch`: HTTPS to `repo1.maven.org`, `raw.githubusercontent.com/apache/camel`, `api.github.com` (Kamelet listing) and `search.maven.org`; redirects followed except HTTPS-to-HTTP; no checksum or signature *(documented — downloader constants; accepted boundary, maintainer 2026-10-27 — Q7)*. Other commands: none (inspected) | the operator-selected target, `.camel-kit/` and `.camel-kit/.cache/`; merges `.codex/config.toml` / `opencode.json` in place *(documented — `docs/commands.md`, `docs/architecture.md`)*; nothing under `$HOME` (inspected) | `~/.camel-kit/config.properties`; `PATH` for probes (inspected) | none (inspected) | downloads: 30–60 s request deadlines; archive entries read in memory or written by file name inside the cache *(documented — `CatalogDownloader`, `CitrusSchemaDownloader`, `ForageCatalogService`)* |
 | **Graph analysis** (inside the CLI process) | none (inspected) | none *(inferred — V1)* | none *(inferred — V1)* | `.camel-kit/project-graph.json` or the `--output` path *(documented — `GraphGenerateCommand`)* | none (inspected) | none (inspected) | 60 s per parser except the POM parser; no file-size or memory bound; file symbolic links not yet checked *(documented — `GraphBuilder`; gaps V2)* |
 | **Ship controller** `camel-kit ship` | none (inspected) | `pi` and `node` (Pi backend), `/usr/bin/setsid`, `/bin/kill`, the controller's own `java` for evidence *(documented — `PiWorker`, `LocalCommandRunner`, `EvidenceRunner`)* | HTTPS to Maven Central through the resolver; no redirects; checksum `fail` *(documented — `ShipMavenResolver`)* | `.camel-kit/ship/state/` or `$CAMEL_KIT_SHIP_STATE_HOME`; the live project only through journaled publication *(documented — `docs/commands.md`, `ShipPublicationService`)* | the whole environment, to redact and scan secrets *(documented — `LocalCommandRunner`)*; `CAMEL_KIT_SHIP_STATE_HOME`; `PATH` | none (inspected) | P11 |
-| **Ship Pi worker** (`--backend pi`) | Pi's own process | Pi's tools — `bash`, `edit`, `write` in EXECUTE — inside the staging cwd *(documented — `PiWorker`)* | whatever Pi and its provider need; launched with `--offline`, `--no-extensions`, `--no-skills`, `--no-context-files` *(documented — `PiWorker` arguments)* | the staging workspace and its session directory under the state root *(documented — `PiWorker`)* | the controller's full environment, by design *(maintainer, 2026-10-27 — Q8)* | Pi's own | prompt 1 MiB, log 16 MiB, session 64 MiB *(documented — `PiWorker`)* |
+| **Ship Pi worker** (`--backend pi`) | Pi's own process | Pi's tools — `bash`, `edit`, `write` in EXECUTE — started in the staging cwd, which is a working directory, not a confinement *(documented — `PiWorker` Javadoc)* | whatever Pi and its provider need — external behaviour, outside this model (§4.3); launched with `--offline`, `--no-extensions`, `--no-skills`, `--no-context-files` *(documented — `PiWorker` arguments)* | *Intended:* the staging workspace and its session directory under the state root *(documented — `PiWorker`)*. *Reachable:* `PiWorker` sets only the working directory and the environment of the `setsid`/`node`/`pi` process and imposes no filesystem confinement, so the worker — and whatever Pi or its provider run — can write wherever the controller's OS account can; what Pi writes on its own account (configuration, caches) is external behaviour (§4.3) *(documented — `PiWorker.runRpc`; maintainer, 2026-10-27 — Q8)* | the controller's full environment, by design *(maintainer, 2026-10-27 — Q8)* | Pi's own | prompt 1 MiB, log 16 MiB, session 64 MiB *(documented — `PiWorker`)* |
 | **Ship evidence JVMs** | none (inspected) | none (inspected) | none by design: every non-direct endpoint stubbed *(documented — `docs/commands.md`)* | private `HOME` and `TMPDIR` under the run; frozen read-only copy *(documented — `EvidenceRunner`)* | scrubbed to `LANG`, `LC_ALL`, `HOME`, `TMPDIR`, `GIT_CEILING_DIRECTORIES` and controller-provided variables *(documented — `EvidenceRunner`)* | none (inspected) | 64 MiB log cap; stage timeout *(documented — `EvidenceRunner`)* |
-| **Knowledge MCP server** (default configuration) | none — stdio *(documented — `knowledge/README.md`)*; HTTP/SSE only with `quarkus.http.host-enabled=true` | none *(inferred — V6)* | first query only: the configured releases endpoint, manifest and asset URLs *(documented — `IndexDownloader`)*; nothing else *(inferred — V6)* | `~/.camel-kit/knowledge-index` or `knowledge.index.cache-dir`; a `camel-kit-onnx-*` temp directory *(documented — `IndexDownloader`, `OnnxEmbeddingProvider`)* | `knowledge.index.*` / `KNOWLEDGE_INDEX_*` and Quarkus configuration *(documented — `knowledge/README.md`)* | none *(inferred — V6)* | 25 results per call; release pages ≤ 2 MiB, ≤ 10 pages; 3 s connect, 5 s manifest, 5 min archive deadlines *(documented — `KnowledgeMcpServer`, `IndexDownloader`)*; no archive size cap |
+| **Knowledge MCP server** (default configuration) | none — stdio *(documented — `knowledge/README.md`)*; HTTP/SSE only with `quarkus.http.host-enabled=true` | none *(inferred — V6)* | first query only: the configured releases endpoint, manifest and asset URLs over `https` (`http` only to a loopback host), each redirect target checked before the hop *(documented — `IndexDownloader`; apache/camel-kit#143)*; nothing else *(inferred — V6)* | `~/.camel-kit/knowledge-index` or `knowledge.index.cache-dir`; a `camel-kit-onnx-*` temp directory *(documented — `IndexDownloader`, `OnnxEmbeddingProvider`)*; a `knowledge-index*` temp directory only when resolution fails with no pinned version — the classpath fallback, removed on orderly shutdown *(documented — `LuceneSearchService`)* | `knowledge.index.*` / `KNOWLEDGE_INDEX_*` and Quarkus configuration *(documented — `knowledge/README.md`)* | none *(inferred — V6)* | 25 results per call; release pages ≤ 2 MiB, ≤ 10 pages; 3 s connect, 5 s manifest, 5 min archive deadlines *(documented — `KnowledgeMcpServer`, `IndexDownloader`)*; no archive size cap |
 | **Knowledge indexer** (maintainer tool: `-Prebuild-index`, `index-release.yml`) | none (inspected) | none — JGit runs in-process (inspected) | `github.com` (clones, `ls-remote`), `raw.githubusercontent.com`, Maven Central, `issues.apache.org`, `services.nvd.nist.gov`, `vulnerability.circl.lu` *(documented — `knowledge/README.md`, `VersionResolver`, `JiraFetcher`, `CveParser`)* | `knowledge/indexer/src/main/resources/apache-camel/{repos,catalog-cache,embedding-cache,cve-cache}` and the index output *(documented — `knowledge/README.md`)* | `jira.parallelism`, `download.parallelism`, `index.*` system properties; no tokens — "No API key is required" *(documented — `knowledge/README.md`)* | none (inspected) | NVD/CIRCL: requests spaced 6.1 s, 15 s deadline, 5 s connect, cooldown on 429/503 *(documented — `knowledge/README.md`)* |
 
 Camel-Kit never runs `git` against the live project: Ship bounds Git discovery at the staged workspace with
@@ -372,7 +385,7 @@ Camel-Kit is a family of postures. The knobs that move the security envelope:
 | `CAMEL_KIT_SHIP_STATE_HOME` | unset → `.camel-kit/ship/state/` in the project | Relocates run records, retained evidence, Pi transcripts and the staged workspace *(documented — `docs/commands.md`)*. | Documented; location choice is the developer's (§4.10). |
 | `camel-kit ship --stage-timeout` | `10m` | Bounds one stage attempt. | Documented. |
 | `knowledge.index.path` (`KNOWLEDGE_INDEX_PATH`) | unset | Uses a local index directory in place: no network, no cache *(documented — `knowledge/README.md`)*. | Documented (development, tests, air-gapped use). |
-| `knowledge.index.url` (`KNOWLEDGE_INDEX_URL`) | unset → release discovery | Explicit manifest URL; `https`, `http` and `file` schemes are accepted, so a plaintext `http://` manifest is possible when configured *(documented — `knowledge/README.md`; `IndexDownloader`)*. | Documented; an operator-selected origin is trusted input (§4.10). |
+| `knowledge.index.url` (`KNOWLEDGE_INDEX_URL`) | unset → release discovery | Explicit manifest URL; `https` and `file` are accepted anywhere, `http` only to a loopback host (`localhost`, `127.0.0.0/8`, `::1`) — a plaintext manifest from a remote host is refused before any request, and so is a redirect to one *(documented — `knowledge/README.md`; `IndexDownloader.requireFetchableUri`; apache/camel-kit#143)*. | Documented; an operator-selected origin is trusted input (§4.10). |
 | `knowledge.index.version` (`KNOWLEDGE_INDEX_VERSION`) | unset → newest compatible published index | Exact index pin; never falls back to another version *(documented — `knowledge/README.md`)*. | Documented. |
 | `knowledge.index.releases-url`, `knowledge.index.cache-dir` | `https://api.github.com/repos/apache/camel-kit/releases`, `~/.camel-kit/knowledge-index` | Discovery endpoint and cache location *(documented — `knowledge/README.md`)*. | Documented; operator input. |
 | `quarkus.http.host-enabled`, `quarkus.http.host`, `quarkus.http.port` (Knowledge SSE) | disabled: stdio only | Opens an HTTP/SSE listener without authentication on the configured host and port *(documented — `knowledge/README.md`)*. | Documented opt-in; keep on loopback (§4.10). |
@@ -435,8 +448,10 @@ constants)*.
    *(documented — Apache Camel Security Model, "Adversary model")*.
 3. **A network peer** between the CLI and Maven Central, the ASF repositories or GitHub. Defeated by TLS; the Ship
    resolver additionally refuses redirects and enforces checksums *(documented — `ShipMavenResolver`)*; `init`
-   downloaders follow HTTPS redirects, never to plain HTTP *(documented — downloader constants)*; the absence of
-   independent verification is the accepted boundary *(maintainer, 2026-10-27 — Q7)*.
+   downloaders follow HTTPS redirects, never to plain HTTP *(documented — downloader constants)*; the Knowledge
+   downloader refuses remote cleartext and checks each redirect target before the hop *(documented —
+   `IndexDownloader`; apache/camel-kit#143)*; the absence of independent verification is the accepted boundary
+   *(maintainer, 2026-10-27 — Q7)*.
 4. **Another local account on the same host.** Camel-Kit must not write evidence, transcripts, secrets or proposals
    where other accounts can read them (umbrella's "second, weaker adversary"). Ship creates its private directories
    and files with owner-only permissions *(documented — `EvidenceRunner`, `PiWorker`, `ShipPublicationService`
@@ -607,7 +622,11 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
     (§4.9). *Violation:* a generated asset grants more than the accepted posture — a worker with edit or shell tools, a
     filter or auto-approval list containing a tool outside the manifest's `allowed_tools`, a prompt-mode target
     generated with auto-approval, a hook or guard that fails open on a pattern it documents denying. The known Claude
-    wildcard deviation is V3, triaged `VALID-HARDENING` until the template changes.
+    wildcard pre-approval is a documented deviation, not a breach of this property: a report that only restates it is
+    tracked under V3 (#155) as `VALID-HARDENING` until the template changes. A report that demonstrates what the grant
+    lets through — a credential read or a destructive action reaching the developer's account without a prompt, or
+    any other in-scope boundary breach — is evaluated on that breach and its impact under the tiers below; it is
+    neither downgraded to V3 nor closed as its duplicate *(maintainer, 2026-10-27 — review of #6)*.
     *Severity:* hardening; security-critical when the widened grant reaches a credential or destructive action
     without a prompt.
 11. **P11 — Stated resource bounds.** Route YAML and Citrus YAML ≤ 2 MiB each *(documented —
@@ -634,11 +653,16 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
     manifest value before unpacking; zip entries are confined to the per-download staging directory; the version
     directory is activated atomically and must be a real directory; a failed update keeps the previous working
     index; a pinned client never falls back to another version *(documented — `knowledge/README.md`, "Index
-    Distribution"; `IndexDownloader`)*. *Violation:* an archive accepted on SHA-256 mismatch; an entry written
-    outside the staging or version directory; a version name outside the safe-name rules accepted; a pinned client
-    using another version; a manifest from a different release tag accepted; activation of a partially unpacked
-    version. *Severity:* security-critical (integrity and path escape). This describes the monorepo sources; the
-    published `0.0.2` server has the standalone repository's download behaviour (§4.4a).
+    Distribution"; `IndexDownloader`)*. Remote manifest, discovery and asset URLs — and every redirect target, checked
+    before the hop is issued — must be `https`, or `http` to a loopback host only; the manifest carries the archive's
+    hash, so cleartext would let a network adversary rewrite both *(documented — `IndexDownloader.requireFetchableUri`;
+    apache/camel-kit#143)*. An unpinned client whose resolution fails falls back to a classpath-bundled index in a
+    temporary directory; a pinned client does not *(documented — `LuceneSearchService`)*. *Violation:* an archive
+    accepted on SHA-256 mismatch; an entry written outside the staging or version directory; a version name outside
+    the safe-name rules accepted; a pinned client using another version or the classpath fallback; a manifest from a
+    different release tag accepted; a remote fetch or redirect issued over non-loopback `http`; activation of a
+    partially unpacked version. *Severity:* security-critical (integrity and path escape). This describes the monorepo
+    sources; the published `0.0.2` server has the standalone repository's download behaviour (§4.4a).
 14. **P14 — Knowledge tool arguments are queries, not code.** `camel_docs_*` arguments are used as escaped Lucene
     query text (`QueryParser.escape`), structured field lookups, version strings and an endpoint URI validated
     against the bundled Camel catalog; `max_results` is clamped to 25; no argument names a file path, URL or command
@@ -713,8 +737,9 @@ This is the most important section for a developer adopting Camel-Kit and for an
   HTTP/SSE transport carries no authentication beyond its bind address *(documented — `knowledge/README.md`; inferred
   for the SSE posture — V6)*.
 - **Knowledge: no independent signature on the index.** Integrity rests on HTTPS to the GitHub release origin and the
-  SHA-256 in a manifest served from the same origin; a configured `http://` or `file://` manifest is trusted as
-  operator input *(documented — `knowledge/README.md`; `IndexDownloader`)*.
+  SHA-256 in a manifest served from the same origin; a configured `file://` manifest, or a loopback `http://` one, is
+  trusted as operator input, and remote cleartext is refused before any request *(documented — `knowledge/README.md`;
+  `IndexDownloader`; apache/camel-kit#143)*.
 - **Knowledge: index content is upstream text.** Documentation, release notes, advisories and catalog metadata may
   carry instruction-like text; results are data under `context-authority.md`. CVE and JIRA data are informational
   and best-effort (indexer-time NVD/CIRCL enrichment), not a complete advisory feed; `camel_docs_validate_endpoint`
@@ -790,8 +815,8 @@ For the **developer** (who is also the route author and the operator of the mach
 7. **Regenerate assets after upgrading** with `init --here --ai <agent> --force` after backing up customisations
    *(documented — README)*, so the generated controls match this model's version.
 8. **Run Knowledge as a local stdio server.** Keep the SSE transport disabled or bound to loopback; prefer
-   `knowledge.index.path` or a trusted HTTPS mirror in locked-down networks; treat an `http://` or `file://` manifest
-   as your own trusted input; protect `~/.camel-kit/knowledge-index` like any user cache; pin `knowledge.index.version`
+   `knowledge.index.path` or a trusted HTTPS mirror in locked-down networks; treat a `file://` manifest, or a loopback
+   `http://` one, as your own trusted input (remote cleartext is refused, apache/camel-kit#143); protect `~/.camel-kit/knowledge-index` like any user cache; pin `knowledge.index.version`
    where reproducibility matters (§4.4a).
 
 For **operators of the generated integration**: everything in the Apache Camel Security Model's "Deployment
@@ -829,8 +854,11 @@ security checklist — and do not link to this model *(maintainer, 2026-10-27 �
 - **Using Ship for production delivery.** It is a Technology Preview *(documented — README)*.
 - **Exposing the Knowledge SSE transport beyond loopback.** *Why unsafe:* the transport has no authentication (§4.9).
   *Instead:* stdio, or `quarkus.http.host=127.0.0.1`.
-- **Pointing `knowledge.index.url` at a plaintext `http://` mirror.** *Why unsafe:* the manifest and its SHA-256 then
-  travel unprotected. *Instead:* HTTPS, `file://` from a vetted copy, or `knowledge.index.path`.
+- **Pointing `knowledge.index.url` at a loopback `http://` proxy that fetches from a plaintext upstream.** *Why
+  unsafe:* the downloader refuses remote `http://` manifests and redirects to them (apache/camel-kit#143), but it
+  cannot see what a local proxy does on its own connection; the manifest and its SHA-256 then travel unprotected
+  between the proxy and the upstream. *Instead:* HTTPS end to end, `file://` from a vetted copy, or
+  `knowledge.index.path`.
 - **Treating `camel_docs_cve_search` as a complete advisory feed.** *Why unsafe:* coverage follows the indexed
   advisories and best-effort enrichment. *Instead:* the Apache Camel security page plus `camel_docs_index_info`.
 
@@ -859,13 +887,17 @@ Suitable as a suppression or negative-prompt list for scanners and AI-assisted t
   `{{env:DATABASE_PASSWORD}}`, `{{PLACEHOLDER}}` and fixture values.
 - **`--no-approve` in the Pi worker argument list**: Pi's own prompt is replaced by the controller's oversight gates
   and deterministic validation; the worker runs inside the staging workspace with a bounded tool list (P5–P8).
-- **`followRedirects(NORMAL)` in the `init` downloaders and the Knowledge `IndexDownloader`**: HTTPS-to-HTTPS
-  redirects from Maven Central and GitHub are expected; `NORMAL` never downgrades to HTTP; the absence of independent
-  verification is the accepted boundary (§4.9).
+- **`followRedirects(NORMAL)` in the `init` downloaders**: HTTPS-to-HTTPS redirects from Maven Central and GitHub are
+  expected; `NORMAL` never downgrades to HTTP; the absence of independent verification is the accepted boundary
+  (§4.9). The Knowledge `IndexDownloader` no longer relies on `NORMAL`: it follows redirects itself and checks each
+  target's transport before the hop (apache/camel-kit#143), so a hit on its redirect handling is a non-finding only
+  while that check stands.
 - **The generated Claude `settings.json` pre-approving `mvn` and `./mvnw`**: documented posture (§4.5a).
 - **The generated Claude `settings.json` pre-approving every tool of the three MCP servers (`mcp__<server>__*`)**: a
-  known deviation from the accepted posture, tracked as V3 and triaged `VALID-HARDENING`; duplicates are closed
-  against V3, not opened as new findings.
+  known deviation from the accepted posture, tracked as V3 (#155) and triaged `VALID-HARDENING` when the report only
+  restates the configuration; duplicates of that report are closed against V3, not opened as new findings. A report
+  that demonstrates a breach *through* the grant is not a non-finding: it is triaged on the breach and its impact
+  (P10).
 - **A Pi-backend Ship run publishing an ordinary additional material file** (documentation, test data): the
   documented acceptance behaviour of P5, not a violation; the launch surface and the declared artifacts are what
   validation bounds.
@@ -895,8 +927,9 @@ Suitable as a suppression or negative-prompt list for scanners and AI-assisted t
 - A change to the graph parser timeout or the POM parser path, or the addition of size, memory or symbolic-link
   checks in `camel-kit-graph` (which closes V2 items and promotes P1 tags).
 - Knowledge: a new tool, a tool argument that names a path, URL or command, the SSE transport enabled by default, a
-  new download origin or manifest scheme, a new index format channel, authentication added to the transport, the
-  indexer promoted into the runtime server, or Kit's Knowledge pin moving to `org.apache.camel` coordinates.
+  new download origin or manifest scheme, a change to the `IndexDownloader` transport rule or redirect validation, a
+  new index format channel, authentication added to the transport, the indexer promoted into the runtime server, or
+  Kit's Knowledge pin moving to `org.apache.camel` coordinates.
 - A change to the default oversight mode, default backend, Pi tool lists or launch flags, the tree policy rules or
   quotas (its schema version), the expression gate, the secret-scan rules, or the resolver's origin, checksum or
   redirect policy.
@@ -920,7 +953,7 @@ match the Apache Camel Security Model so a triager can cite either document.
 | Disposition | Meaning | Licensed by |
 | --- | --- | --- |
 | `VALID` | Violates a §4.8 property through an in-scope adversary (§4.7) and an attacker-controllable input (§4.6). Fixed in a coordinated release; published as a CVE. | §4.8, §4.6, §4.7 |
-| `VALID-HARDENING` | No §4.8 property is violated, but a §4.11 misuse is easy enough, or a §4.11 limit fails its documented value, that the project elects to harden. Reported privately; usually no CVE. | §4.11, §4.8 P9, P11 |
+| `VALID-HARDENING` | No §4.8 property is violated, but a §4.11 misuse is easy enough, or a §4.11 limit fails its documented value, that the project elects to harden; also a report that only restates a documented deviation tracked by an open §4.14.2 item (today V3). Reported privately; usually no CVE. | §4.11, §4.8 P9, P11, §4.14.2 |
 | `OUT-OF-MODEL: trusted-input` | Requires control of a trusted input: CLI flags, config files, the developer's approval of a design, or the developer's own OS account. Covers "the user asked for an insecure route". | §4.6, §4.2 |
 | `OUT-OF-MODEL: adversary-not-in-scope` | Requires an actor §4.7 excludes: the developer or a same-user process, a compromised harness or provider, a hostile pinned origin, a transitive-dependency author. Covers operator misconfiguration of the host or harness. | §4.7 |
 | `OUT-OF-MODEL: unsupported-component` | Lands in family F (external MCP servers — route to Apache Camel or Citrus; Knowledge is family K, in model), G (the generated integration's runtime — route to the Apache Camel Security Model) or H (shipped-but-unsupported code). | §4.3, §4.2 |
@@ -933,8 +966,10 @@ A report that demonstrates an outside-root read, non-termination or unbounded me
 `VALID` under P1 whatever the status of V1 and V2; it is neither `BY-DESIGN` nor a `MODEL-GAP`. A Pi-backend run
 that publishes an ordinary additional material file is the documented behaviour of P5, not a violation. A report that
 matches an open verification item (§4.14.2) is triaged on the model's claim: a breach of a claimed property is `VALID`
-while the item is open, and the Claude wildcard MCP grant (V3) is `VALID-HARDENING` until the generated default changes.
-Knowledge findings use the same dispositions (§4.4a).
+while the item is open. The Claude wildcard MCP grant (V3) is the one documented deviation: a report that only restates
+the configuration is `VALID-HARDENING` until the generated default changes, while a report that demonstrates a breach
+through the grant is evaluated on that breach and its impact under P10's tiers and is never downgraded to V3 or closed
+as its duplicate *(maintainer, 2026-10-27 — review of #6)*. Knowledge findings use the same dispositions (§4.4a).
 
 Mapping the categories named in apache/camel-kit#5: a **framework vulnerability** is `VALID`; an **LLM
 hallucination** or insecure suggestion is `BY-DESIGN: property-disclaimed` unless a documented tool, permission, parser or controller boundary failed
@@ -1000,32 +1035,35 @@ tags read *(maintainer, 2026-10-27 — Qn)*.
 
 Answering the policy questions did not mark the implementation work complete. Every remaining *(inferred — Vn)* tag
 routes to one of these items; the model is accepted when each is verified by a maintainer or closed by a change.
-Until then a report that matches an open item is triaged on the model's claim (§4.13).
+Until then a report that matches an open item is triaged on the model's claim (§4.13). Each item is tracked in its
+own issue, linked below.
 
-- **V1 — Per-parser regression coverage (Q1) → §4.2, §4.5, §4.8 P1.** Tests pinning, for each of the nine parsers
+- **V1 — Per-parser regression coverage (Q1; #153) → §4.2, §4.5, §4.8 P1.** Tests pinning, for each of the nine parsers
   including the compiler-based Java and Groovy paths, that parsing executes no project code, loads no project class,
   resolves no placeholder or secret, opens no connection and spawns no process. *Interim triage:* a demonstrated breach
   is `VALID`.
-- **V2 — Graph confinement and resource bounds (Q2) → §4.6, §4.8 P1, P11.** Verify or add: confinement of file reads to
+- **V2 — Graph confinement and resource bounds (Q2; #154) → §4.6, §4.8 P1, P11.** Verify or add: confinement of file reads to
   the analysed root when the tree contains symbolic links; the POM parser under the parser timeout; a memory or
   file-size bound. *Interim triage:* a demonstrated outside-root read, non-termination or unbounded memory is `VALID`.
-- **V3 — Narrower Claude MCP grants (Q3) → §4.5a, §4.8 P10, §4.11a.** Replace `mcp__camel__*`,
+- **V3 — Narrower Claude MCP grants (Q3; #155) → §4.5a, §4.8 P10, §4.11a.** Replace `mcp__camel__*`,
   `mcp__camel-knowledge__*` and `mcp__citrus__*` in the generated `settings.json` with explicit per-tool grants aligned
-  with the workflow manifest's `allowed_tools`, and verify the generated behaviour in Claude Code. *Interim triage:* the
-  current wildcard grant is a documented deviation, `VALID-HARDENING`; duplicates are closed against this item.
-- **V4 — Verified per-process side-effect inventory (Q6) → §4.5, §4.4a.** Maintainer verification of every row of the
+  with the workflow manifest's `allowed_tools`, and verify the generated behaviour in Claude Code. *Interim triage:* a
+  report that only restates the current wildcard grant is `VALID-HARDENING` and is closed against this item; a report
+  that demonstrates a breach through the grant is triaged on the breach and its impact under P10, never as a duplicate.
+- **V4 — Verified per-process side-effect inventory (Q6; #156) → §4.5, §4.4a.** Maintainer verification of every row of the
   §4.5 inventory — Kit CLI, graph analysis, Ship controller, Pi worker, evidence JVMs, Knowledge server, Knowledge
   indexer — for listeners, child processes, network origins, filesystem writes, environment reads, telemetry and
   actual parser limits. *Interim triage:* inspected statements stay *(inferred)*; a breach of a claimed property is
   `VALID`.
-- **V5 — Init and download path controls (Q7, Q9) → §4.8 P3, P4.** Verify that `init` writes stay inside the
+- **V5 — Init and download path controls (Q7, Q9; #157) → §4.8 P3, P4.** Verify that `init` writes stay inside the
   operator-selected target when a generated subtree is a symbolic link, and that every archive extraction (Citrus
   schemas, Forage catalog, Knowledge index) stays inside its cache directory. *Interim triage:* a redirected write or
   an extraction escape reachable from an untrusted tree or a downloaded artifact is `VALID`.
-- **V6 — Knowledge section verification (Q11) → §4.4a, §4.8 P12–P14.** Maintainer verification of the statements
+- **V6 — Knowledge section verification (Q11; #158) → §4.4a, §4.8 P12–P14.** Maintainer verification of the statements
   drafted from code and the README: no listener in the default configuration, no process execution and no network
-  access other than index acquisition, tool-argument handling, cache permissions and the SSE posture. *Interim
-  triage:* a breach of P12–P14 is `VALID`.
+  access other than index acquisition, tool-argument handling, cache permissions, the SSE posture, and the classpath
+  fallback (temporary-directory permissions; no bundled index in the monorepo runner). Related hardening: #137
+  (apache/camel-kit#143), #139 (apache/camel-kit#142), #140. *Interim triage:* a breach of P12–P14 is `VALID`.
 
 ---
 
@@ -1060,6 +1098,8 @@ file changes.
 | Source Javadoc and constants: `SecureXml`, `BizTalk*Parser`, `ArtifactValidator`, `GeneratedAssetCleaner`, `AtomicFileWriter`, `DistributionConfig`, `CatalogDownloader`, `CitrusSchemaDownloader`, `ForageCatalogService`, `ShipTreePolicy`, `ShipSecureFilesystem`, `ShipMavenResolver`, `ShipJvmPayloadBootstrap`, `EvidenceRunner`, `ShipCamelMainBootstrap`, `ShipExpressionPolicy`, `ShipArtifactLimits`, `ShipNativeWorker`, `PiWorker`, `LocalCommandRunner`, `ChangedWorkspaceSecretScanner`, `ShipPublicationService` | §4.4, §4.5, §4.6, §4.7, §4.8 P1–P11, §4.9, §4.11a |
 | Claude Code permissions reference (`mcp__<server>__*` matches every tool of that server) | §4.5a, §4.8 P10 |
 | Review of apache/camel-kit#6 by a maintainer, 2026-10-22 (native-only proposal allowlist; Pi candidate acceptance and extra material files; Claude `settings.json` MCP grants) | §4.5a, §4.6, §4.8 P5, P10, §4.9, §4.11a |
+| Review of apache/camel-kit#6 by a maintainer, 2026-10-27 (configuration versus breach for the Claude grant; intended writes versus reach in the Pi inventory row; Knowledge classpath fallback) | §4.4a, §4.5, §4.8 P10, P13, §4.11a, §4.13, §4.14.2 |
+| apache/camel-kit#143 (`IndexDownloader` transport rule: `https`, or `http` to loopback only; every redirect target validated before the hop) | §4.1, §4.4a, §4.5, §4.5a, §4.7, §4.8 P13, §4.9, §4.10, §4.11, §4.11a, §4.12 |
 | Maintainer decision, 2026-10-27 (graph source-reading contract inherited in full; enforcement gaps tracked, not disclaimed) | §4.1, §4.6, §4.8 P1, P11, §4.13, V1, V2 |
 | Maintainer answers to Q1–Q13, 2026-10-27 (review round 2 of apache/camel-kit#6) | §4.14.1 and every *(maintainer, 2026-10-27 — Qn)* tag |
 | `knowledge/README.md` (transport, tools, index distribution, cache rules, data sources, CVE enrichment, release lines), root `README.md` | §4.1, §4.2, §4.4a, §4.5, §4.5a, §4.8 P12–P14, §4.9, §4.11a |

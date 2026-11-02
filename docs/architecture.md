@@ -893,6 +893,16 @@ one repository), the side-effect inventory is kept per process rather than as bl
 gated on verification items (tested parser guarantees, graph confinement and bounds, narrower Claude MCP defaults, a
 verified inventory, init and download path controls, Knowledge verification).
 
+After review round 3 (2026-11-02) two triage and inventory rules were settled. A report that only restates the known
+Claude MCP wildcard grant is `VALID-HARDENING` under its verification item, but a report that demonstrates a breach
+through that grant is triaged on the breach and its impact, never downgraded or closed as a duplicate (rejected:
+routing every wildcard report to the verification item, which would have suppressed a real credential or destructive
+access finding). The side-effect inventory distinguishes what a process is intended to write from what it can reach:
+the Pi worker's staging workspace is a working directory, not a confinement, and the Knowledge server's classpath
+fallback (a temporary `knowledge-index*` directory, used only when resolution fails with no pinned version) is listed
+with its conditions (rejected: omitting the fallback as legacy, since it is shipped code). Each verification item has
+a tracking issue (#153–#158), and the Knowledge transport statements follow apache/camel-kit#143.
+
 ---
 
 ## 10. How to Add a Skill

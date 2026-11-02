@@ -188,6 +188,202 @@ class IndexDownloaderTest {
     }
 
     @Test
+    void nonLoopbackHttpManifestIsRejected() throws Exception {
+        publishDir = tmp.resolve("publish");
+        Files.createDirectories(publishDir);
+        cacheDir = tmp.resolve("cache");
+
+        IOException e = assertThrows(IOException.class,
+                () -> downloader(null, "http://example.org/index.json").resolve());
+        boolean refused = false;
+        for (Throwable t = e; t != null; t = t.getCause()) {
+            if (t.getMessage() != null && t.getMessage().contains("cleartext http")) {
+                refused = true;
+                break;
+            }
+        }
+        assertTrue(refused, "A remote http manifest must be refused over cleartext: " + e);
+    }
+
+    /** Asserts a cleartext-http refusal somewhere in the exception's cause chain. */
+    private static void assertRefusedCleartext(Throwable thrown) {
+        for (Throwable t = thrown; t != null; t = t.getCause()) {
+            if (t.getMessage() != null && t.getMessage().contains("cleartext http")) {
+                return;
+            }
+        }
+        fail("Expected a cleartext-http refusal in the cause chain, got: " + thrown);
+    }
+
+    /** A manifest-less config that drives release discovery against the given endpoint. */
+    private IndexResolverConfig discoveryConfig(String releasesUrl) {
+        cacheDir = tmp.resolve("cache");
+        return new IndexResolverConfig() {
+            @Override
+            public Optional<String> path() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<String> url() {
+                return Optional.empty();
+            }
+
+            @Override
+            public String releasesUrl() {
+                return releasesUrl;
+            }
+
+            @Override
+            public Optional<String> version() {
+                return Optional.empty();
+            }
+
+            @Override
+            public String cacheDir() {
+                return cacheDir.toString();
+            }
+        };
+    }
+
+    @Test
+    void manifestRedirectToNonLoopbackHttpIsRejected() throws Exception {
+        publishDir = tmp.resolve("publish");
+        Files.createDirectories(publishDir);
+        cacheDir = tmp.resolve("cache");
+        HttpServer redirector = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        redirector.createContext("/", exchange -> {
+            try (exchange) {
+                exchange.getResponseHeaders().set("Location", "http://example.org/index.json");
+                exchange.sendResponseHeaders(302, -1);
+            }
+        });
+        redirector.start();
+        try {
+            String url = "http://127.0.0.1:" + redirector.getAddress().getPort() + "/index.json";
+            assertRefusedCleartext(assertThrows(IOException.class, () -> downloader(null, url).resolve()));
+            assertFalse(Files.exists(cacheDir.resolve("current")),
+                    "a rejected loopback->remote-http redirect must not activate an index");
+        } finally {
+            redirector.stop(0);
+        }
+    }
+
+    @Test
+    void loopbackHttpRedirectIsFollowed() throws Exception {
+        publish("2026.07.09", "redirect-followed", null);
+        HttpServer backend = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        backend.createContext("/", exchange -> {
+            try (exchange) {
+                String name = exchange.getRequestURI().getPath().endsWith("index.json")
+                        ? "index.json"
+                        : "knowledge-index.zip";
+                byte[] body = Files.readAllBytes(publishDir.resolve(name));
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+            }
+        });
+        backend.start();
+        int backendPort = backend.getAddress().getPort();
+        HttpServer redirector = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        redirector.createContext("/", exchange -> {
+            try (exchange) {
+                exchange.getResponseHeaders()
+                        .set("Location", "http://127.0.0.1:" + backendPort + exchange.getRequestURI().getPath());
+                exchange.sendResponseHeaders(302, -1);
+            }
+        });
+        redirector.start();
+        try {
+            String url = "http://127.0.0.1:" + redirector.getAddress().getPort() + "/index.json";
+            IndexDownloader.ResolvedIndex resolved = downloader(null, url).resolve();
+            assertEquals("redirect-followed", Files.readString(resolved.dir().resolve("segments_1")),
+                    "a loopback->loopback http redirect must be followed");
+        } finally {
+            redirector.stop(0);
+            backend.stop(0);
+        }
+    }
+
+    @Test
+    void manifestRedirectKeepsConditionalRevalidation() throws Exception {
+        publish("v1", "index-bytes", null);
+        try (HttpFixture http = new HttpFixture()) {
+            int backendPort = http.server.getAddress().getPort();
+            HttpServer redirector = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+            redirector.createContext("/", exchange -> {
+                try (exchange) {
+                    exchange.getResponseHeaders()
+                            .set("Location", "http://127.0.0.1:" + backendPort + exchange.getRequestURI().getPath());
+                    exchange.sendResponseHeaders(302, -1);
+                }
+            });
+            redirector.start();
+            try {
+                String url = "http://127.0.0.1:" + redirector.getAddress().getPort() + "/index.json";
+                Path installed = downloader(null, url).resolve().dir();
+                assertEquals(1, http.downloads.get());
+                assertNull(http.ifNoneMatch, "The first resolution has no validator to send");
+
+                assertEquals(installed, downloader(null, url).resolve().dir(),
+                        "a 304 behind the redirect must reuse the installed index");
+                assertEquals("\"v1\"", http.ifNoneMatch, "If-None-Match must survive the validated redirect hop");
+                assertEquals(1, http.notModified.get(), "the redirect target must answer 304");
+                assertEquals(1, http.downloads.get(), "HTTP 304 must not download the archive again");
+            } finally {
+                redirector.stop(0);
+            }
+        }
+    }
+
+    @Test
+    void releasesEndpointOverNonLoopbackHttpIsRejected() {
+        IndexDownloader downloader = new IndexDownloader(discoveryConfig("http://example.org/releases"));
+        assertRefusedCleartext(assertThrows(IOException.class, () -> downloader.resolve()));
+        assertFalse(Files.exists(cacheDir.resolve("current")));
+    }
+
+    @Test
+    void discoveredManifestUrlOverNonLoopbackHttpIsRejected() throws Exception {
+        HttpServer releases = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        releases.createContext("/", exchange -> {
+            try (exchange) {
+                byte[] body = ("[{\"tag_name\":\"knowledge-index-v1-2026.07.09-000000\",\"draft\":false,"
+                               + "\"prerelease\":false,\"assets\":[{\"name\":\"index.json\","
+                               + "\"browser_download_url\":\"http://example.org/index.json\"}]}]")
+                        .getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                exchange.sendResponseHeaders(200, body.length);
+                exchange.getResponseBody().write(body);
+            }
+        });
+        releases.start();
+        try {
+            String releasesUrl = "http://127.0.0.1:" + releases.getAddress().getPort() + "/releases";
+            IndexDownloader downloader = new IndexDownloader(discoveryConfig(releasesUrl));
+            assertRefusedCleartext(assertThrows(IOException.class, () -> downloader.resolve()));
+            assertFalse(Files.exists(cacheDir.resolve("current")));
+        } finally {
+            releases.stop(0);
+        }
+    }
+
+    @Test
+    void resolvedArchiveUrlOverNonLoopbackHttpIsRejected() throws Exception {
+        publishDir = tmp.resolve("publish");
+        Files.createDirectories(publishDir);
+        cacheDir = tmp.resolve("cache");
+        Files.writeString(publishDir.resolve("index.json"), new ObjectMapper().createObjectNode()
+                .put("version", "2026.07.09")
+                .put("sha256", "0".repeat(64))
+                .put("asset", "http://example.org/knowledge-index.zip")
+                .put("embeddingModel", "granite-embedding-small-english-r2-q8").toString());
+        String url = "file://" + publishDir.resolve("index.json");
+
+        assertRefusedCleartext(assertThrows(IOException.class, () -> downloader(null, url).resolve()));
+        assertFalse(Files.exists(cacheDir.resolve("2026.07.09")), "a rejected archive URL must not be installed");
+    }
+
+    @Test
     void newVersionReplacesOldAndPrunes() throws Exception {
         String url = publish("2026.07.01", "old-bytes", null);
         downloader(null, url).resolve();

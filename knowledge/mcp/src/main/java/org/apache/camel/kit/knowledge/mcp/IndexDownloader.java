@@ -72,6 +72,8 @@ public class IndexDownloader {
     private static final Duration LOCK_TIMEOUT = Duration.ofSeconds(5);
     static final int FORMAT_VERSION = 1;
     static final String RELEASE_PREFIX = "knowledge-index-v" + FORMAT_VERSION + "-";
+    /** Request headers re-sent on a validated redirect hop; the downloader sets no others. */
+    private static final List<String> FORWARDED_REQUEST_HEADERS = List.of("Accept", "If-None-Match");
     private static final int MAX_RELEASE_PAGES = 10;
     private static final int MAX_RELEASE_PAGE_BYTES = 2 * 1024 * 1024;
 
@@ -86,8 +88,10 @@ public class IndexDownloader {
     private final Duration manifestTimeout;
     private final Duration assetTimeout;
     private final ObjectMapper mapper = new ObjectMapper();
+    // NEVER, not NORMAL: redirects are followed manually in send() so each hop's transport is validated
+    // (requireFetchableUri) before it is fetched. NORMAL would follow a loopback->non-loopback-http hop first.
     private final HttpClient httpClient = HttpClient.newBuilder()
-            .followRedirects(HttpClient.Redirect.NORMAL)
+            .followRedirects(HttpClient.Redirect.NEVER)
             .connectTimeout(CONNECT_TIMEOUT)
             .build();
 
@@ -268,9 +272,12 @@ public class IndexDownloader {
 
     private ManifestLocation discoverManifest() throws IOException, InterruptedException {
         if (config.url().isPresent()) {
-            return new ManifestLocation(URI.create(config.url().get()), config.version().orElse(null));
+            URI manifestUri = URI.create(config.url().get());
+            requireFetchableUri(manifestUri);
+            return new ManifestLocation(manifestUri, config.version().orElse(null));
         }
         URI endpoint = URI.create(config.releasesUrl());
+        requireFetchableUri(endpoint);
         if (config.version().isPresent()) {
             URI pinned = URI.create(endpoint.toString().replaceAll("/+$", "")
                                     + "/tags/" + RELEASE_PREFIX + config.version().get());
@@ -330,9 +337,7 @@ public class IndexDownloader {
             if ("index.json".equals(asset.path("name").asText())) {
                 try {
                     URI uri = URI.create(asset.path("browser_download_url").asText());
-                    if (!Set.of("https", "http", "file").contains(uri.getScheme())) {
-                        throw new IOException("Unsupported index manifest URI: " + uri);
-                    }
+                    requireFetchableUri(uri);
                     return Optional.of(uri);
                 } catch (IllegalArgumentException e) {
                     throw new IOException("Invalid index manifest download URL", e);
@@ -370,6 +375,37 @@ public class IndexDownloader {
                 || lower.matches("(con|prn|aux|nul|com[1-9]|lpt[1-9])(\\..*)?")) {
             throw new IOException("Index version must be a safe directory name: " + version);
         }
+    }
+
+    /**
+     * The manifest carries the sha256 that verifies the archive, so fetching the manifest (or the asset) over cleartext
+     * would let a man-in-the-middle rewrite both the content and its expected hash. Allow {@code https} and local
+     * {@code file} URIs anywhere; allow {@code http} only to a loopback host, which has no network attacker and keeps
+     * local testing working.
+     */
+    private static void requireFetchableUri(URI uri) throws IOException {
+        String scheme = uri.getScheme() == null ? "" : uri.getScheme().toLowerCase(Locale.ROOT);
+        switch (scheme) {
+            case "https", "file" -> {
+            }
+            case "http" -> {
+                if (!isLoopbackHost(uri.getHost())) {
+                    throw new IOException(
+                            "Refusing to fetch the knowledge index over cleartext http from a non-loopback host; "
+                                          + "use https, since the manifest's sha256 cannot protect a manifest served over http: "
+                                          + uri);
+                }
+            }
+            default -> throw new IOException("Unsupported index URI scheme (expected https or file): " + uri);
+        }
+    }
+
+    private static boolean isLoopbackHost(String host) {
+        if (host == null) {
+            return false;
+        }
+        String h = host.toLowerCase(Locale.ROOT);
+        return h.equals("localhost") || h.equals("::1") || h.equals("[::1]") || h.matches("127(\\.\\d{1,3}){3}");
     }
 
     private static Path versionDirectory(Path cacheDir, String version) throws IOException {
@@ -506,6 +542,7 @@ public class IndexDownloader {
         } catch (IllegalArgumentException e) {
             throw new IOException("Invalid index asset URI: " + manifest.asset(), e);
         }
+        requireFetchableUri(assetUri);
         LOG.info("Downloading knowledge index {} from {} ...", manifest.version(), assetUri);
 
         Path zipFile = Files.createTempFile(cacheDir, "index-", ".zip.part");
@@ -568,9 +605,45 @@ public class IndexDownloader {
     }
 
     private HttpResponse<InputStream> send(HttpRequest request) throws IOException, InterruptedException {
+        final int maxRedirects = 5;
         long deadline = System.nanoTime() + request.timeout().orElseThrow().toNanos();
-        return httpClient.send(request, info -> HttpResponse.BodySubscribers.mapping(
-                HttpResponse.BodySubscribers.ofPublisher(), publisher -> new TimedBody(publisher, deadline)));
+        HttpRequest current = request;
+        for (int hop = 0;; hop++) {
+            HttpResponse<InputStream> response = httpClient.send(current, info -> HttpResponse.BodySubscribers.mapping(
+                    HttpResponse.BodySubscribers.ofPublisher(), publisher -> new TimedBody(publisher, deadline)));
+            int status = response.statusCode();
+            if (status != 301 && status != 302 && status != 303 && status != 307 && status != 308) {
+                return response;
+            }
+            // Validate the redirect target's transport BEFORE following it; a 304 is not a redirect and
+            // is returned above for the conditional-manifest path.
+            String target = response.headers().firstValue("Location").orElse(null);
+            response.body().close();
+            if (hop >= maxRedirects) {
+                throw new IOException("Too many index redirects starting from " + request.uri());
+            }
+            if (target == null) {
+                throw new IOException("Index redirect without a Location header from " + current.uri());
+            }
+            URI next;
+            try {
+                next = current.uri().resolve(target);
+            } catch (IllegalArgumentException e) {
+                throw new IOException("Invalid index redirect target: " + target, e);
+            }
+            requireFetchableUri(next);
+            long remaining = deadline - System.nanoTime();
+            if (remaining <= 0) {
+                throw new HttpTimeoutException("Index redirect handling timed out from " + request.uri());
+            }
+            HttpRequest.Builder builder = HttpRequest.newBuilder(next).timeout(Duration.ofNanos(remaining)).GET();
+            // Carry only the request headers this downloader sets: content negotiation and the manifest validator,
+            // so a redirected manifest still revalidates with If-None-Match. Nothing else crosses a hop.
+            for (String name : FORWARDED_REQUEST_HEADERS) {
+                current.headers().firstValue(name).ifPresent(value -> builder.header(name, value));
+            }
+            current = builder.build();
+        }
     }
 
     /** Bounded HTTP buffering; only the resolving thread reads or writes index files. */

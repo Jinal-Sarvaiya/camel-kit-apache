@@ -419,6 +419,48 @@ class ShipStageResultTest {
         assertRejected(Stage.PLAN, unsorted, "unsorted routes");
     }
 
+    @Test
+    void acceptsSingleFencedResponse() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String fenced = "Here is the result:\n```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+        ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, fenced);
+        assertEquals("149-local-controller", parsed.pipelineId());
+    }
+
+    @Test
+    void rejectsConflictingFencedEnvelopes() throws Exception {
+        ObjectNode first = result("149-local-controller", null);
+        ObjectNode second = result("149-local-controller", null);
+        second.put("materialAmbiguity", true);
+        second.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String multiFence = "First:\n```json\n" + JSON.writeValueAsString(first)
+                            + "\n```\nCorrection:\n```json\n" + JSON.writeValueAsString(second) + "\n```\n";
+        assertRejected(Stage.DISCOVERY, multiFence, "conflicting fenced envelopes");
+    }
+
+    @Test
+    void rejectsArrayWrappedEnvelope() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String array = "[" + JSON.writeValueAsString(valid) + "]";
+        assertRejected(Stage.DISCOVERY, array, "array-wrapped envelope");
+    }
+
+    @Test
+    void rejectsOversizedProseAroundValidFence() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String prose = "x".repeat(1024 * 1024 + 1);
+        String oversized = prose + "\n```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+        assertRejected(Stage.DISCOVERY, oversized, "oversized prose around valid fence");
+    }
+
+    @Test
+    void rejectsInvalidUnicodeOutsideFence() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String fenced = "\uD800\n```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+        assertRejected(Stage.DISCOVERY, fenced, "lone surrogate outside fence");
+    }
+
     private static void assertPolicyMutationRejected(ObjectNode valid, String field, String value)
             throws Exception {
         ObjectNode invalid = valid.deepCopy();

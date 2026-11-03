@@ -80,9 +80,9 @@ record ShipStageResult(
         WireResult wire;
         boolean legacy = false;
         try {
+            utf8(assistantText, MAX_ASSISTANT_BYTES, "assistant response");
             String normalized = extractJsonObject(assistantText);
-            JsonNode document
-                    = JSON.readValue(utf8(normalized, MAX_ASSISTANT_BYTES, "assistant response"), JsonNode.class);
+            JsonNode document = JSON.readValue(normalized, JsonNode.class);
             if (document instanceof ObjectNode object && object.path("schemaVersion").isIntegralNumber()
                     && object.path("schemaVersion").intValue() == 1) {
                 legacy = true;
@@ -294,11 +294,19 @@ record ShipStageResult(
         }
         Matcher m = JSON_FENCE.matcher(text);
         if (m.find()) {
-            return m.group(1).strip();
+            String first = m.group(1).strip();
+            if (m.find()) {
+                return stripped;
+            }
+            return first;
         }
         int start = text.indexOf('{');
         int end = text.lastIndexOf('}');
         if (start >= 0 && end > start) {
+            String prefix = text.substring(0, start).strip();
+            if (!prefix.isEmpty() && prefix.charAt(prefix.length() - 1) == '[') {
+                return stripped;
+            }
             return text.substring(start, end + 1);
         }
         return stripped;

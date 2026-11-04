@@ -284,7 +284,7 @@ record ShipStageResult(
         utf8(report, MAX_REPORT_BYTES, "stage report");
     }
 
-    private static String extractJsonObject(String text) {
+    private static String extractJsonObject(String text) throws IOException {
         if (text == null) {
             return text;
         }
@@ -296,7 +296,7 @@ record ShipStageResult(
         if (m.find()) {
             String first = m.group(1).strip();
             if (m.find()) {
-                return stripped;
+                throw new IOException("Pi stage result contains conflicting fenced JSON envelopes");
             }
             return first;
         }

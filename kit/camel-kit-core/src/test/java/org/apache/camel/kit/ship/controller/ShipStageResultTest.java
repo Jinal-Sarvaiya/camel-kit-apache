@@ -440,10 +440,32 @@ class ShipStageResultTest {
     }
 
     @Test
+    void rejectsMixedFencedAndBareEnvelopes() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String fencedThenBare = "```json\n" + JSON.writeValueAsString(fenced)
+                                + "\n```\nCorrection:\n" + JSON.writeValueAsString(bare);
+        assertRejected(Stage.DESIGN, fencedThenBare, "fenced then bare envelope");
+        String bareThenFenced = JSON.writeValueAsString(bare)
+                                + "\nCorrected:\n```json\n" + JSON.writeValueAsString(fenced) + "\n```\n";
+        assertRejected(Stage.DESIGN, bareThenFenced, "bare then fenced envelope");
+    }
+
+    @Test
     void rejectsArrayWrappedEnvelope() throws Exception {
         ObjectNode valid = result("149-local-controller", null);
         String array = "[" + JSON.writeValueAsString(valid) + "]";
         assertRejected(Stage.DISCOVERY, array, "array-wrapped envelope");
+    }
+
+    @Test
+    void rejectsNullPaddedArrayWrapper() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String nullPadded = "[null, " + JSON.writeValueAsString(valid) + "]";
+        assertRejected(Stage.DISCOVERY, nullPadded, "null-padded array wrapper");
     }
 
     @Test

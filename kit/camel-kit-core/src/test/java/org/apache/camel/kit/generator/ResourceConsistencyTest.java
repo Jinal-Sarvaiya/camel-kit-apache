@@ -1279,6 +1279,48 @@ class ResourceConsistencyTest {
     }
 
     @Test
+    void mainRunScriptPinsTheProjectCamelVersion() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String runScript = Files.readString(root.resolve("camel-implement/guides/run-script.md"));
+        String orchestrator = Files.readString(root.resolve("camel-implement/guides/orchestrator.md"));
+        String greenfield = Files.readString(root.resolve("camel-plan/guides/task-template-greenfield.md"));
+
+        String pin = "--camel-version={project.camelVersion}";
+        assertTrue(runScript.contains("`project.camelVersion`"));
+        assertTrue(runScriptCommand(runScript).contains(pin), "run.sh template must pin the project version");
+
+        // Installation resolves {UPPER_CASE} tokens to the distribution defaults; the project-context token must
+        // survive it even when the distribution version differs from the project version.
+        Path installed = tempDir.resolve("run-script-installed.md");
+        Files.writeString(installed, runScript);
+        new VersionPlaceholderResolver().substitute(installed, DistributionConfig.loadFromClasspathOrDefaults(),
+                "camel kit");
+        String installedGuide = Files.readString(installed);
+        assertTrue(installedGuide.contains(pin), "installed guide must keep the project-context token");
+        assertTrue(runScriptCommand(installedGuide).contains(pin), "installed run.sh template must keep the pin");
+        assertFalse(installedGuide.contains("--camel-version="
+                                            + DistributionConfig.loadFromClasspathOrDefaults().camelMainVersion()));
+
+        // Removing the flag from the executable block must fail even though the rules table still mentions it.
+        String withoutFlag = runScript.replace("  " + pin + " \\\n", "");
+        assertNotEquals(runScript, withoutFlag);
+        assertFalse(runScriptCommand(withoutFlag).contains(pin));
+        assertTrue(orchestrator.contains("`MODULE_DIR`, `CAMEL_VERSION`, `ROUTE_FILES`"));
+        assertTrue(greenfield.contains("--camel-version=[CAMEL_VERSION]"));
+    }
+
+    /** Returns the fenced bash block that holds the executable {@code jbang camel@apache/camel run} command. */
+    private static String runScriptCommand(String guide) {
+        Matcher block = Pattern.compile("```bash\\n(.*?)```", Pattern.DOTALL).matcher(guide);
+        while (block.find()) {
+            if (block.group(1).contains("jbang camel@apache/camel run")) {
+                return block.group(1);
+            }
+        }
+        return fail("run.sh bash block not found");
+    }
+
+    @Test
     void migrationContractsPreserveRuntimeAndCanonicalTransformationEngine() throws IOException {
         Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
         String migrate = Files.readString(root.resolve("camel-migrate/SKILL.md"));

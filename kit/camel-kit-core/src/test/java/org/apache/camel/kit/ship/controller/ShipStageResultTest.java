@@ -439,14 +439,24 @@ class ShipStageResultTest {
     @Test
     void malformedFenceOpenersDoNotCauseQuadraticScan() throws Exception {
         StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < 4000; i++) {
-            sb.append("```json\n");
-            sb.append("Not valid JSON, just prose line ").append(i).append('\n');
+        for (int i = 0; i < 90_000; i++) {
+            sb.append("```json\n{\n");
         }
-        ObjectNode valid = result("149-local-controller", null);
-        sb.append("```json\n").append(JSON.writeValueAsString(valid)).append("\n```\n");
         String input = sb.toString();
-        assertTrue(input.length() > 150_000, "input must exceed 150 KB");
+        assertTrue(input.length() > 800_000, "input must exceed 800 KB");
+
+        long start = System.nanoTime();
+        assertRejected(Stage.DISCOVERY, input, "90k unfinished openers");
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+        assertTrue(elapsedMs < 2000,
+                "parse took " + elapsedMs + " ms — expected under 2000 ms");
+    }
+
+    @Test
+    void blankLinePrefixDoesNotCauseQuadraticScan() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String prefix = "\n".repeat(100_000);
+        String input = prefix + "```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
 
         long start = System.nanoTime();
         ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, input);
@@ -482,6 +492,19 @@ class ShipStageResultTest {
         String bareThenFenced = JSON.writeValueAsString(bare)
                                 + "\nCorrected:\n```json\n" + JSON.writeValueAsString(fenced) + "\n```\n";
         assertRejected(Stage.DESIGN, bareThenFenced, "bare then fenced envelope");
+    }
+
+    @Test
+    void rejectsSameLineBareCorrection() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String fencedThenSameLineBare = "```json\n" + JSON.writeValueAsString(fenced)
+                                        + "\n```\nCorrection: " + JSON.writeValueAsString(bare);
+        assertRejected(Stage.DESIGN, fencedThenSameLineBare,
+                "fenced then same-line bare correction");
     }
 
     @Test

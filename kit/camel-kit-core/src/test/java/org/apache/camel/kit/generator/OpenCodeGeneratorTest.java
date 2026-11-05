@@ -1073,7 +1073,7 @@ class OpenCodeGeneratorTest {
     }
 
     @Test
-    void shipWorkerSkipsExternalServerToAvoidBuiltinCollision() throws Exception {
+    void shipWorkerNotGeneratedWhenExternalServerCollidesWithBuiltin() throws Exception {
         InitContext ctx = createContext();
         new OpenCodeGenerator().generate(ctx);
 
@@ -1089,13 +1089,71 @@ class OpenCodeGeneratorTest {
 
         new OpenCodeGenerator().generate(ctx);
 
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertFalse(Files.exists(workerFile),
+                "Ship worker must not be generated when an MCP server collides with a built-in permission prefix");
+        assertTrue(Files.exists(tempDir.resolve(".opencode/agents/brainstormer.md")),
+                "Other agent definitions must still be generated");
+    }
+
+    @Test
+    void shipWorkerDeletedOnReInitWhenCollisionAppears() throws Exception {
+        InitContext ctx = createContext();
+        new OpenCodeGenerator().generate(ctx);
+
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertTrue(Files.exists(workerFile), "Worker must exist after initial generation");
+
+        Path configFile = tempDir.resolve("opencode.json");
+        com.fasterxml.jackson.databind.node.ObjectNode config
+                = (com.fasterxml.jackson.databind.node.ObjectNode) new ObjectMapper().readTree(configFile.toFile());
+        com.fasterxml.jackson.databind.node.ObjectNode external = new ObjectMapper().createObjectNode();
+        external.put("type", "remote");
+        external.put("url", "https://example.test/external");
+        ((com.fasterxml.jackson.databind.node.ObjectNode) config.path("mcp")).set("external", external);
+        Files.writeString(configFile, new ObjectMapper().writerWithDefaultPrettyPrinter()
+                .writeValueAsString(config));
+
+        new OpenCodeGenerator().generate(ctx);
+
+        assertFalse(Files.exists(workerFile),
+                "Ship worker must be deleted on re-init when collision is detected");
+    }
+
+    @Test
+    void shipWorkerDeniesNativeFormatServers() throws Exception {
+        InitContext ctx = createContext();
+
+        Files.writeString(tempDir.resolve("opencode.json"), """
+                {
+                  "mcp": {
+                    "servers": {
+                      "probe": {"type": "local", "command": ["echo"], "enabled": true},
+                      "scanner": {"type": "local", "command": ["echo"], "enabled": true}
+                    }
+                  }
+                }
+                """);
+
+        new OpenCodeGenerator().generate(ctx);
+
         String worker = Files.readString(
                 tempDir.resolve(".opencode/agents/camel-ship-worker.md"));
-        assertFalse(worker.contains("external_*: deny"),
-                "Ship worker must not emit external_* denial to avoid colliding with built-in external_directory");
-        assertTrue(worker.contains("mcp: deny"),
-                "Ship worker must still deny all MCP tools via the mcp permission");
-        assertTrue(worker.contains("camel_*: deny"),
-                "Ship worker must still deny other MCP server tools");
+        assertTrue(worker.contains("probe_*: deny"),
+                "Ship worker must deny servers declared in native mcp.servers format");
+        assertTrue(worker.contains("scanner_*: deny"),
+                "Ship worker must deny all servers from native mcp.servers container");
+    }
+
+    @Test
+    void shipWorkerUsesAsciiOnlyNormalization() throws Exception {
+        assertEquals("caf_", OpenCodeGenerator.normalizeServerName("café"),
+                "Non-ASCII letters must be replaced with underscore");
+        assertEquals("probe_local", OpenCodeGenerator.normalizeServerName("probe.local"),
+                "Dots must be replaced with underscore");
+        assertEquals("my-server", OpenCodeGenerator.normalizeServerName("my-server"),
+                "Hyphens must be preserved");
+        assertEquals("__", OpenCodeGenerator.normalizeServerName("üñ"),
+                "All non-ASCII characters must be replaced");
     }
 }

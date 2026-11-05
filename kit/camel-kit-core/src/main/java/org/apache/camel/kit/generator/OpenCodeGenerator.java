@@ -24,6 +24,8 @@ public class OpenCodeGenerator extends DefaultGenerator {
 
     private static final Set<String> BUILTIN_PERMISSION_PREFIXES = Set.of("external");
 
+    private static final List<String> GLOBAL_CONFIG_FILES = List.of("opencode.json", "opencode.jsonc");
+
     private final QuteTemplateEngine templateEngine = new QuteTemplateEngine();
 
     @Override
@@ -42,57 +44,105 @@ public class OpenCodeGenerator extends DefaultGenerator {
 
         List<String> mcpServers = readMcpServerNames(ctx);
         Set<String> seen = new LinkedHashSet<>();
+        boolean collisionDetected = false;
         StringBuilder denials = new StringBuilder();
         for (String server : mcpServers) {
             String normalized = normalizeServerName(server);
             if (BUILTIN_PERMISSION_PREFIXES.contains(normalized)) {
-                continue;
-            }
-            if (seen.add(normalized)) {
+                collisionDetected = true;
+            } else if (seen.add(normalized)) {
                 denials.append("  ").append(normalized).append("_*: deny\n");
             }
         }
         data.put("MCP_TOOL_DENIALS", denials.toString());
 
         // OpenCode-specific: generate agent definitions
-        generateAgents(ctx, data);
+        generateAgents(ctx, data, !collisionDetected);
     }
 
     static String normalizeServerName(String name) {
         StringBuilder sb = new StringBuilder(name.length());
         for (int i = 0; i < name.length(); i++) {
             char c = name.charAt(i);
-            sb.append(Character.isLetterOrDigit(c) || c == '-' ? c : '_');
+            sb.append(isAsciiAlphanumericOrHyphen(c) ? c : '_');
         }
         return sb.toString();
+    }
+
+    private static boolean isAsciiAlphanumericOrHyphen(char c) {
+        return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-';
     }
 
     private List<String> readMcpServerNames(InitContext ctx) throws IOException {
         Set<String> names = new LinkedHashSet<>();
         for (Path configFile : OpenCodeProjectConfig.existingFiles(ctx.projectDir())) {
-            JsonNode config = OpenCodeProjectConfig.newJsonMapper().readTree(configFile.toFile());
-            if (config == null) {
-                continue;
-            }
-            JsonNode mcp = config.path("mcp");
-            if (!mcp.isObject()) {
-                continue;
-            }
-            mcp.fieldNames().forEachRemaining(names::add);
+            collectMcpServersFromFile(configFile, names);
+        }
+        for (Path globalFile : globalConfigFiles()) {
+            collectMcpServersFromFile(globalFile, names);
         }
         return List.copyOf(names);
     }
 
-    private void generateAgents(InitContext ctx, Map<String, Object> data) throws Exception {
+    private static void collectMcpServersFromFile(Path configFile, Set<String> names) throws IOException {
+        JsonNode config = OpenCodeProjectConfig.newJsonMapper().readTree(configFile.toFile());
+        if (config == null) {
+            return;
+        }
+        JsonNode mcp = config.path("mcp");
+        if (!mcp.isObject()) {
+            return;
+        }
+        JsonNode servers = mcp.path("servers");
+        boolean hasNativeContainer = servers.isObject() && !servers.has("type");
+        if (hasNativeContainer) {
+            servers.fields().forEachRemaining(entry -> {
+                if (entry.getValue().isObject()) {
+                    names.add(entry.getKey());
+                }
+            });
+        }
+        mcp.fields().forEachRemaining(entry -> {
+            if (entry.getValue().isObject()
+                    && !(hasNativeContainer && "servers".equals(entry.getKey()))) {
+                names.add(entry.getKey());
+            }
+        });
+    }
+
+    static List<Path> globalConfigFiles() {
+        Path globalDir = globalConfigDir();
+        return GLOBAL_CONFIG_FILES.stream()
+                .map(globalDir::resolve)
+                .filter(Files::exists)
+                .toList();
+    }
+
+    private static Path globalConfigDir() {
+        String xdgConfigHome = System.getenv("XDG_CONFIG_HOME");
+        if (xdgConfigHome != null && !xdgConfigHome.isBlank()) {
+            return Path.of(xdgConfigHome, "opencode");
+        }
+        return Path.of(System.getProperty("user.home"), ".config", "opencode");
+    }
+
+    private void generateAgents(InitContext ctx, Map<String, Object> data, boolean includeShipWorker)
+            throws Exception {
         Path agentsDir = ctx.projectDir().resolve(".opencode/agents");
         Files.createDirectories(agentsDir);
 
+        int count = 0;
         for (String agentName : AGENTS) {
+            if ("camel-ship-worker".equals(agentName) && !includeShipWorker) {
+                Files.deleteIfExists(agentsDir.resolve(agentName + ".md"));
+                continue;
+            }
             String content = templateEngine.render("templates/opencode/agents/" + agentName + ".md", data);
             Files.writeString(agentsDir.resolve(agentName + ".md"), content);
+            count++;
         }
 
-        ctx.printer().println(AnsiColors.green("✓") + " Generated " + AGENTS.length + " OpenCode agent definitions");
+        ctx.printer().println(AnsiColors.green("✓") + " Generated " + count + " OpenCode agent definitions");
     }
 
 }

@@ -10,7 +10,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.camel.kit.ship.artifact.ArtifactManifest.JavaPolicy;
@@ -48,8 +47,7 @@ record ShipStageResult(
     private static final int MAX_ASSISTANT_BYTES = 1024 * 1024;
     private static final int MAX_REPORT_BYTES = MAX_ASSISTANT_BYTES;
     private static final Pattern ROUTE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]{0,127}");
-    private static final Pattern JSON_FENCE = Pattern.compile(
-            "```(?:json)?\\s*\\n(\\{.*?\\})\\s*\\n```", Pattern.DOTALL);
+    private static final Pattern BARE_JSON_START = Pattern.compile("(?:^|\\n)\\s*\\{");
     private static final Comparator<RouteContract> ROUTE_ORDER = Comparator
             .comparing(RouteContract::routeId)
             .thenComparing(RouteContract::routePath)
@@ -292,20 +290,9 @@ record ShipStageResult(
         if (stripped.startsWith("{")) {
             return stripped;
         }
-        Matcher m = JSON_FENCE.matcher(text);
-        if (m.find()) {
-            String first = m.group(1).strip();
-            int fenceStart = m.start();
-            int fenceEnd = m.end();
-            if (m.find()) {
-                throw new IOException("Pi stage result contains conflicting fenced JSON envelopes");
-            }
-            String before = text.substring(0, fenceStart);
-            String after = text.substring(fenceEnd);
-            if (before.indexOf('{') >= 0 || after.indexOf('{') >= 0) {
-                throw new IOException("Pi stage result contains conflicting JSON envelopes");
-            }
-            return first;
+        String fenced = extractFencedJson(text);
+        if (fenced != null) {
+            return fenced;
         }
         int start = text.indexOf('{');
         int end = text.lastIndexOf('}');
@@ -317,6 +304,86 @@ record ShipStageResult(
             return text.substring(start, end + 1);
         }
         return stripped;
+    }
+
+    private static String extractFencedJson(String text) throws IOException {
+        String result = null;
+        int regionStart = -1;
+        int regionEnd = -1;
+        int pos = 0;
+        int len = text.length();
+
+        while (pos < len) {
+            int tick = text.indexOf("```", pos);
+            if (tick < 0) {
+                break;
+            }
+            if (tick > 0 && text.charAt(tick - 1) != '\n') {
+                pos = tick + 3;
+                continue;
+            }
+            int cur = tick + 3;
+            if (cur + 4 <= len && text.startsWith("json", cur)) {
+                cur += 4;
+            }
+            while (cur < len && (text.charAt(cur) == ' ' || text.charAt(cur) == '\t')) {
+                cur++;
+            }
+            if (cur >= len || text.charAt(cur) != '\n') {
+                pos = tick + 3;
+                continue;
+            }
+            int contentStart = cur + 1;
+
+            int close = contentStart;
+            boolean found = false;
+            while (true) {
+                close = text.indexOf("\n```", close);
+                if (close < 0) {
+                    break;
+                }
+                int afterClose = close + 4;
+                if (afterClose >= len || text.charAt(afterClose) == '\n') {
+                    found = true;
+                    break;
+                }
+                close = afterClose;
+            }
+            if (!found) {
+                pos = contentStart;
+                continue;
+            }
+
+            String content = text.substring(contentStart, close).strip();
+            int end = close + 4;
+            if (end < len && text.charAt(end) == '\n') {
+                end++;
+            }
+
+            if (content.startsWith("{") && content.endsWith("}")) {
+                if (result != null) {
+                    throw new IOException("Pi stage result contains conflicting fenced JSON envelopes");
+                }
+                result = content;
+                regionStart = tick;
+                regionEnd = end;
+            }
+            pos = end;
+        }
+
+        if (result == null) {
+            return null;
+        }
+        String before = text.substring(0, regionStart);
+        String after = text.substring(regionEnd);
+        if (hasBareJsonStart(before) || hasBareJsonStart(after)) {
+            throw new IOException("Pi stage result contains conflicting JSON envelopes");
+        }
+        return result;
+    }
+
+    private static boolean hasBareJsonStart(String fragment) {
+        return BARE_JSON_START.matcher(fragment).find();
     }
 
     static byte[] utf8(String value, int maximum, String label) throws IOException {

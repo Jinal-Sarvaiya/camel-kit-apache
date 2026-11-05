@@ -295,8 +295,15 @@ record ShipStageResult(
         Matcher m = JSON_FENCE.matcher(text);
         if (m.find()) {
             String first = m.group(1).strip();
+            int fenceStart = m.start();
+            int fenceEnd = m.end();
             if (m.find()) {
                 throw new IOException("Pi stage result contains conflicting fenced JSON envelopes");
+            }
+            String before = text.substring(0, fenceStart);
+            String after = text.substring(fenceEnd);
+            if (before.indexOf('{') >= 0 || after.indexOf('{') >= 0) {
+                throw new IOException("Pi stage result contains conflicting JSON envelopes");
             }
             return first;
         }
@@ -304,8 +311,8 @@ record ShipStageResult(
         int end = text.lastIndexOf('}');
         if (start >= 0 && end > start) {
             String prefix = text.substring(0, start).strip();
-            if (!prefix.isEmpty() && prefix.charAt(prefix.length() - 1) == '[') {
-                return stripped;
+            if (!prefix.isEmpty() && prefix.indexOf('[') >= 0) {
+                throw new IOException("Pi stage result is wrapped in an array");
             }
             return text.substring(start, end + 1);
         }

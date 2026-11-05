@@ -47,7 +47,6 @@ record ShipStageResult(
     private static final int MAX_ASSISTANT_BYTES = 1024 * 1024;
     private static final int MAX_REPORT_BYTES = MAX_ASSISTANT_BYTES;
     private static final Pattern ROUTE_ID = Pattern.compile("[A-Za-z0-9][A-Za-z0-9_.-]{0,127}");
-    private static final Pattern BARE_JSON_START = Pattern.compile("(?:^|\\n)\\s*\\{");
     private static final Comparator<RouteContract> ROUTE_ORDER = Comparator
             .comparing(RouteContract::routeId)
             .thenComparing(RouteContract::routePath)
@@ -350,8 +349,7 @@ record ShipStageResult(
                 close = afterClose;
             }
             if (!found) {
-                pos = contentStart;
-                continue;
+                break;
             }
 
             String content = text.substring(contentStart, close).strip();
@@ -383,7 +381,26 @@ record ShipStageResult(
     }
 
     private static boolean hasBareJsonStart(String fragment) {
-        return BARE_JSON_START.matcher(fragment).find();
+        int i = 0;
+        int len = fragment.length();
+        while (i < len) {
+            char c = fragment.charAt(i);
+            if (c == '`') {
+                int j = i + 1;
+                while (j < len && fragment.charAt(j) != '`' && fragment.charAt(j) != '\n') {
+                    j++;
+                }
+                if (j < len && fragment.charAt(j) == '`') {
+                    i = j + 1;
+                    continue;
+                }
+            }
+            if (c == '{') {
+                return true;
+            }
+            i++;
+        }
+        return false;
     }
 
     static byte[] utf8(String value, int maximum, String label) throws IOException {

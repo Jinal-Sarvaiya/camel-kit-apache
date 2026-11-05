@@ -31,6 +31,8 @@ templates:
     target: .opencode/agents/tester.md
   - source: templates/opencode/agents/validator.md
     target: .opencode/agents/validator.md
+  - source: templates/opencode/agents/camel-ship-worker.md
+    target: .opencode/agents/camel-ship-worker.md
   - source: agents/acr-moderator.md
     target: .opencode/camel-kit-personas/acr-moderator.md
   - source: agents/catalog-researcher.md

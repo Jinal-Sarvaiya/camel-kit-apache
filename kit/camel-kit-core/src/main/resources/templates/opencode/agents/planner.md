@@ -9,7 +9,7 @@ permission:
   bash:
     "*": ask
     "{COMMAND_PREFIX} *": allow
-  task: deny
+  subagent: deny
 steps: 30
 ---
 

@@ -41,7 +41,8 @@ class ShipCommandTest {
 
     @org.junit.jupiter.params.ParameterizedTest
     @org.junit.jupiter.params.provider.ValueSource(strings = {
-            "bob2-native", "copilot-native", "claude-native", "codex-native", "antigravity-native", "qwen-native"})
+            "bob2-native", "copilot-native", "claude-native", "codex-native", "antigravity-native", "qwen-native",
+            "opencode-native"})
     @EnabledOnOs(OS.LINUX)
     void nativeCommandReturnsAndAcceptsHandoffsOnBothCommandSurfaces(String backend) throws Exception {
         Assumptions.assumeTrue(System.getenv("CAMEL_KIT_SHIP_STATE_HOME") == null);
@@ -107,7 +108,8 @@ class ShipCommandTest {
             "copilot-native,FAILED", "copilot-native,CANCELLED", "copilot-native,TIMED_OUT",
             "claude-native,FAILED", "claude-native,CANCELLED", "claude-native,TIMED_OUT",
             "antigravity-native,FAILED", "antigravity-native,CANCELLED", "antigravity-native,TIMED_OUT",
-            "qwen-native,FAILED", "qwen-native,CANCELLED", "qwen-native,TIMED_OUT"})
+            "qwen-native,FAILED", "qwen-native,CANCELLED", "qwen-native,TIMED_OUT",
+            "opencode-native,FAILED", "opencode-native,CANCELLED", "opencode-native,TIMED_OUT"})
     @EnabledOnOs(OS.LINUX)
     void nativeChildFailuresReturnJsonWithExitOneAndPreserveTheFailure(String backend, String outcome)
             throws Exception {
@@ -155,7 +157,8 @@ class ShipCommandTest {
             "copilot-native,false", "copilot-native,true",
             "claude-native,false", "claude-native,true",
             "antigravity-native,false", "antigravity-native,true",
-            "qwen-native,false", "qwen-native,true"})
+            "qwen-native,false", "qwen-native,true",
+            "opencode-native,false", "opencode-native,true"})
     @EnabledOnOs(OS.LINUX)
     void nativeStatusRejectsInvalidHandoffsAndExplicitResumesRecoverThem(String backend, boolean unbound)
             throws Exception {

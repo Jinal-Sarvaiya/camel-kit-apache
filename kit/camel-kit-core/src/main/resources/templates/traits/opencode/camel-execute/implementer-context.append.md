@@ -6,4 +6,4 @@ Configure the implementer subagent with full `edit` and `bash` permissions (matc
 
 ### Step Limit
 
-The generated `implementer` agent owns its `steps: 50` limit. The `task` tool does not accept a per-dispatch step budget; do not add one to a task call.
+The generated `implementer` agent owns its `steps: 50` limit. The `subagent` tool does not accept a per-dispatch step budget; do not add one to a subagent call.

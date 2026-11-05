@@ -285,7 +285,6 @@ public final class ShipNativeWorker implements ShipStageWorker {
             allowed.add(route.routePath());
             allowed.add(route.citrusTestPath());
         }
-        // Validate every proposal before touching the candidate.
         for (ProposedFile file : files) {
             if (!allowed.contains(file.path()) || ChangedWorkspaceSecretScanner.containsSensitiveValue(
                     ShipStageResult.utf8(file.content(), MAX_BYTES, "native proposal"), environment)) {

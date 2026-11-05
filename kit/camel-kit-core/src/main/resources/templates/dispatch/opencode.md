@@ -10,8 +10,8 @@ content that is not already authorized requires `NEEDS_USER_CONFIRMATION` with t
 performs no affected action.
 
 Keep the complete user-invoked workflow in its selected primary session. This preserves questions, approval, command
-arguments, and phase handoffs. Use OpenCode's `task` tool only for a bounded step, with the exact lowercase
-`subagent_type`:
+arguments, and phase handoffs. Use OpenCode's `subagent` tool only for a bounded step, with the exact lowercase
+`agent`:
 
 - `implementer` for general implementation or fixes
 - `migrator` when the plan role is `migration-specialist`
@@ -21,9 +21,10 @@ arguments, and phase handoffs. Use OpenCode's `task` tool only for a bounded ste
 - `planner` for the bounded re-plan loop
 - `brainstormer` only for bounded non-interactive discovery or design analysis
 - `validator` only for a bounded report-producing validation task
+- `camel-ship-worker` only for a controller-issued Ship stage task (dispatched by the Ship skill, never by other workflows)
 
-Do not delegate a complete brainstorm, plan, migrate, start, or chained workflow to a child. OpenCode's `task` call must
-include `subagent_type`; omit `background` for every result that gates the next step. Agent definitions own their step
+Do not delegate a complete brainstorm, plan, migrate, start, or chained workflow to a child. OpenCode's `subagent` call must
+include `agent`; omit `background` for every result that gates the next step. Agent definitions own their step
 limits, so do not pass a per-call `steps` value.
 
 Encode the following data as named canonical fields/envelopes after validating the shipped persona selector and allowed

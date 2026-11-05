@@ -428,6 +428,36 @@ class ShipStageResultTest {
     }
 
     @Test
+    void acceptsFencedResponseWithInlineBracesInProse() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String fenced = "Verified: POST returned `{\"status\":\"ok\"}` and logged the body.\n\n"
+                        + "```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+        ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, fenced);
+        assertEquals("149-local-controller", parsed.pipelineId());
+    }
+
+    @Test
+    void malformedFenceOpenersDoNotCauseQuadraticScan() throws Exception {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 4000; i++) {
+            sb.append("```json\n");
+            sb.append("Not valid JSON, just prose line ").append(i).append('\n');
+        }
+        ObjectNode valid = result("149-local-controller", null);
+        sb.append("```json\n").append(JSON.writeValueAsString(valid)).append("\n```\n");
+        String input = sb.toString();
+        assertTrue(input.length() > 150_000, "input must exceed 150 KB");
+
+        long start = System.nanoTime();
+        ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, input);
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+        assertEquals("149-local-controller", parsed.pipelineId());
+        assertTrue(elapsedMs < 2000,
+                "parse took " + elapsedMs + " ms — expected under 2000 ms");
+    }
+
+    @Test
     void rejectsConflictingFencedEnvelopes() throws Exception {
         ObjectNode first = result("149-local-controller", null);
         ObjectNode second = result("149-local-controller", null);

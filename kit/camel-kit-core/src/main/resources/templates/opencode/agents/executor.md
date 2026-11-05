@@ -6,7 +6,7 @@ permission:
   edit: allow
   bash:
     "*": allow
-  task:
+  subagent:
     "*": deny
     implementer: allow
     migrator: allow

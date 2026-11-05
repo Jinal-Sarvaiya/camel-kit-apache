@@ -10,7 +10,7 @@ permission:
   bash:
     "*": allow
     "rm -rf *": deny
-  task: deny
+  subagent: deny
 steps: 40
 ---
 

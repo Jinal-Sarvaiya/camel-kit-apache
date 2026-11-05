@@ -5,7 +5,7 @@ mode: subagent
 permission:
   edit: deny
   bash: deny
-  task: deny
+  subagent: deny
 steps: 30
 ---
 

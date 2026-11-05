@@ -11,7 +11,7 @@ permission:
     "*": ask
     "./mvnw *": allow
     "{COMMAND_PREFIX} *": allow
-  task: deny
+  subagent: deny
 steps: 20
 ---
 

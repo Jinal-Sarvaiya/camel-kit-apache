@@ -8,9 +8,9 @@
 primary executor session -> leaf agent
 ```
 
-The executor may dispatch only the generated `implementer`, `migrator`, `planner`, `researcher`, `reviewer`, and `tester` agents. Every leaf denies `task`, so it cannot create another child. This generated one-level topology does not require a development-only configuration key.
+The executor may dispatch only the generated `implementer`, `migrator`, `planner`, `researcher`, `reviewer`, and `tester` agents. Every leaf denies `subagent`, so it cannot create another child. This generated one-level topology does not require a development-only configuration key.
 
-OpenCode's `task` tool requires the exact lowercase agent name in `subagent_type`. It does not accept a per-call `steps` argument; each generated agent definition owns its limit. Foreground is the default. Keep every implementation, research result, and review gate in the foreground by omitting `background`.
+OpenCode's `subagent` tool requires the exact lowercase agent name in `agent`. It does not accept a per-call `steps` argument; each generated agent definition owns its limit. Foreground is the default. Keep every implementation, research result, and review gate in the foreground by omitting `background`.
 
 ### Role Mapping
 

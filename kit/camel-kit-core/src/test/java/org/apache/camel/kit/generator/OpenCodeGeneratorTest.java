@@ -1156,4 +1156,55 @@ class OpenCodeGeneratorTest {
         assertEquals("__", OpenCodeGenerator.normalizeServerName("üñ"),
                 "All non-ASCII characters must be replaced");
     }
+
+    @Test
+    void shipWorkerDeniesServersFromAncestorConfig() throws Exception {
+        InitContext ctx = createContext();
+
+        Path ancestorDir = tempDir.getParent();
+        Path ancestorConfig = ancestorDir.resolve("opencode.json");
+        Files.writeString(ancestorConfig, """
+                {
+                  "mcp": {
+                    "ancestor-probe": {"type": "local", "command": ["echo"], "enabled": true}
+                  }
+                }
+                """);
+
+        try {
+            new OpenCodeGenerator().generate(ctx);
+
+            String worker = Files.readString(
+                    tempDir.resolve(".opencode/agents/camel-ship-worker.md"));
+            assertTrue(worker.contains("ancestor-probe_*: deny"),
+                    "Ship worker must deny MCP servers inherited from ancestor config");
+        } finally {
+            Files.deleteIfExists(ancestorConfig);
+        }
+    }
+
+    @Test
+    void shipWorkerDeniesNativeFormatServerNamedType() throws Exception {
+        InitContext ctx = createContext();
+
+        Files.writeString(tempDir.resolve("opencode.json"), """
+                {
+                  "mcp": {
+                    "servers": {
+                      "type": {"type": "local", "command": ["echo"], "enabled": true},
+                      "probe": {"type": "local", "command": ["echo"], "enabled": true}
+                    }
+                  }
+                }
+                """);
+
+        new OpenCodeGenerator().generate(ctx);
+
+        String worker = Files.readString(
+                tempDir.resolve(".opencode/agents/camel-ship-worker.md"));
+        assertTrue(worker.contains("type_*: deny"),
+                "Ship worker must deny a native server named 'type'");
+        assertTrue(worker.contains("probe_*: deny"),
+                "Ship worker must deny other servers in the same native container");
+    }
 }

@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFileAttributeView;
 import java.nio.file.attribute.PosixFilePermission;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -1181,6 +1182,44 @@ class OpenCodeGeneratorTest {
         } finally {
             Files.deleteIfExists(ancestorConfig);
         }
+    }
+
+    @Test
+    void collectMcpServersFromFileHandlesGlobalConfig() throws Exception {
+        Path globalConfig = tempDir.resolve("global-opencode.json");
+        Files.writeString(globalConfig, """
+                {
+                  "mcp": {
+                    "global-probe": {"type": "local", "command": ["echo"], "enabled": true}
+                  }
+                }
+                """);
+
+        Set<String> names = new LinkedHashSet<>();
+        OpenCodeGenerator.collectMcpServersFromFile(globalConfig, names);
+        assertTrue(names.contains("global-probe"),
+                "collectMcpServersFromFile must extract servers from global-style config");
+    }
+
+    @Test
+    void collectMcpServersFromFileHandlesNativeGlobalConfig() throws Exception {
+        Path globalConfig = tempDir.resolve("global-opencode.json");
+        Files.writeString(globalConfig, """
+                {
+                  "mcp": {
+                    "servers": {
+                      "global-native": {"type": "local", "command": ["echo"], "enabled": true}
+                    }
+                  }
+                }
+                """);
+
+        Set<String> names = new LinkedHashSet<>();
+        OpenCodeGenerator.collectMcpServersFromFile(globalConfig, names);
+        assertTrue(names.contains("global-native"),
+                "collectMcpServersFromFile must extract servers from native mcp.servers format in global config");
+        assertFalse(names.contains("servers"),
+                "collectMcpServersFromFile must not treat native servers container as a server");
     }
 
     @Test

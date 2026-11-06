@@ -26,6 +26,10 @@ public class OpenCodeGenerator extends DefaultGenerator {
 
     private static final List<String> GLOBAL_CONFIG_FILES = List.of("opencode.json", "opencode.jsonc");
 
+    private static final List<String> ANCESTOR_CONFIG_FILES = List.of(
+            "opencode.json", "opencode.jsonc",
+            ".opencode/opencode.json", ".opencode/opencode.jsonc");
+
     private final QuteTemplateEngine templateEngine = new QuteTemplateEngine();
 
     @Override
@@ -78,13 +82,20 @@ public class OpenCodeGenerator extends DefaultGenerator {
         for (Path configFile : OpenCodeProjectConfig.existingFiles(ctx.projectDir())) {
             collectMcpServersFromFile(configFile, names);
         }
+        for (Path ancestorFile : ancestorConfigFiles(ctx.projectDir())) {
+            collectMcpServersFromFile(ancestorFile, names);
+        }
         for (Path globalFile : globalConfigFiles()) {
             collectMcpServersFromFile(globalFile, names);
+        }
+        Path explicitConfig = explicitConfigFile();
+        if (explicitConfig != null) {
+            collectMcpServersFromFile(explicitConfig, names);
         }
         return List.copyOf(names);
     }
 
-    private static void collectMcpServersFromFile(Path configFile, Set<String> names) throws IOException {
+    static void collectMcpServersFromFile(Path configFile, Set<String> names) throws IOException {
         JsonNode config = OpenCodeProjectConfig.newJsonMapper().readTree(configFile.toFile());
         if (config == null) {
             return;
@@ -94,7 +105,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
             return;
         }
         JsonNode servers = mcp.path("servers");
-        boolean hasNativeContainer = servers.isObject() && !servers.has("type");
+        boolean hasNativeContainer = servers.isObject() && isNativeServersContainer(servers);
         if (hasNativeContainer) {
             servers.fields().forEachRemaining(entry -> {
                 if (entry.getValue().isObject()) {
@@ -108,6 +119,27 @@ public class OpenCodeGenerator extends DefaultGenerator {
                 names.add(entry.getKey());
             }
         });
+    }
+
+    private static boolean isNativeServersContainer(JsonNode servers) {
+        JsonNode type = servers.path("type");
+        return !type.isTextual();
+    }
+
+    static List<Path> ancestorConfigFiles(Path projectDir) throws IOException {
+        Path realProject = projectDir.toRealPath();
+        Path parent = realProject.getParent();
+        List<Path> result = new java.util.ArrayList<>();
+        while (parent != null) {
+            for (String name : ANCESTOR_CONFIG_FILES) {
+                Path candidate = parent.resolve(name);
+                if (Files.exists(candidate)) {
+                    result.add(candidate);
+                }
+            }
+            parent = parent.getParent();
+        }
+        return result;
     }
 
     static List<Path> globalConfigFiles() {
@@ -124,6 +156,17 @@ public class OpenCodeGenerator extends DefaultGenerator {
             return Path.of(xdgConfigHome, "opencode");
         }
         return Path.of(System.getProperty("user.home"), ".config", "opencode");
+    }
+
+    static Path explicitConfigFile() {
+        String explicitPath = System.getenv("OPENCODE_CONFIG");
+        if (explicitPath != null && !explicitPath.isBlank()) {
+            Path path = Path.of(explicitPath);
+            if (Files.exists(path)) {
+                return path;
+            }
+        }
+        return null;
     }
 
     private void generateAgents(InitContext ctx, Map<String, Object> data, boolean includeShipWorker)

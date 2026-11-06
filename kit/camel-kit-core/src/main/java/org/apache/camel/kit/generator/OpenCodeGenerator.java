@@ -92,11 +92,24 @@ public class OpenCodeGenerator extends DefaultGenerator {
         if (explicitConfig != null) {
             collectMcpServersFromFile(explicitConfig, names);
         }
+        String inlineContent = inlineConfigContent();
+        if (inlineContent != null && !inlineContent.isBlank()) {
+            collectMcpServersFromContent(inlineContent, names);
+        }
         return List.copyOf(names);
     }
 
     static void collectMcpServersFromFile(Path configFile, Set<String> names) throws IOException {
-        JsonNode config = OpenCodeProjectConfig.newJsonMapper().readTree(configFile.toFile());
+        collectMcpServersFromNode(
+                OpenCodeProjectConfig.newJsonMapper().readTree(configFile.toFile()), names);
+    }
+
+    static void collectMcpServersFromContent(String jsonContent, Set<String> names) throws IOException {
+        collectMcpServersFromNode(
+                OpenCodeProjectConfig.newJsonMapper().readTree(jsonContent), names);
+    }
+
+    private static void collectMcpServersFromNode(JsonNode config, Set<String> names) {
         if (config == null) {
             return;
         }
@@ -142,7 +155,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
         return result;
     }
 
-    static List<Path> globalConfigFiles() {
+    List<Path> globalConfigFiles() {
         Path globalDir = globalConfigDir();
         return GLOBAL_CONFIG_FILES.stream()
                 .map(globalDir::resolve)
@@ -150,7 +163,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
                 .toList();
     }
 
-    private static Path globalConfigDir() {
+    Path globalConfigDir() {
         String xdgConfigHome = System.getenv("XDG_CONFIG_HOME");
         if (xdgConfigHome != null && !xdgConfigHome.isBlank()) {
             return Path.of(xdgConfigHome, "opencode");
@@ -158,7 +171,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
         return Path.of(System.getProperty("user.home"), ".config", "opencode");
     }
 
-    static Path explicitConfigFile() {
+    Path explicitConfigFile() {
         String explicitPath = System.getenv("OPENCODE_CONFIG");
         if (explicitPath != null && !explicitPath.isBlank()) {
             Path path = Path.of(explicitPath);
@@ -167,6 +180,10 @@ public class OpenCodeGenerator extends DefaultGenerator {
             }
         }
         return null;
+    }
+
+    String inlineConfigContent() {
+        return System.getenv("OPENCODE_CONFIG_CONTENT");
     }
 
     private void generateAgents(InitContext ctx, Map<String, Object> data, boolean includeShipWorker)

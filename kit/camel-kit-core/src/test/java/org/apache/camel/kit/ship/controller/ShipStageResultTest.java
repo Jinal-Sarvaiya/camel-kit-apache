@@ -522,6 +522,21 @@ class ShipStageResultTest {
     }
 
     @Test
+    void rejectsInlineBacktickWrappedCorrectionWithEscapedKey() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String bareJson = JSON.writeValueAsString(bare)
+                .replace("\"materialAmbiguity\"", "\"\\u006daterialAmbiguity\"");
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection, use this instead: `" + bareJson + "`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped correction envelope with escaped key");
+    }
+
+    @Test
     void acceptsHarmlessInlineJsonExample() throws Exception {
         ObjectNode valid = result("149-local-controller", null);
         String input = "Here is `{\"status\":\"ok\"}` for reference.\n```json\n"

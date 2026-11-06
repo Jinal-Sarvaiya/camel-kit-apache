@@ -380,8 +380,6 @@ record ShipStageResult(
         return result;
     }
 
-    private static final String ENVELOPE_MARKER = "\"materialAmbiguity\"";
-
     private static boolean hasBareJsonStart(String fragment) {
         int i = 0;
         int len = fragment.length();
@@ -394,7 +392,7 @@ record ShipStageResult(
                 }
                 if (j < len && fragment.charAt(j) == '`') {
                     String span = fragment.substring(i + 1, j);
-                    if (span.contains(ENVELOPE_MARKER)) {
+                    if (looksLikeEnvelope(span)) {
                         return true;
                     }
                     i = j + 1;
@@ -407,6 +405,15 @@ record ShipStageResult(
             i++;
         }
         return false;
+    }
+
+    private static boolean looksLikeEnvelope(String span) {
+        try {
+            JsonNode node = JSON.readTree(span);
+            return node.isObject() && node.has("materialAmbiguity");
+        } catch (JsonProcessingException e) {
+            return false;
+        }
     }
 
     static byte[] utf8(String value, int maximum, String label) throws IOException {

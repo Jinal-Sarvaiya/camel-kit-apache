@@ -408,11 +408,26 @@ record ShipStageResult(
     }
 
     private static boolean looksLikeEnvelope(String span) {
+        String trimmed = span.trim();
+        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+            return false;
+        }
         try {
             JsonNode node = JSON.readTree(span);
-            return node.isObject() && node.has("materialAmbiguity");
-        } catch (JsonProcessingException e) {
+            if (node.isObject()) {
+                return node.has("materialAmbiguity");
+            }
+            if (node.isArray()) {
+                for (JsonNode element : node) {
+                    if (element.isObject() && element.has("materialAmbiguity")) {
+                        return true;
+                    }
+                }
+            }
             return false;
+        } catch (JsonProcessingException e) {
+            // fail-closed: unparseable JSON starting with {/[ is suspicious
+            return true;
         }
     }
 

@@ -537,6 +537,50 @@ class ShipStageResultTest {
     }
 
     @Test
+    void rejectsInlineBacktickWithDuplicateKey() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String bareJson = JSON.writeValueAsString(bare);
+        String duplicated = bareJson.substring(0, bareJson.length() - 1)
+                            + ",\"materialAmbiguity\":false}";
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection: `" + duplicated + "`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped duplicate-key correction");
+    }
+
+    @Test
+    void rejectsInlineBacktickWithTrailingDocument() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String bareJson = JSON.writeValueAsString(bare);
+        String trailing = bareJson + bareJson;
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection: `" + trailing + "`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped trailing-document correction");
+    }
+
+    @Test
+    void rejectsInlineBacktickArrayWrappedCorrection() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection: `[" + JSON.writeValueAsString(bare) + "]`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped array-wrapped correction");
+    }
+
+    @Test
     void acceptsHarmlessInlineJsonExample() throws Exception {
         ObjectNode valid = result("149-local-controller", null);
         String input = "Here is `{\"status\":\"ok\"}` for reference.\n```json\n"

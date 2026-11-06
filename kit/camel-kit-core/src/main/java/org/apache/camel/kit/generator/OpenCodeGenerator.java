@@ -8,6 +8,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Pattern;
 
 import org.apache.camel.kit.config.OpenCodeProjectConfig;
 import org.apache.camel.kit.util.AnsiColors;
@@ -23,6 +24,8 @@ public class OpenCodeGenerator extends DefaultGenerator {
     };
 
     private static final Set<String> BUILTIN_PERMISSION_PREFIXES = Set.of("external");
+
+    private static final Pattern SUBSTITUTION_PATTERN = Pattern.compile("\\{(env|file):[^}]+}");
 
     private static final List<String> GLOBAL_CONFIG_FILES = List.of("opencode.json", "opencode.jsonc");
 
@@ -49,8 +52,13 @@ public class OpenCodeGenerator extends DefaultGenerator {
         List<String> mcpServers = readMcpServerNames(ctx);
         Set<String> seen = new LinkedHashSet<>();
         boolean collisionDetected = false;
+        boolean unresolvedSubstitution = false;
         StringBuilder denials = new StringBuilder();
         for (String server : mcpServers) {
+            if (SUBSTITUTION_PATTERN.matcher(server).find()) {
+                unresolvedSubstitution = true;
+                continue;
+            }
             String normalized = normalizeServerName(server);
             if (BUILTIN_PERMISSION_PREFIXES.contains(normalized)) {
                 collisionDetected = true;
@@ -61,7 +69,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
         data.put("MCP_TOOL_DENIALS", denials.toString());
 
         // OpenCode-specific: generate agent definitions
-        generateAgents(ctx, data, !collisionDetected);
+        generateAgents(ctx, data, !collisionDetected && !unresolvedSubstitution);
     }
 
     static String normalizeServerName(String name) {
@@ -88,6 +96,8 @@ public class OpenCodeGenerator extends DefaultGenerator {
         for (Path globalFile : globalConfigFiles()) {
             collectMcpServersFromFile(globalFile, names);
         }
+        collectMcpServersFromDir(customConfigDir(), names);
+        collectMcpServersFromDir(managedConfigDir(), names);
         Path explicitConfig = explicitConfigFile();
         if (explicitConfig != null) {
             collectMcpServersFromFile(explicitConfig, names);
@@ -97,6 +107,18 @@ public class OpenCodeGenerator extends DefaultGenerator {
             collectMcpServersFromContent(inlineContent, names);
         }
         return List.copyOf(names);
+    }
+
+    private static void collectMcpServersFromDir(Path dir, Set<String> names) throws IOException {
+        if (dir == null) {
+            return;
+        }
+        for (String fileName : GLOBAL_CONFIG_FILES) {
+            Path candidate = dir.resolve(fileName);
+            if (Files.exists(candidate)) {
+                collectMcpServersFromFile(candidate, names);
+            }
+        }
     }
 
     static void collectMcpServersFromFile(Path configFile, Set<String> names) throws IOException {
@@ -180,6 +202,18 @@ public class OpenCodeGenerator extends DefaultGenerator {
             }
         }
         return null;
+    }
+
+    Path customConfigDir() {
+        String dir = System.getenv("OPENCODE_CONFIG_DIR");
+        if (dir != null && !dir.isBlank()) {
+            return Path.of(dir);
+        }
+        return null;
+    }
+
+    Path managedConfigDir() {
+        return Path.of("/etc/opencode");
     }
 
     String inlineConfigContent() {

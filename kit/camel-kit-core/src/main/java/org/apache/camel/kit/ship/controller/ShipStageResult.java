@@ -380,6 +380,8 @@ record ShipStageResult(
         return result;
     }
 
+    private static final String ENVELOPE_MARKER = "\"materialAmbiguity\"";
+
     private static boolean hasBareJsonStart(String fragment) {
         int i = 0;
         int len = fragment.length();
@@ -391,6 +393,10 @@ record ShipStageResult(
                     j++;
                 }
                 if (j < len && fragment.charAt(j) == '`') {
+                    String span = fragment.substring(i + 1, j);
+                    if (span.contains(ENVELOPE_MARKER)) {
+                        return true;
+                    }
                     i = j + 1;
                     continue;
                 }

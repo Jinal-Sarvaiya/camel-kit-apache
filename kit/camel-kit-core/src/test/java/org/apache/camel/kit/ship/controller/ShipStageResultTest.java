@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -505,6 +506,28 @@ class ShipStageResultTest {
                                         + "\n```\nCorrection: " + JSON.writeValueAsString(bare);
         assertRejected(Stage.DESIGN, fencedThenSameLineBare,
                 "fenced then same-line bare correction");
+    }
+
+    @Test
+    void rejectsInlineBacktickWrappedCorrection() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection, use this instead: `" + JSON.writeValueAsString(bare) + "`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped correction envelope");
+    }
+
+    @Test
+    void acceptsHarmlessInlineJsonExample() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String input = "Here is `{\"status\":\"ok\"}` for reference.\n```json\n"
+                       + JSON.writeValueAsString(valid) + "\n```\n";
+        ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, input);
+        assertNotNull(parsed, "harmless inline JSON example should not cause rejection");
     }
 
     @Test

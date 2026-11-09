@@ -1503,4 +1503,184 @@ class OpenCodeGeneratorTest {
                 OpenCodeGenerator.managedConfigDirForOs("Windows 10"),
                 "Windows managed dir must use ProgramData\\opencode");
     }
+
+    @Test
+    void managedConfigDirHonorsWindowsProgramDataEnv() {
+        assertEquals(Path.of("D:\\CompanyData", "opencode"),
+                OpenCodeGenerator.managedConfigDirForOs("Windows 10", "D:\\CompanyData"),
+                "Windows managed dir must honor the ProgramData environment variable");
+        assertEquals(Path.of("C:\\ProgramData", "opencode"),
+                OpenCodeGenerator.managedConfigDirForOs("Windows 10", " "),
+                "Blank ProgramData must fall back to C:\\ProgramData");
+        assertEquals(Path.of("/etc/opencode"),
+                OpenCodeGenerator.managedConfigDirForOs("Linux", "D:\\CompanyData"),
+                "ProgramData must be ignored outside Windows");
+    }
+
+    @Test
+    void shipWorkerRemovedOnReInitWhenInlineSubstitutionProducesJsonStructure() throws Exception {
+        InitContext ctx = createContext();
+        new OpenCodeGenerator().generate(ctx);
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertTrue(Files.exists(workerFile), "precondition: worker generated on first init");
+
+        // Not valid JSON until the host substitutes {env:MCP_SERVERS}; parsing must not abort before the worker is removed
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            String inlineConfigContent() {
+                return "{\"mcp\":{env:MCP_SERVERS}}";
+            }
+        };
+        gen.generate(ctx);
+
+        assertFalse(Files.exists(workerFile),
+                "Stale ship worker must be removed when inline config substitution cannot be inventoried");
+    }
+
+    @Test
+    void shipWorkerRemovedOnReInitWhenExplicitConfigSubstitutionProducesJsonStructure() throws Exception {
+        InitContext ctx = createContext();
+        new OpenCodeGenerator().generate(ctx);
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertTrue(Files.exists(workerFile), "precondition: worker generated on first init");
+
+        Path configWithSub = tempDir.resolve("structure-sub.json");
+        Files.writeString(configWithSub, "{\"mcp\":{env:MCP_SERVERS}}");
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            Path explicitConfigFile() {
+                return configWithSub;
+            }
+        };
+        gen.generate(ctx);
+
+        assertFalse(Files.exists(workerFile),
+                "Stale ship worker must be removed when explicit config substitution cannot be inventoried");
+    }
+
+    @Test
+    void shipWorkerNotGeneratedWhenConfigSourceIsUnparsable() throws Exception {
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            String inlineConfigContent() {
+                return "{ this is not json";
+            }
+        };
+        gen.generate(createContext());
+
+        assertFalse(Files.exists(tempDir.resolve(".opencode/agents/camel-ship-worker.md")),
+                "Ship worker must not be generated when a config source cannot be parsed");
+    }
+
+    @Test
+    void shipWorkerDeniesServersFromWindowsProgramDataManagedConfigThroughGeneration() throws Exception {
+        Path programData = tempDir.resolve("CompanyData");
+        Files.createDirectories(programData.resolve("opencode"));
+        Files.writeString(programData.resolve("opencode").resolve("opencode.json"), """
+                {"mcp": {"win-managed-probe": {"type": "local", "command": ["echo"]}}}
+                """);
+
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            // managedConfigDir() is deliberately NOT overridden: exercises the production platform lookup
+            @Override
+            String osName() {
+                return "Windows 11";
+            }
+
+            @Override
+            String programDataEnv() {
+                return programData.toString();
+            }
+        };
+        gen.generate(createContext());
+
+        String worker = Files.readString(tempDir.resolve(".opencode/agents/camel-ship-worker.md"));
+        assertTrue(worker.contains("win-managed-probe_*: deny"),
+                "Ship worker must deny servers from the effective Windows ProgramData managed directory");
+    }
+
+    @Test
+    void shipWorkerNotGeneratedWhenMacManagedPreferencesPresent() throws Exception {
+        Path prefs = tempDir.resolve("Managed Preferences");
+        Files.createDirectories(prefs);
+        Files.writeString(prefs.resolve("ai.opencode.managed.plist"), "<plist/>");
+
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            String osName() {
+                return "Mac OS X";
+            }
+
+            @Override
+            Path managedConfigDir() {
+                return tempDir.resolve("no-such-managed-dir");
+            }
+
+            @Override
+            Path managedPreferencesRoot() {
+                return prefs;
+            }
+        };
+        gen.generate(createContext());
+
+        assertFalse(Files.exists(tempDir.resolve(".opencode/agents/camel-ship-worker.md")),
+                "Ship worker must not be generated when macOS managed preferences cannot be inventoried");
+    }
+
+    @Test
+    void shipWorkerNotGeneratedWhenMacPerUserManagedPreferencesPresent() throws Exception {
+        Path prefs = tempDir.resolve("Managed Preferences");
+        Files.createDirectories(prefs.resolve("alice"));
+        Files.writeString(prefs.resolve("alice").resolve("ai.opencode.managed.plist"), "<plist/>");
+
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            String osName() {
+                return "Mac OS X";
+            }
+
+            @Override
+            String userName() {
+                return "alice";
+            }
+
+            @Override
+            Path managedConfigDir() {
+                return tempDir.resolve("no-such-managed-dir");
+            }
+
+            @Override
+            Path managedPreferencesRoot() {
+                return prefs;
+            }
+        };
+        gen.generate(createContext());
+
+        assertFalse(Files.exists(tempDir.resolve(".opencode/agents/camel-ship-worker.md")),
+                "Ship worker must not be generated when per-user macOS managed preferences are present");
+    }
+
+    @Test
+    void shipWorkerGeneratedOnMacWithoutManagedPreferences() throws Exception {
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            String osName() {
+                return "Mac OS X";
+            }
+
+            @Override
+            Path managedConfigDir() {
+                return tempDir.resolve("no-such-managed-dir");
+            }
+
+            @Override
+            Path managedPreferencesRoot() {
+                return tempDir.resolve("no-such-prefs");
+            }
+        };
+        gen.generate(createContext());
+
+        assertTrue(Files.exists(tempDir.resolve(".opencode/agents/camel-ship-worker.md")),
+                "Ship worker is generated on macOS when no managed preferences exist");
+    }
 }

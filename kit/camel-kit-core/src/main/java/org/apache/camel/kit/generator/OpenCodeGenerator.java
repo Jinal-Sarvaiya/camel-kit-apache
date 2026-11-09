@@ -53,10 +53,11 @@ public class OpenCodeGenerator extends DefaultGenerator {
         McpInventory inventory = readMcpInventory(ctx);
         Set<String> seen = new LinkedHashSet<>();
         boolean collisionDetected = false;
+        boolean unbounded = inventory.unbounded;
         StringBuilder denials = new StringBuilder();
         for (String server : inventory.servers) {
             if (SUBSTITUTION_PATTERN.matcher(server).find()) {
-                inventory = new McpInventory(inventory.servers, true);
+                unbounded = true;
                 continue;
             }
             String normalized = normalizeServerName(server);
@@ -69,7 +70,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
         data.put("MCP_TOOL_DENIALS", denials.toString());
 
         // OpenCode-specific: generate agent definitions
-        generateAgents(ctx, data, !collisionDetected && !inventory.hasUnresolvedSubstitution);
+        generateAgents(ctx, data, !collisionDetected && !unbounded);
     }
 
     static String normalizeServerName(String name) {
@@ -85,61 +86,81 @@ public class OpenCodeGenerator extends DefaultGenerator {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-';
     }
 
-    record McpInventory(List<String> servers, boolean hasUnresolvedSubstitution) {
+    /**
+     * @param servers   MCP server names found in the effective host configuration
+     * @param unbounded true when the effective MCP inventory cannot be established (unresolved substitutions,
+     *                  unparsable sources, or sources that are not inspected); the native Ship worker must not be
+     *                  generated
+     */
+    record McpInventory(List<String> servers, boolean unbounded) {
     }
 
     private McpInventory readMcpInventory(InitContext ctx) throws IOException {
         Set<String> names = new LinkedHashSet<>();
-        boolean hasSubstitution = false;
+        boolean unbounded = false;
         for (Path configFile : OpenCodeProjectConfig.existingFiles(ctx.projectDir())) {
-            hasSubstitution |= collectFromFileWithSubstitutionCheck(configFile, names);
+            unbounded |= collectFromFile(configFile, names);
         }
         for (Path ancestorFile : ancestorConfigFiles(ctx.projectDir())) {
-            hasSubstitution |= collectFromFileWithSubstitutionCheck(ancestorFile, names);
+            unbounded |= collectFromFile(ancestorFile, names);
         }
         for (Path globalFile : globalConfigFiles()) {
-            hasSubstitution |= collectFromFileWithSubstitutionCheck(globalFile, names);
+            unbounded |= collectFromFile(globalFile, names);
         }
-        hasSubstitution |= collectFromDirWithSubstitutionCheck(customConfigDir(), names);
-        hasSubstitution |= collectFromDirWithSubstitutionCheck(managedConfigDir(), names);
+        unbounded |= collectFromDir(customConfigDir(), names);
+        unbounded |= collectFromDir(managedConfigDir(), names);
+        unbounded |= managedPreferencesPresent();
         Path explicitConfig = explicitConfigFile();
         if (explicitConfig != null) {
-            hasSubstitution |= collectFromFileWithSubstitutionCheck(explicitConfig, names);
+            unbounded |= collectFromFile(explicitConfig, names);
         }
         String inlineContent = inlineConfigContent();
         if (inlineContent != null && !inlineContent.isBlank()) {
-            if (SUBSTITUTION_PATTERN.matcher(inlineContent).find()) {
-                hasSubstitution = true;
-            }
-            collectMcpServersFromContent(inlineContent, names);
+            unbounded |= collectFromContent(inlineContent, names);
         }
-        return new McpInventory(List.copyOf(names), hasSubstitution);
+        return new McpInventory(List.copyOf(names), unbounded);
     }
 
-    private static boolean collectFromFileWithSubstitutionCheck(Path configFile, Set<String> names)
-            throws IOException {
+    private static boolean collectFromFile(Path configFile, Set<String> names) throws IOException {
         String rawContent = Files.readString(configFile);
         if (rawContent.startsWith("\uFEFF")) {
             rawContent = rawContent.substring(1);
         }
-        boolean hasSubstitution = SUBSTITUTION_PATTERN.matcher(rawContent).find();
-        collectMcpServersFromContent(rawContent, names);
-        return hasSubstitution;
+        return collectFromContent(rawContent, names);
     }
 
-    private static boolean collectFromDirWithSubstitutionCheck(Path dir, Set<String> names)
-            throws IOException {
+    /**
+     * Collects server names from raw config text. OpenCode substitutes {env:}/{file:} references in the whole config
+     * text before parsing, so raw text containing a substitution cannot be inventoried reliably (the substituted text
+     * may even change the JSON structure). Such content, and content that cannot be parsed, is reported as unbounded
+     * without being parsed so that a parse error can never abort generation before the stale worker is removed.
+     *
+     * @return true when the inventory is unbounded because of this content
+     */
+    private static boolean collectFromContent(String rawContent, Set<String> names) {
+        if (SUBSTITUTION_PATTERN.matcher(rawContent).find()) {
+            return true;
+        }
+        try {
+            collectMcpServersFromContent(rawContent, names);
+            return false;
+        } catch (IOException e) {
+            return true;
+        }
+    }
+
+    private static boolean collectFromDir(Path dir, Set<String> names) throws IOException {
         if (dir == null) {
             return false;
         }
-        boolean hasSubstitution = false;
+        boolean unbounded = false;
         for (String fileName : GLOBAL_CONFIG_FILES) {
             Path candidate = dir.resolve(fileName);
             if (Files.exists(candidate)) {
-                hasSubstitution |= collectFromFileWithSubstitutionCheck(candidate, names);
+                unbounded |= collectFromFile(candidate, names);
             }
         }
-        return hasSubstitution;
+        return unbounded;
     }
 
     static void collectMcpServersFromContent(String jsonContent, Set<String> names) throws IOException {
@@ -229,17 +250,60 @@ public class OpenCodeGenerator extends DefaultGenerator {
     }
 
     Path managedConfigDir() {
-        return managedConfigDirForOs(System.getProperty("os.name", ""));
+        return managedConfigDirForOs(osName(), programDataEnv());
+    }
+
+    String programDataEnv() {
+        return System.getenv("ProgramData");
     }
 
     static Path managedConfigDirForOs(String osName) {
-        String os = osName.toLowerCase(Locale.ROOT);
-        if (os.contains("mac") || os.contains("darwin")) {
+        return managedConfigDirForOs(osName, null);
+    }
+
+    static Path managedConfigDirForOs(String osName, String programData) {
+        if (isMac(osName)) {
             return Path.of("/Library/Application Support/opencode");
-        } else if (os.contains("win")) {
-            return Path.of("C:\\ProgramData", "opencode");
+        } else if (isWindows(osName)) {
+            String base = programData != null && !programData.isBlank() ? programData : "C:\\ProgramData";
+            return Path.of(base, "opencode");
         }
         return Path.of("/etc/opencode");
+    }
+
+    String osName() {
+        return System.getProperty("os.name", "");
+    }
+
+    String userName() {
+        return System.getProperty("user.name", "");
+    }
+
+    Path managedPreferencesRoot() {
+        return Path.of("/Library/Managed Preferences");
+    }
+
+    /**
+     * OpenCode on macOS also loads MDM managed-preference plists (ai.opencode.managed.plist), per-user first. These are
+     * not parsed here, so their presence means the effective MCP inventory cannot be bounded.
+     */
+    private boolean managedPreferencesPresent() {
+        if (!isMac(osName())) {
+            return false;
+        }
+        Path root = managedPreferencesRoot();
+        return Files.exists(root.resolve("ai.opencode.managed.plist"))
+                || (!userName().isBlank()
+                        && Files.exists(root.resolve(userName()).resolve("ai.opencode.managed.plist")));
+    }
+
+    private static boolean isMac(String osName) {
+        String os = osName.toLowerCase(Locale.ROOT);
+        return os.contains("mac") || os.contains("darwin");
+    }
+
+    private static boolean isWindows(String osName) {
+        return osName.toLowerCase(Locale.ROOT).contains("win") && !isMac(osName);
     }
 
     String inlineConfigContent() {

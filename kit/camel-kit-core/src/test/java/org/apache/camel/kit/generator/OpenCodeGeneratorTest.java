@@ -1410,4 +1410,90 @@ class OpenCodeGeneratorTest {
         assertFalse(Files.exists(workerFile),
                 "Ship worker must not be generated when project config has unresolved substitution");
     }
+
+    @Test
+    void shipWorkerNotGeneratedWhenEnclosingKeyHasEnvSubstitution() throws Exception {
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            String inlineConfigContent() {
+                return """
+                        {
+                          "{env:MCP_SECTION}": {
+                            "probe": {"type": "local", "command": ["echo"]}
+                          }
+                        }
+                        """;
+            }
+        };
+        InitContext ctx = createContext();
+        gen.generate(ctx);
+
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertFalse(Files.exists(workerFile),
+                "Ship worker must not be generated when enclosing config key has env substitution");
+    }
+
+    @Test
+    void shipWorkerNotGeneratedWhenEnclosingKeyHasFileSubstitution() throws Exception {
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            String inlineConfigContent() {
+                return """
+                        {
+                          "{file:section.txt}": {
+                            "probe": {"type": "local", "command": ["echo"]}
+                          }
+                        }
+                        """;
+            }
+        };
+        InitContext ctx = createContext();
+        gen.generate(ctx);
+
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertFalse(Files.exists(workerFile),
+                "Ship worker must not be generated when enclosing config key has file substitution");
+    }
+
+    @Test
+    void shipWorkerNotGeneratedWhenFileConfigHasSubstitutionInKey() throws Exception {
+        Path configWithSub = tempDir.resolve("sub-config.json");
+        Files.writeString(configWithSub, """
+                {
+                  "{env:MCP_KEY}": {
+                    "probe": {"type": "local", "command": ["echo"]}
+                  }
+                }
+                """);
+
+        OpenCodeGenerator gen = new OpenCodeGenerator() {
+            @Override
+            Path explicitConfigFile() {
+                return configWithSub;
+            }
+        };
+        InitContext ctx = createContext();
+        gen.generate(ctx);
+
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertFalse(Files.exists(workerFile),
+                "Ship worker must not be generated when file config has substitution in enclosing key");
+    }
+
+    @Test
+    void managedConfigDirIsPlatformSpecific() {
+        OpenCodeGenerator gen = new OpenCodeGenerator();
+        Path dir = gen.managedConfigDir();
+        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
+        if (os.contains("mac") || os.contains("darwin")) {
+            assertEquals(Path.of("/Library/Application Support/opencode"), dir,
+                    "macOS managed dir must use /Library/Application Support/opencode");
+        } else if (os.contains("win")) {
+            assertTrue(dir.toString().endsWith("opencode"),
+                    "Windows managed dir must end with opencode");
+        } else {
+            assertEquals(Path.of("/etc/opencode"), dir,
+                    "Linux managed dir must use /etc/opencode");
+        }
+    }
 }

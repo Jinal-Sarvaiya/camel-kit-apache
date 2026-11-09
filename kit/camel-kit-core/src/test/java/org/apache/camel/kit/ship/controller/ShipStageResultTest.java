@@ -15,6 +15,7 @@ import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -417,6 +418,204 @@ class ShipStageResultTest {
                 "test/payments.camel.it.yaml"));
         routes.add(orders);
         assertRejected(Stage.PLAN, unsorted, "unsorted routes");
+    }
+
+    @Test
+    void acceptsSingleFencedResponse() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String fenced = "Here is the result:\n```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+        ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, fenced);
+        assertEquals("149-local-controller", parsed.pipelineId());
+    }
+
+    @Test
+    void acceptsFencedResponseWithInlineBracesInProse() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String fenced = "Verified: POST returned `{\"status\":\"ok\"}` and logged the body.\n\n"
+                        + "```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+        ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, fenced);
+        assertEquals("149-local-controller", parsed.pipelineId());
+    }
+
+    @Test
+    void malformedFenceOpenersDoNotCauseQuadraticScan() throws Exception {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 90_000; i++) {
+            sb.append("```json\n{\n");
+        }
+        String input = sb.toString();
+        assertTrue(input.length() > 800_000, "input must exceed 800 KB");
+
+        long start = System.nanoTime();
+        assertRejected(Stage.DISCOVERY, input, "90k unfinished openers");
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+        assertTrue(elapsedMs < 2000,
+                "parse took " + elapsedMs + " ms — expected under 2000 ms");
+    }
+
+    @Test
+    void blankLinePrefixDoesNotCauseQuadraticScan() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String prefix = "\n".repeat(100_000);
+        String input = prefix + "```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+
+        long start = System.nanoTime();
+        ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, input);
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+        assertEquals("149-local-controller", parsed.pipelineId());
+        assertTrue(elapsedMs < 2000,
+                "parse took " + elapsedMs + " ms — expected under 2000 ms");
+    }
+
+    @Test
+    void rejectsConflictingFencedEnvelopes() throws Exception {
+        ObjectNode first = result("149-local-controller", null);
+        ObjectNode second = result("149-local-controller", null);
+        second.put("materialAmbiguity", true);
+        second.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String multiFence = "First:\n```json\n" + JSON.writeValueAsString(first)
+                            + "\n```\nCorrection:\n```json\n" + JSON.writeValueAsString(second) + "\n```\n";
+        assertRejected(Stage.DISCOVERY, multiFence, "conflicting fenced envelopes");
+    }
+
+    @Test
+    void rejectsMixedFencedAndBareEnvelopes() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String fencedThenBare = "```json\n" + JSON.writeValueAsString(fenced)
+                                + "\n```\nCorrection:\n" + JSON.writeValueAsString(bare);
+        assertRejected(Stage.DESIGN, fencedThenBare, "fenced then bare envelope");
+        String bareThenFenced = JSON.writeValueAsString(bare)
+                                + "\nCorrected:\n```json\n" + JSON.writeValueAsString(fenced) + "\n```\n";
+        assertRejected(Stage.DESIGN, bareThenFenced, "bare then fenced envelope");
+    }
+
+    @Test
+    void rejectsSameLineBareCorrection() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String fencedThenSameLineBare = "```json\n" + JSON.writeValueAsString(fenced)
+                                        + "\n```\nCorrection: " + JSON.writeValueAsString(bare);
+        assertRejected(Stage.DESIGN, fencedThenSameLineBare,
+                "fenced then same-line bare correction");
+    }
+
+    @Test
+    void rejectsInlineBacktickWrappedCorrection() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection, use this instead: `" + JSON.writeValueAsString(bare) + "`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped correction envelope");
+    }
+
+    @Test
+    void rejectsInlineBacktickWrappedCorrectionWithEscapedKey() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String bareJson = JSON.writeValueAsString(bare)
+                .replace("\"materialAmbiguity\"", "\"\\u006daterialAmbiguity\"");
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection, use this instead: `" + bareJson + "`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped correction envelope with escaped key");
+    }
+
+    @Test
+    void rejectsInlineBacktickWithDuplicateKey() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String bareJson = JSON.writeValueAsString(bare);
+        String duplicated = bareJson.substring(0, bareJson.length() - 1)
+                            + ",\"materialAmbiguity\":false}";
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection: `" + duplicated + "`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped duplicate-key correction");
+    }
+
+    @Test
+    void rejectsInlineBacktickWithTrailingDocument() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String bareJson = JSON.writeValueAsString(bare);
+        String trailing = bareJson + bareJson;
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection: `" + trailing + "`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped trailing-document correction");
+    }
+
+    @Test
+    void rejectsInlineBacktickArrayWrappedCorrection() throws Exception {
+        ObjectNode fenced = result(null, null);
+        ObjectNode bare = result(null, null);
+        bare.put("materialAmbiguity", true);
+        bare.withArray("unansweredQuestions").addObject()
+                .put("question", "Which retry limit?").putNull("defaultApplied");
+        String input = "```json\n" + JSON.writeValueAsString(fenced)
+                       + "\n```\nCorrection: `[" + JSON.writeValueAsString(bare) + "]`";
+        assertRejected(Stage.DESIGN, input,
+                "backtick-wrapped array-wrapped correction");
+    }
+
+    @Test
+    void acceptsHarmlessInlineJsonExample() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String input = "Here is `{\"status\":\"ok\"}` for reference.\n```json\n"
+                       + JSON.writeValueAsString(valid) + "\n```\n";
+        ShipStageResult parsed = ShipStageResult.parse(Stage.DISCOVERY, input);
+        assertNotNull(parsed, "harmless inline JSON example should not cause rejection");
+    }
+
+    @Test
+    void rejectsArrayWrappedEnvelope() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String array = "[" + JSON.writeValueAsString(valid) + "]";
+        assertRejected(Stage.DISCOVERY, array, "array-wrapped envelope");
+    }
+
+    @Test
+    void rejectsNullPaddedArrayWrapper() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String nullPadded = "[null, " + JSON.writeValueAsString(valid) + "]";
+        assertRejected(Stage.DISCOVERY, nullPadded, "null-padded array wrapper");
+    }
+
+    @Test
+    void rejectsOversizedProseAroundValidFence() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String prose = "x".repeat(1024 * 1024 + 1);
+        String oversized = prose + "\n```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+        assertRejected(Stage.DISCOVERY, oversized, "oversized prose around valid fence");
+    }
+
+    @Test
+    void rejectsInvalidUnicodeOutsideFence() throws Exception {
+        ObjectNode valid = result("149-local-controller", null);
+        String fenced = "\uD800\n```json\n" + JSON.writeValueAsString(valid) + "\n```\n";
+        assertRejected(Stage.DISCOVERY, fenced, "lone surrogate outside fence");
     }
 
     private static void assertPolicyMutationRejected(ObjectNode valid, String field, String value)

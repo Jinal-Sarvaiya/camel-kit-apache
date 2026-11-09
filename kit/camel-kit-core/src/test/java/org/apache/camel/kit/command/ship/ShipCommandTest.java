@@ -14,11 +14,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.ship.ShipDigest;
 import org.apache.camel.kit.ship.context.ShipContext;
 import org.apache.camel.kit.ship.context.ShipContext.Kind;
 import org.apache.camel.kit.ship.controller.ShipController;
 import org.apache.camel.kit.ship.controller.ShipControllerTestSupport;
+import org.apache.camel.kit.ship.controller.ShipCoordinator;
 import org.apache.camel.kit.ship.controller.ShipRun;
 
 import org.junit.jupiter.api.Assumptions;
@@ -203,6 +205,71 @@ class ShipCommandTest {
     }
 
     @Test
+    void piRunRejectsNativeBackendOnResumeAndSubmit() throws Exception {
+        Path project = Files.createDirectory(tempDir.resolve("project"));
+        ShipController controller = controller("state");
+        RecordingLauncher launcher = RecordingLauncher.passThrough(controller);
+
+        RunResult started = run(controller, launcher, "--project-dir", project.toString());
+        assertEquals(0, started.exitCode(), started.error());
+        String id = runId(started.output());
+        assertEquals(ShipRun.ExecutionMode.PI, controller.status(id).executionMode());
+
+        RunResult mismatch = run(controller, rejectingLauncher(),
+                "--project-dir", project.toString(),
+                "--resume", id, "--backend", "bob2-native");
+        assertEquals(1, mismatch.exitCode());
+        assertTrue(mismatch.error().contains("execution-mode-mismatch"), mismatch.error());
+
+        RunResult mismatchClaude = run(controller, rejectingLauncher(),
+                "--project-dir", project.toString(),
+                "--resume", id, "--backend", "claude-native");
+        assertEquals(1, mismatchClaude.exitCode());
+        assertTrue(mismatchClaude.error().contains("execution-mode-mismatch"), mismatchClaude.error());
+
+        Assumptions.assumeTrue(
+                Files.getFileStore(tempDir).supportsFileAttributeView("posix"),
+                "Pi coordinator requires POSIX executable files");
+        Path fakePi = writeExecutable(tempDir.resolve("fake-pi"), "#!/bin/sh\nexit 1\n");
+        Path fakeNode = writeExecutable(tempDir.resolve("fake-node"), "#!/bin/sh\nexit 1\n");
+        ShipCoordinator coordinator = new ShipCoordinator(
+                tempDir.resolve("state"), fakePi, fakeNode,
+                tempDir.resolve("repo"),
+                DistributionConfig.loadBundled(),
+                Duration.ofMinutes(10), false);
+        ShipCommand.WorkflowLauncher coordinatorLauncher = settings -> new ShipCommand.Workflow() {
+            @Override
+            public ShipRun run(String runId) throws IOException, InterruptedException {
+                return coordinator.run(runId);
+            }
+
+            @Override
+            public ShipRun resume(String runId, List<? extends ShipContext.Input> additions)
+                    throws IOException, InterruptedException {
+                return coordinator.resume(runId, additions);
+            }
+
+            @Override
+            public ShipRun submit(String runId, Path resultFile) throws IOException, InterruptedException {
+                return coordinator.submit(runId, resultFile);
+            }
+        };
+
+        Path fakeResult = Files.writeString(tempDir.resolve("fake.json"), "{}");
+        RunResult submitted = run(controller, coordinatorLauncher,
+                "--project-dir", project.toString(),
+                "--submit", id, "--result", fakeResult.toString());
+        assertEquals(1, submitted.exitCode());
+        assertTrue(submitted.error().contains("requires a native Ship run"),
+                "Pi run must reject --submit through the production coordinator: " + submitted.error());
+        ShipRun afterSubmit = controller.status(id);
+        assertEquals(ShipRun.ExecutionMode.PI, afterSubmit.executionMode(),
+                "Run state must be unchanged after rejected submit");
+        assertEquals(ShipRun.RunStatus.RUNNING, afterSubmit.status(),
+                "Run status must be unchanged after rejected submit");
+    }
+
+    @Test
     void continuationCommandsCarryTheProjectDirectoryOfTheProjectLocalStore() throws Exception {
         Assumptions.assumeTrue(System.getenv("CAMEL_KIT_SHIP_STATE_HOME") == null,
                 "CAMEL_KIT_SHIP_STATE_HOME overrides the project-local store");
@@ -246,12 +313,15 @@ class ShipCommandTest {
 
         assertEquals(0, result.exitCode(), result.error());
         assertEquals("", result.error());
-        assertEquals(summary(id, "RUNNING", "DISCOVERY", "SMART"), result.output());
-        assertEquals(List.of("run:" + id), launcher.invocations);
 
         ShipRun run = controller.status(id);
+        assertEquals(ShipRun.ExecutionMode.PI, run.executionMode(),
+                "A bare start without --backend must default to PI");
         assertEquals(project.toAbsolutePath().normalize().toString(), run.projectDirectory());
         assertTrue(run.context().sources().isEmpty());
+
+        assertEquals(summary(id, "RUNNING", "DISCOVERY", "SMART"), result.output());
+        assertEquals(List.of("run:" + id), launcher.invocations);
     }
 
     @Test

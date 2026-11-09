@@ -77,8 +77,9 @@ record ShipStageResult(
         WireResult wire;
         boolean legacy = false;
         try {
-            JsonNode document
-                    = JSON.readValue(utf8(assistantText, MAX_ASSISTANT_BYTES, "assistant response"), JsonNode.class);
+            utf8(assistantText, MAX_ASSISTANT_BYTES, "assistant response");
+            String normalized = extractJsonObject(assistantText);
+            JsonNode document = JSON.readValue(normalized, JsonNode.class);
             if (document instanceof ObjectNode object && object.path("schemaVersion").isIntegralNumber()
                     && object.path("schemaVersion").intValue() == 1) {
                 legacy = true;
@@ -278,6 +279,156 @@ record ShipStageResult(
             throw new IOException("Pi stage report is invalid");
         }
         utf8(report, MAX_REPORT_BYTES, "stage report");
+    }
+
+    private static String extractJsonObject(String text) throws IOException {
+        if (text == null) {
+            return text;
+        }
+        String stripped = text.strip();
+        if (stripped.startsWith("{")) {
+            return stripped;
+        }
+        String fenced = extractFencedJson(text);
+        if (fenced != null) {
+            return fenced;
+        }
+        int start = text.indexOf('{');
+        int end = text.lastIndexOf('}');
+        if (start >= 0 && end > start) {
+            String prefix = text.substring(0, start).strip();
+            if (!prefix.isEmpty() && prefix.indexOf('[') >= 0) {
+                throw new IOException("Pi stage result is wrapped in an array");
+            }
+            return text.substring(start, end + 1);
+        }
+        return stripped;
+    }
+
+    private static String extractFencedJson(String text) throws IOException {
+        String result = null;
+        int regionStart = -1;
+        int regionEnd = -1;
+        int pos = 0;
+        int len = text.length();
+
+        while (pos < len) {
+            int tick = text.indexOf("```", pos);
+            if (tick < 0) {
+                break;
+            }
+            if (tick > 0 && text.charAt(tick - 1) != '\n') {
+                pos = tick + 3;
+                continue;
+            }
+            int cur = tick + 3;
+            if (cur + 4 <= len && text.startsWith("json", cur)) {
+                cur += 4;
+            }
+            while (cur < len && (text.charAt(cur) == ' ' || text.charAt(cur) == '\t')) {
+                cur++;
+            }
+            if (cur >= len || text.charAt(cur) != '\n') {
+                pos = tick + 3;
+                continue;
+            }
+            int contentStart = cur + 1;
+
+            int close = contentStart;
+            boolean found = false;
+            while (true) {
+                close = text.indexOf("\n```", close);
+                if (close < 0) {
+                    break;
+                }
+                int afterClose = close + 4;
+                if (afterClose >= len || text.charAt(afterClose) == '\n') {
+                    found = true;
+                    break;
+                }
+                close = afterClose;
+            }
+            if (!found) {
+                break;
+            }
+
+            String content = text.substring(contentStart, close).strip();
+            int end = close + 4;
+            if (end < len && text.charAt(end) == '\n') {
+                end++;
+            }
+
+            if (content.startsWith("{") && content.endsWith("}")) {
+                if (result != null) {
+                    throw new IOException("Pi stage result contains conflicting fenced JSON envelopes");
+                }
+                result = content;
+                regionStart = tick;
+                regionEnd = end;
+            }
+            pos = end;
+        }
+
+        if (result == null) {
+            return null;
+        }
+        String before = text.substring(0, regionStart);
+        String after = text.substring(regionEnd);
+        if (hasBareJsonStart(before) || hasBareJsonStart(after)) {
+            throw new IOException("Pi stage result contains conflicting JSON envelopes");
+        }
+        return result;
+    }
+
+    private static boolean hasBareJsonStart(String fragment) {
+        int i = 0;
+        int len = fragment.length();
+        while (i < len) {
+            char c = fragment.charAt(i);
+            if (c == '`') {
+                int j = i + 1;
+                while (j < len && fragment.charAt(j) != '`' && fragment.charAt(j) != '\n') {
+                    j++;
+                }
+                if (j < len && fragment.charAt(j) == '`') {
+                    String span = fragment.substring(i + 1, j);
+                    if (looksLikeEnvelope(span)) {
+                        return true;
+                    }
+                    i = j + 1;
+                    continue;
+                }
+            }
+            if (c == '{') {
+                return true;
+            }
+            i++;
+        }
+        return false;
+    }
+
+    private static boolean looksLikeEnvelope(String span) {
+        String trimmed = span.trim();
+        if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+            return false;
+        }
+        try {
+            JsonNode node = JSON.readTree(span);
+            if (node.isObject()) {
+                return node.has("materialAmbiguity");
+            }
+            if (node.isArray()) {
+                for (JsonNode element : node) {
+                    if (element.isObject() && element.has("materialAmbiguity")) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        } catch (JsonProcessingException e) {
+            // fail-closed: unparseable JSON starting with {/[ is suspicious
+            return true;
+        }
     }
 
     static byte[] utf8(String value, int maximum, String label) throws IOException {

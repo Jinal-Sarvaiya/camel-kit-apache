@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Graph input boundaries (#154)** — reject outside-root and symlink inputs, bound source bytes and discovery, and apply the parser timeout to POM analysis.
+
 - **Parser source-reading regression coverage (#153)** — exercise all nine graph parsers with execution, class-loading, placeholder and external-entity canaries.
 
 - **Google Antigravity native Ship (#95)** — eligible sessions relay controller-issued stages through a dedicated

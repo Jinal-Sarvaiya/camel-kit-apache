@@ -1,9 +1,11 @@
 package org.apache.camel.kit.graph.parser;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.nio.file.LinkOption;
 import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -30,16 +32,19 @@ public class XmlRouteParser implements GraphParser {
 
     @Override
     public List<String> scannedFiles(Path projectRoot) {
-        return GraphParser.findFiles(projectRoot, this::isCamelXmlCandidate);
+        return GraphParser.relativeFileNames(projectRoot,
+                scannedFilePaths(projectRoot, GraphParser.projectFiles(projectRoot)));
     }
 
     @Override
     public List<Path> scannedFilePaths(Path projectRoot, List<Path> projectFiles) {
-        return GraphParser.findFilePaths(projectRoot, projectFiles, this::isCamelXmlCandidate);
+        return GraphParser.findFilePaths(projectRoot, projectFiles, this::isCandidateName).stream()
+                .filter(this::isCamelXmlCandidate).toList();
     }
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         files.forEach(file -> parseXmlFile(file, projectRoot, graph));
     }
 
@@ -53,11 +58,12 @@ public class XmlRouteParser implements GraphParser {
         warnings.clear();
     }
 
+    private boolean isCandidateName(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".xml") && !name.equals("pom.xml");
+    }
+
     private boolean isCamelXmlCandidate(Path file) {
-        String fileName = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        if (!fileName.endsWith(".xml") || fileName.equals("pom.xml")) {
-            return false;
-        }
         try {
             String head = readHead(file);
             return !head.contains("mulesoft.org/schema/mule") && !BizTalkParser.isBizTalkXml(head);
@@ -71,7 +77,7 @@ public class XmlRouteParser implements GraphParser {
         try {
             var factory = SecureXml.documentBuilderFactory();
             DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(xmlFile.toFile());
+            Document doc = builder.parse(new ByteArrayInputStream(GraphParser.readSource(xmlFile)));
 
             // Find all route elements
             NodeList routes = doc.getElementsByTagNameNS("*", "route");
@@ -86,7 +92,7 @@ public class XmlRouteParser implements GraphParser {
     }
 
     private String readHead(Path file) throws IOException {
-        try (InputStream input = Files.newInputStream(file)) {
+        try (InputStream input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
             byte[] buffer = new byte[SNIFF_BYTES];
             int read = input.read(buffer);
             if (read <= 0) {

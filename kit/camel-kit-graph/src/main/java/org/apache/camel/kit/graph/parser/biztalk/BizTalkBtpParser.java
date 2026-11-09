@@ -1,5 +1,6 @@
 package org.apache.camel.kit.graph.parser.biztalk;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -89,7 +90,8 @@ public class BizTalkBtpParser {
         factory.setProperty(XMLInputFactory.IS_SUPPORTING_EXTERNAL_ENTITIES, false);
         factory.setProperty(XMLInputFactory.SUPPORT_DTD, false);
 
-        try (InputStream input = Files.newInputStream(btpFile)) {
+        try (InputStream input
+                = new ByteArrayInputStream(org.apache.camel.kit.graph.parser.GraphParser.readSource(btpFile))) {
             XMLStreamReader reader = factory.createXMLStreamReader(input);
 
             try {

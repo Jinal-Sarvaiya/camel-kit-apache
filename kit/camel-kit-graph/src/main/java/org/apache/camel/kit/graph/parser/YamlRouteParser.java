@@ -36,6 +36,7 @@ public class YamlRouteParser implements GraphParser {
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         files.forEach(file -> parseYamlFile(file, projectRoot, graph));
     }
 
@@ -57,7 +58,7 @@ public class YamlRouteParser implements GraphParser {
 
     private void parseYamlFile(Path yamlFile, Path projectRoot, ProjectGraph graph) {
         try {
-            JsonNode root = yamlMapper.readTree(yamlFile.toFile());
+            JsonNode root = yamlMapper.readTree(GraphParser.readSource(yamlFile));
 
             // Handle array of routes or single route
             if (root.isArray()) {

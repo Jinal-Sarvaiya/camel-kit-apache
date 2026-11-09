@@ -1,6 +1,7 @@
 package org.apache.camel.kit.graph.parser;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -43,13 +44,14 @@ public class DataWeaveParser implements GraphParser {
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         files.forEach(file -> parseDwlFile(file, projectRoot, graph));
     }
 
     private void parseDwlFile(Path file, Path projectRoot, ProjectGraph graph) {
         String content;
         try {
-            content = Files.readString(file);
+            content = new String(GraphParser.readSource(file), StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new RuntimeException("Failed to read DataWeave file: " + file, e);
         }

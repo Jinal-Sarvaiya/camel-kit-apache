@@ -78,15 +78,15 @@ public class GraphBuilder {
 
         // Run PomParser first so MAVEN_ARTIFACT nodes are available for all other parsers
         ParserRun pomRun
-                = runParser(pomParser, projectRoot, new ProjectGraph(),
-                        parserTask(pomParser, projectRoot, projectFiles));
+                = runFirstParser(projectRoot, projectFiles);
         diagnostics.add(pomRun.diagnostic());
         if (pomRun.diagnostic().successful()) {
             mergeDeterministically(graph, pomRun.graph());
         }
 
         ExecutorService executor = Executors.newFixedThreadPool(
-                Math.max(1, Math.min(remainingParsers.size(), Runtime.getRuntime().availableProcessors())));
+                Math.max(1, Math.min(remainingParsers.size(), Runtime.getRuntime().availableProcessors())),
+                GraphBuilder::parserThread);
         try {
             ProjectGraph baseGraph = new ProjectGraph();
             baseGraph.merge(graph);
@@ -109,7 +109,9 @@ public class GraphBuilder {
             for (int i = 0; i < futures.size(); i++) {
                 ParserFuture parserFuture = futures.get(i);
                 try {
-                    ParserRun parserRun = parserFuture.future().get(parserTimeout, parserTimeoutUnit);
+                    long remaining = parserTimeoutUnit.toNanos(parserTimeout)
+                                     - (System.nanoTime() - parserFuture.submittedAt());
+                    ParserRun parserRun = parserFuture.future().get(Math.max(0, remaining), TimeUnit.NANOSECONDS);
                     diagnostics.add(parserRun.diagnostic());
                     if (parserRun.diagnostic().successful()) {
                         mergeDeterministically(graph, parserRun.graph());
@@ -176,6 +178,9 @@ public class GraphBuilder {
         try {
             ProjectGraph fragment = parser.parseFragment(projectRoot, baseGraph, task.scannedFilePaths());
             delta = deltaFrom(fragment, baseGraph);
+            if (System.nanoTime() - startedAt > parserTimeoutUnit.toNanos(parserTimeout)) {
+                return new ParserRun(new ProjectGraph(), timeoutDiagnostic(parser, task.scannedFiles()));
+            }
             ParserDiagnostic diagnostic = diagnostic(
                     parser,
                     task.scannedFiles(),
@@ -191,6 +196,35 @@ public class GraphBuilder {
             ParserDiagnostic diagnostic = failureDiagnostic(parser, task.scannedFiles(), e, elapsedMillis(startedAt));
             return new ParserRun(delta, diagnostic);
         }
+    }
+
+    private ParserRun runFirstParser(Path projectRoot, List<Path> projectFiles) {
+        ParserTask task = parserTask(pomParser, projectRoot, projectFiles);
+        ExecutorService executor = Executors.newSingleThreadExecutor(GraphBuilder::parserThread);
+        Future<ParserRun> future = executor.submit(() -> runParser(pomParser, projectRoot, new ProjectGraph(), task));
+        long startedAt = System.nanoTime();
+        try {
+            return future.get(parserTimeout, parserTimeoutUnit);
+        } catch (TimeoutException e) {
+            return new ParserRun(new ProjectGraph(), timeoutDiagnostic(pomParser, task.scannedFiles()));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return new ParserRun(new ProjectGraph(), interruptedDiagnostic(pomParser, task.scannedFiles()));
+        } catch (ExecutionException e) {
+            return new ParserRun(
+                    new ProjectGraph(), failureDiagnostic(pomParser, task.scannedFiles(),
+                            e.getCause(), elapsedMillis(startedAt)));
+        } finally {
+            future.cancel(true);
+            executor.shutdownNow();
+        }
+    }
+
+    private static Thread parserThread(Runnable task) {
+        Thread thread = new Thread(task, "camel-kit-graph-parser");
+        // A timed-out library parser must not keep the CLI alive if it ignores interruption.
+        thread.setDaemon(true);
+        return thread;
     }
 
     private ParserTask parserTask(GraphParser parser, Path projectRoot, List<Path> projectFiles) {

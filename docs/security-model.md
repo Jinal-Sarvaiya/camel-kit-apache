@@ -349,7 +349,7 @@ a report against `0.0.2` is triaged on what that release documents.
 | Process (configuration) | Listening sockets | Child processes | Network | Filesystem writes | Environment read | Telemetry | Limits |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | **Kit CLI** `camel-kit` / `camel kit`: `init`, `doctor`, `doc`, `nextId`, `plan analyze`, `graph` | none (inspected) | version probes only: `java -version`, `jbang version`, `camel --version`, `mvn`/`mvnw`, `pi -a` *(documented — `PrerequisiteChecker`, `DoctorService`, `docs/agent-architectures.md`)* | `init` without `--no-fetch`: HTTPS to `repo1.maven.org`, `raw.githubusercontent.com/apache/camel`, `api.github.com` (Kamelet listing) and `search.maven.org`; redirects followed except HTTPS-to-HTTP; no checksum or signature *(documented — downloader constants; accepted boundary, maintainer 2026-10-27 — Q7)*. Other commands: none (inspected) | the operator-selected target, `.camel-kit/` and `.camel-kit/.cache/`; merges `.codex/config.toml` / `opencode.json` in place *(documented — `docs/commands.md`, `docs/architecture.md`)*; nothing under `$HOME` (inspected) | `~/.camel-kit/config.properties`; `PATH` for probes (inspected) | none (inspected) | downloads: 30–60 s request deadlines; archive entries read in memory or written by file name inside the cache *(documented — `CatalogDownloader`, `CitrusSchemaDownloader`, `ForageCatalogService`)* |
-| **Graph analysis** (inside the CLI process) | none (inspected) | none *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))* | none *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))* | `.camel-kit/project-graph.json` or the `--output` path *(documented — `GraphGenerateCommand`)* | none (inspected) | none (inspected) | 60 s per parser except the POM parser; no file-size or memory bound; file symbolic links not yet checked *(documented — `GraphBuilder`; gaps V2)* |
+| **Graph analysis** (inside the CLI process) | none (inspected) | none *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))* | none *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))* | `.camel-kit/project-graph.json` or the `--output` path *(documented — `GraphGenerateCommand`)* | none (inspected) | none (inspected) | 60 s per parser including POM; 16 MiB/source, 64 MiB aggregate recognized source, 100,000 entries; file links refused *(documented — `GraphParser`, `GraphBuilder`, `GraphInputBoundaryTest`)* |
 | **Ship controller** `camel-kit ship` | none (inspected) | `pi` and `node` (Pi backend), `/usr/bin/setsid`, `/bin/kill`, the controller's own `java` for evidence *(documented — `PiWorker`, `LocalCommandRunner`, `EvidenceRunner`)* | HTTPS to Maven Central through the resolver; no redirects; checksum `fail` *(documented — `ShipMavenResolver`)* | `.camel-kit/ship/state/` or `$CAMEL_KIT_SHIP_STATE_HOME`; the live project only through journaled publication *(documented — `docs/commands.md`, `ShipPublicationService`)* | the whole environment, to redact and scan secrets *(documented — `LocalCommandRunner`)*; `CAMEL_KIT_SHIP_STATE_HOME`; `PATH` | none (inspected) | P11 |
 | **Ship Pi worker** (`--backend pi`) | Pi's own process | Pi's tools — `bash`, `edit`, `write` in EXECUTE — started in the staging cwd, which is a working directory, not a confinement *(documented — `PiWorker` Javadoc)* | whatever Pi and its provider need — external behaviour, outside this model (§4.3); launched with `--offline`, `--no-extensions`, `--no-skills`, `--no-context-files` *(documented — `PiWorker` arguments)* | *Intended:* the staging workspace and its session directory under the state root *(documented — `PiWorker`)*. *Reachable:* `PiWorker` sets only the working directory and the environment of the `setsid`/`node`/`pi` process and imposes no filesystem confinement, so the worker — and whatever Pi or its provider run — can write wherever the controller's OS account can; what Pi writes on its own account (configuration, caches) is external behaviour (§4.3) *(documented — `PiWorker.runRpc`; maintainer, 2026-10-27 — Q8)* | the controller's full environment, by design *(maintainer, 2026-10-27 — Q8)* | Pi's own | prompt 1 MiB, log 16 MiB, session 64 MiB *(documented — `PiWorker`)* |
 | **Ship evidence JVMs** | none (inspected) | none (inspected) | none by design: every non-direct endpoint stubbed *(documented — `docs/commands.md`)* | private `HOME` and `TMPDIR` under the run; frozen read-only copy *(documented — `EvidenceRunner`)* | scrubbed to `LANG`, `LC_ALL`, `HOME`, `TMPDIR`, `GIT_CEILING_DIRECTORIES` and controller-provided variables *(documented — `EvidenceRunner`)* | none (inspected) | 64 MiB log cap; stage timeout *(documented — `EvidenceRunner`)* |
@@ -426,8 +426,7 @@ Per-entry-point trust table. "Caller" is the developer unless stated otherwise.
 | Knowledge configuration (`knowledge.index.*`, `KNOWLEDGE_INDEX_*`, `quarkus.http.*`) and a local `knowledge.index.path` | properties, environment, directory | no — operator | — |
 | Knowledge cache directory (`~/.camel-kit/knowledge-index`) | version directories, `current`, `etag`, staging | same user only | Server: version directories must be real directories; marker and validator rebound on activation; staging cleaned under the update lock (§4.8 P13) |
 
-**Size, shape and rate.** Ship states its limits (§4.8 P11). Graph analysis reads whole files; the per-parser timeout
-in P1 is the only bound in place today *(inferred — V2)*. `init` downloads are whole artifacts with a 30–60 s request timeout *(documented — downloader
+**Size, shape and rate.** Ship states its limits (§4.8 P11). Graph input bounds are 16 MiB per source, 64 MiB aggregate recognized source and 100,000 filesystem entries; every parser has a 60-second timeout (P1). `init` downloads are whole artifacts with a 30–60 s request timeout *(documented — downloader
 constants)*.
 
 ---
@@ -496,11 +495,14 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
    `IS_SUPPORTING_EXTERNAL_ENTITIES=false` and `SUPPORT_DTD=false` *(documented — `BizTalk*Parser`)*; the Java parser
    is AST-only (JavaParser, no symbol solving) *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*; the Groovy parser compiles to the `CONVERSION`
    phase only *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*; YAML routes and configuration use Jackson's tree model, DataWeave and properties are
-   regular-expression scans *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*. Bound in place: `GraphBuilder` runs every parser other than the POM
-   parser as a task with a 60-second timeout (`DEFAULT_PARSER_TIMEOUT`); a parser that exceeds it is cancelled and
-   recorded as a timeout diagnostic *(documented — `GraphBuilder`)*. Not yet verified: a bound for the POM parser, a
-   memory or file-size bound, and confinement of file reads to the analysed root when the tree contains symbolic
-   links *(inferred — V2)*. *Violation symptom:* a child process, a class loaded or defined from the source, an
+   regular-expression scans *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*. `GraphBuilder` applies a 60-second timeout to every parser, including the POM parser.
+   A timeout discards that parser's partial result. `GraphParser` refuses file links and outside-root
+   inputs, bounds each source to 16 MiB, aggregate recognized source to 64 MiB, and discovery to
+   100,000 filesystem entries. Reads enforce the per-file bound again. The selected root may itself
+   be an operator-chosen alias. See [V2 evidence](security-verification.md#v2-graph-inputs).
+   Cancellation is cooperative inside a daemon thread; it bounds the caller's wait, not a hard JVM
+   heap or CPU quota. These controls do not claim protection against a same-account process
+   concurrently replacing directories. *Violation symptom:* a child process, a class loaded or defined from the source, an
    outbound connection, a read of a file outside the analysed root (including through a symbolic link), a
    placeholder resolved, non-termination, or unbounded memory during `camel-kit graph` or `init --here`.
    *Severity:* security-critical — the umbrella lists "reads a file" and "does not finish" among the breaches of this
@@ -634,7 +636,7 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
     ≤ 1 MiB, RPC log ≤ 16 MiB, session ≤ 64 MiB *(documented — `PiWorker`)*; evidence log ≤ 64 MiB and stage
     timeout 10 min default *(documented — `EvidenceRunner`, `docs/commands.md`)*; resolver bounds as in P4; tree
     quotas as in P6; `graph migration-context` "defaults to depth 3, and returns at most 50 expanded nodes"
-    *(documented — `docs/commands.md`)*; graph parsers other than the POM parser are bounded to 60 s each
+    *(documented — `docs/commands.md`)*; all graph parsers including the POM parser are bounded to 60 s each
     *(documented — `GraphBuilder`)*; Knowledge returns at most 25 results per call, reads release pages of at most
     2 MiB and at most 10 pages, and applies 3 s connect, 5 s manifest and 5 min archive deadlines *(documented —
     `KnowledgeMcpServer`, `IndexDownloader`)*. *Violation:* a limit not enforced at its documented value. *Severity:*
@@ -1040,9 +1042,8 @@ own issue, linked below.
 
 - **V1 — Per-parser regression coverage (Q1; #153): implemented.** `ParserSourceReadingContractTest` exercises all nine parsers, with observable output and hostile source canaries. See [V1 evidence](security-verification.md#v1-source-reading), including mutation controls. A demonstrated breach remains `VALID` under P1.
 
-- **V2 — Graph confinement and resource bounds (Q2; #154) → §4.6, §4.8 P1, P11.** Verify or add: confinement of file reads to
-  the analysed root when the tree contains symbolic links; the POM parser under the parser timeout; a memory or
-  file-size bound. *Interim triage:* a demonstrated outside-root read, non-termination or unbounded memory is `VALID`.
+- **V2 — Graph confinement and resource bounds (Q2; #154): implemented.** `GraphInputBoundaryTest` covers symlink/outside inputs, selected-root aliases, oversized files and aggregate input, large unrelated artifacts and the POM timeout. [V2 evidence](security-verification.md#v2-graph-inputs) states the bounds and cancellation limits. A demonstrated P1 breach remains `VALID`.
+
 - **V3 — Narrower Claude MCP grants (Q3; #155) → §4.5a, §4.8 P10, §4.11a.** Replace `mcp__camel__*`,
   `mcp__camel-knowledge__*` and `mcp__citrus__*` in the generated `settings.json` with explicit per-tool grants aligned
   with the workflow manifest's `allowed_tools`, and verify the generated behaviour in Claude Code. *Interim triage:* a

@@ -1,9 +1,11 @@
 package org.apache.camel.kit.graph.parser;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.nio.file.LinkOption;
 import java.util.*;
 
 import javax.xml.parsers.DocumentBuilder;
@@ -47,16 +49,19 @@ public class MuleXmlFlowParser implements GraphParser {
 
     @Override
     public List<String> scannedFiles(Path projectRoot) {
-        return GraphParser.findFiles(projectRoot, this::isMuleXmlCandidate);
+        return GraphParser.relativeFileNames(projectRoot,
+                scannedFilePaths(projectRoot, GraphParser.projectFiles(projectRoot)));
     }
 
     @Override
     public List<Path> scannedFilePaths(Path projectRoot, List<Path> projectFiles) {
-        return GraphParser.findFilePaths(projectRoot, projectFiles, this::isMuleXmlCandidate);
+        return GraphParser.findFilePaths(projectRoot, projectFiles, this::isCandidateName).stream()
+                .filter(this::isMuleXml).toList();
     }
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         // Two passes across ALL files: first declare every flow/sub-flow node, then parse flow bodies, so
         // flow-ref targets resolve regardless of file processing order.
         List<ParsedMuleDocument> documents = new ArrayList<>();
@@ -81,16 +86,16 @@ public class MuleXmlFlowParser implements GraphParser {
         warnings.clear();
     }
 
-    private boolean isMuleXmlCandidate(Path file) {
-        String fileName = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        return fileName.endsWith(".xml") && !fileName.equals("pom.xml") && isMuleXml(file);
+    private boolean isCandidateName(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".xml") && !name.equals("pom.xml");
     }
 
     /**
      * Namespace sniff: read first 1KB and check for the MuleSoft namespace marker.
      */
     private boolean isMuleXml(Path file) {
-        try (InputStream is = Files.newInputStream(file)) {
+        try (InputStream is = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
             byte[] buf = new byte[SNIFF_BYTES];
             int read = is.read(buf);
             if (read <= 0)
@@ -107,7 +112,7 @@ public class MuleXmlFlowParser implements GraphParser {
         try {
             var factory = SecureXml.documentBuilderFactory();
             DocumentBuilder builder = factory.newDocumentBuilder();
-            Document doc = builder.parse(xmlFile.toFile());
+            Document doc = builder.parse(new ByteArrayInputStream(GraphParser.readSource(xmlFile)));
             String relPath = projectRoot.relativize(xmlFile).toString();
             return Optional.of(new ParsedMuleDocument(relPath, elementChildren(doc.getDocumentElement())));
         } catch (Exception e) {

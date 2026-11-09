@@ -281,10 +281,10 @@ configuration_variants:
 
 claimed_properties:
   - id: P1
-    property: Source-reading contract for graph analysis, inherited in full from the umbrella model - no code execution, class loading, placeholder/secret resolution, network or child processes; always finishes in bounded time and memory; output is data. Bound in place - GraphBuilder 60-second timeout per parser other than the POM parser. Not yet verified - POM parser bound, memory or file-size bound, confinement of reads to the analysed root when the tree contains symbolic links (V2).
+    property: "Source-reading contract inherited from the umbrella model: no project code execution, project class loading, runtime placeholder/secret resolution, network or child processes; output is data. GraphParser confines inputs, refuses file links, limits source files to 16 MiB, recognized source total to 64 MiB and discovery to 100000 entries. GraphBuilder times out every parser including POM after 60 seconds, discards its partial result and cancels its daemon task. Cancellation is cooperative; input bounds are not a hard JVM heap/CPU quota."
     violation_symptom: Child process, class loaded or defined from the source, outbound connection, read of a file outside the analysed root (including through a symbolic link), placeholder resolved, non-termination, or unbounded memory during graph analysis.
     severity: security-critical (VALID regardless of the verification status in V1/V2)
-    provenance: contract - documented (umbrella) and maintainer (2026-10-27, Q1 and Q2); XML/StAX hardening documented (SecureXml, BizTalk parsers); GraphBuilder timeout documented; all nine parsers covered by ParserSourceReadingContractTest (security-verification.md V1); confinement and resource enforcement inferred (V2)
+    provenance: "Contract: umbrella and maintainer (2026-10-27, Q1/Q2). Controls: GraphParser, GraphBuilder, SecureXml and BizTalk parsers. Regressions: ParserSourceReadingContractTest, GraphInputBoundaryTest; security-verification.md V1/V2."
   - id: P2
     property: Hardened XML parsing at every XML entry point, including Ship pom.xml validation.
     violation_symptom: XXE, SSRF or local file read through XML.
@@ -331,7 +331,7 @@ claimed_properties:
     severity: hardening; security-critical when the widened grant reaches a credential or destructive action without a prompt
     provenance: "documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates/mcp-configs/*, templates/claude/settings.json, Claude Code permissions reference); current Claude grant - maintainer, 2026-10-22 (review of #6); accepted posture - maintainer, 2026-10-27 (Q3)"
   - id: P11
-    property: Stated resource bounds - route/Citrus YAML 2 MiB, native result 16 MiB and 1000 files, Pi prompt 1 MiB, Pi log 16 MiB, session 64 MiB, evidence log 64 MiB, stage timeout 10m, resolver 64 roots/512 artifacts/128 MiB JAR/4 MiB POM, tree quotas, migration-context depth 3 and 50 nodes; graph parsers other than the POM parser 60 s each (serves P1); Knowledge tool results at most 25 per call, release pages at most 2 MiB and 10 pages, manifest 5 s and archive 5 min deadlines.
+    property: Stated resource bounds - route/Citrus YAML 2 MiB, native result 16 MiB and 1000 files, Pi prompt 1 MiB, Pi log 16 MiB, session 64 MiB, evidence log 64 MiB, stage timeout 10m, resolver 64 roots/512 artifacts/128 MiB JAR/4 MiB POM, tree quotas, migration-context depth 3 and 50 nodes; all graph parsers including POM 60 s each, source16 MiB/file and64 MiB total, discovery100000 entries (serves P1); Knowledge tool results at most 25 per call, release pages at most 2 MiB and 10 pages, manifest 5 s and archive 5 min deadlines.
     violation_symptom: A limit not enforced at its documented value.
     severity: hardening
     provenance: documented (ShipArtifactLimits, ShipNativeWorker, PiWorker, EvidenceRunner, ShipMavenResolver, ShipTreePolicy, docs/commands.md, KnowledgeMcpServer, IndexDownloader)
@@ -589,7 +589,8 @@ verification_items:
     sections: ["4.6", "4.8 P1", "4.8 P11"]
     work: Verify or add - confinement of file reads to the analysed root when the tree contains symbolic links; the POM parser under the parser timeout; a memory or file-size bound.
     interim_triage: A demonstrated outside-root read, non-termination or unbounded memory is VALID under P1.
-    status: open
+    status: "implemented"
+    evidence: "GraphInputBoundaryTest and GraphBuilderTest; source/entry bounds and cooperative timeout limits documented in security-verification.md V2"
   - id: V3
     tracking: apache/camel-kit#155
     title: Narrower Claude MCP grants in the generated settings.json

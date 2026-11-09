@@ -19,3 +19,19 @@ process and enabling XML entity expansion all caused failures. The XML mutation 
 text: an external entity in an attribute would be rejected even by an otherwise unsafe parser.
 These probes protect the covered execution paths; they do not prove safety of arbitrary future
 parser/dependency changes. Website impact: not required; this pins existing behavior.
+
+
+## V2: graph inputs
+
+`GraphInputBoundaryTest` exercises actual parsing and `GraphBuilder`: outside file links,
+directory links, an operator-selected root alias, direct supplied outside/oversized lists,
+16 MiB and 16 MiB+1 sources, aggregate overflow, large unrelated artifacts and a deliberately
+slow POM parser. Production bounds are 16 MiB per input, 64 MiB aggregate recognized source
+and 100,000 visited entries. Sources are checked before parser sniffing and bounded again
+when read. The POM pass uses the same timeout policy as the remaining parsers.
+
+The baseline reproduced file-link escape, missing POM timeout and oversized-input acceptance.
+A timed-out parser's fragment is discarded; daemon threads do not hold the CLI open.
+Cancellation remains cooperative, and parser/library expansion can exceed the input byte size:
+there is no hard heap quota. Filesystem checks cover a pre-existing hostile tree, not concurrent
+same-account directory substitution. Website impact: required; graph reference updated.

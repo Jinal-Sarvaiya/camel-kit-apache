@@ -1,5 +1,6 @@
 package org.apache.camel.kit.graph.parser;
 
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
@@ -27,6 +28,7 @@ public class ConfigParser implements GraphParser {
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         files.forEach(file -> parseProperties(file, projectRoot, graph));
     }
 
@@ -37,7 +39,7 @@ public class ConfigParser implements GraphParser {
 
     private void parseProperties(Path file, Path projectRoot, ProjectGraph graph) {
         Properties props = new Properties();
-        try (InputStream in = Files.newInputStream(file)) {
+        try (InputStream in = new ByteArrayInputStream(GraphParser.readSource(file))) {
             props.load(in);
         } catch (IOException e) {
             throw new RuntimeException("Failed to parse properties: " + file, e);

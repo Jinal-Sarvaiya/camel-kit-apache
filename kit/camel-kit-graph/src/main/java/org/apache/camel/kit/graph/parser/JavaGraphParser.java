@@ -1,6 +1,7 @@
 package org.apache.camel.kit.graph.parser;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -49,6 +50,7 @@ public class JavaGraphParser implements GraphParser {
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         JavaParser parser = new JavaParser();
         files.forEach(file -> parseJavaFile(parser, file, projectRoot, graph));
     }
@@ -75,7 +77,8 @@ public class JavaGraphParser implements GraphParser {
 
     private void parseJavaFile(JavaParser parser, Path file, Path projectRoot, ProjectGraph graph) {
         try {
-            var parseResult = parser.parse(file);
+            var parseResult
+                    = parser.parse(new String(GraphParser.readSource(file), StandardCharsets.UTF_8));
             if (parseResult.getResult().isEmpty()) {
                 String problems = parseResult.getProblems().stream()
                         .map(Object::toString)

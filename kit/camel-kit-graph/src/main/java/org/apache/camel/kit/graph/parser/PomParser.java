@@ -1,6 +1,8 @@
 package org.apache.camel.kit.graph.parser;
 
 import java.io.Reader;
+import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.List;
 import java.util.Map;
@@ -32,11 +34,13 @@ public class PomParser implements GraphParser {
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         files.forEach(file -> parsePom(file, projectRoot, graph));
     }
 
     private void parsePom(Path pomFile, Path projectRoot, ProjectGraph graph) {
-        try (Reader reader = Files.newBufferedReader(pomFile)) {
+        try (Reader reader = new StringReader(
+                new String(GraphParser.readSource(pomFile), StandardCharsets.UTF_8))) {
             Model model = new MavenXpp3Reader().read(reader);
 
             String groupId = model.getGroupId() != null

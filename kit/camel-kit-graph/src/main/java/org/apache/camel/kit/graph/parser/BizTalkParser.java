@@ -5,6 +5,7 @@ import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.nio.file.LinkOption;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -44,6 +45,7 @@ public class BizTalkParser implements GraphParser {
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         warnings.clear();
         files.forEach(file -> parseArtifact(projectRoot, file, graph));
     }
@@ -55,12 +57,14 @@ public class BizTalkParser implements GraphParser {
 
     @Override
     public List<String> scannedFiles(Path projectRoot) {
-        return GraphParser.findFiles(projectRoot, this::isBizTalkArtifact);
+        return GraphParser.relativeFileNames(projectRoot,
+                scannedFilePaths(projectRoot, GraphParser.projectFiles(projectRoot)));
     }
 
     @Override
     public List<Path> scannedFilePaths(Path projectRoot, List<Path> projectFiles) {
-        return GraphParser.findFilePaths(projectRoot, projectFiles, this::isBizTalkArtifact);
+        return GraphParser.findFilePaths(projectRoot, projectFiles, this::isCandidateName).stream()
+                .filter(this::isBizTalkArtifact).toList();
     }
 
     private void parseArtifact(Path projectRoot, Path file, ProjectGraph graph) {
@@ -77,12 +81,15 @@ public class BizTalkParser implements GraphParser {
         }
     }
 
+    private boolean isCandidateName(Path file) {
+        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
+        return name.endsWith(".odx") || name.endsWith(".btm") || name.endsWith(".btp")
+                || (name.endsWith(".xml") && !name.equals("pom.xml"));
+    }
+
     private boolean isBizTalkArtifact(Path file) {
         String fileName = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        return fileName.endsWith(".odx")
-                || fileName.endsWith(".btm")
-                || fileName.endsWith(".btp")
-                || (fileName.endsWith(".xml") && !fileName.equals("pom.xml") && isBizTalkBindingXml(file));
+        return !fileName.endsWith(".xml") || isBizTalkBindingXml(file);
     }
 
     /**
@@ -92,7 +99,7 @@ public class BizTalkParser implements GraphParser {
      * @return      true if the file contains BizTalk binding markers
      */
     private boolean isBizTalkBindingXml(Path file) {
-        try (InputStream is = Files.newInputStream(file)) {
+        try (InputStream is = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
             byte[] buf = new byte[SNIFF_BYTES];
             int read = is.read(buf);
             if (read <= 0) {

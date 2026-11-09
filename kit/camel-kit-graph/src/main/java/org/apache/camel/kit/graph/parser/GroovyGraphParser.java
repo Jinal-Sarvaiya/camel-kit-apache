@@ -1,6 +1,7 @@
 package org.apache.camel.kit.graph.parser;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.util.*;
 
@@ -40,6 +41,7 @@ public class GroovyGraphParser implements GraphParser {
 
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+        GraphParser.requireSafeFiles(projectRoot, files);
         files.forEach(file -> parseGroovyFile(file, projectRoot, graph));
     }
 
@@ -51,7 +53,8 @@ public class GroovyGraphParser implements GraphParser {
                 Thread.currentThread().getContextClassLoader(), config)) {
 
             CompilationUnit compilationUnit = new CompilationUnit(config, null, classLoader);
-            compilationUnit.addSource(file.toFile());
+            compilationUnit.addSource(file.toString(),
+                    new String(GraphParser.readSource(file), StandardCharsets.UTF_8));
             compilationUnit.compile(Phases.CONVERSION);
 
             // Get the modules from the compilation unit

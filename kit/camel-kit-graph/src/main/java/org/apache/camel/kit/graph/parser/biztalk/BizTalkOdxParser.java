@@ -53,7 +53,8 @@ public class BizTalkOdxParser {
                 return;
             }
 
-            String content = Files.readString(odxFile, StandardCharsets.UTF_8);
+            String content = new String(
+                    org.apache.camel.kit.graph.parser.GraphParser.readSource(odxFile), StandardCharsets.UTF_8);
             String xmlContent = extractXmlContent(content);
             if (xmlContent == null || xmlContent.isEmpty()) {
                 return;

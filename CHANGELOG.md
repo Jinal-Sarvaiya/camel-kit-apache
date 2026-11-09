@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Knowledge runtime boundaries (#158)** — enforce offline CPU tokenizer initialization, cover query/cap/fallback and transport behavior, document native caches, and accept conventional CVE severity spellings.
+
 - **Generated and cached path confinement (#157)** — refuse descendant symlinks before init/catalog writes and validate catalog versions before extraction or replacement.
 
 - **Claude MCP permissions (#155)** — replace server-wide wildcard approvals with explicit manifest-listed tools, with generation and actual-host permission checks.

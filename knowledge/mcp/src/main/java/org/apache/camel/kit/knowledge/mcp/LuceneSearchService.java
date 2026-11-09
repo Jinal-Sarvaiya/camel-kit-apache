@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.*;
+import java.util.LinkedHashSet;
 
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
@@ -507,11 +508,12 @@ public class LuceneSearchService {
     /** Case variants for exact StringField matching — indexed severities vary ("HIGH" vs "Important"). */
     private static BooleanQuery caseVariantsClause(String field, String value) {
         BooleanQuery.Builder b = new BooleanQuery.Builder();
-        for (String v : Set.of(value, value.toUpperCase(Locale.ROOT), value.toLowerCase(Locale.ROOT),
-                value.isEmpty()
-                        ? value
-                        : Character.toUpperCase(value.charAt(0))
-                          + value.substring(1).toLowerCase(Locale.ROOT))) {
+        for (String v : new LinkedHashSet<>(
+                List.of(value, value.toUpperCase(Locale.ROOT), value.toLowerCase(Locale.ROOT),
+                        value.isEmpty()
+                                ? value
+                                : Character.toUpperCase(value.charAt(0))
+                                  + value.substring(1).toLowerCase(Locale.ROOT)))) {
             b.add(new TermQuery(new Term(field, v)), BooleanClause.Occur.SHOULD);
         }
         return b.build();

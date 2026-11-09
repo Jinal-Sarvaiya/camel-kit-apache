@@ -236,7 +236,7 @@ notes, CVE advisories and component metadata" that "also works with MCP clients 
 root `README.md`)*. Kit configures it for every harness at a pinned coordinate (§4.8 P4). This section models the
 server, the index it acquires and the indexer that produces that index *(maintainer, 2026-10-27 — Q11)*; family K in
 §4.2 is the server with its index acquisition and bundled models, K2 the indexer. Its statements come from the
-Knowledge README and code and await maintainer verification (V6).
+Knowledge README, code and executable checks recorded in [V6 evidence](security-verification.md#v6-knowledge).
 
 **Processes.**
 
@@ -256,11 +256,17 @@ Knowledge README and code and await maintainer verification (V6).
   with the JDK's default temporary-directory permissions and removed on orderly shutdown; a pinned client receives
   the error instead. The monorepo runner bundles no index, so the fallback serves legacy uber-jars that do
   *(documented — `knowledge/README.md`, "Index Distribution" step 3; `LuceneSearchService.resolveIndex`; the
-  permission and bundling statements are inferred — V6)*.
-- *Bundled embedding model and reranker* (`knowledge/embedding`): ONNX models packaged at build time ("The MCP module
-  downloads the ONNX embedding model from HuggingFace during `generate-resources`") and loaded at runtime from the
-  classpath into a private `camel-kit-onnx-*` temporary directory *(documented — `knowledge/README.md`;
-  `OnnxEmbeddingProvider`)*; no model is downloaded at runtime *(inferred — V6)*.
+  permission and fallback checks are covered by `LuceneFallbackBoundaryTest`; bundling is checked against the packaged runner)*.
+- *Bundled embedding model and reranker* (`knowledge/embedding`): model/tokenizer resources are
+  acquired at build time and loaded locally. The embedding model uses a `camel-kit-onnx-*` temporary
+  directory; the reranker loads model bytes directly. Native libraries additionally use DJL's engine
+  cache (normally `~/.djl.ai/tokenizers`, configurable by `ENGINE_CACHE_DIR`/`DJL_CACHE_DIR`),
+  ONNX Runtime's `onnxruntime-java*` directory and dependency-managed native temporary files.
+  `OfflineTokenizer` enforces offline CPU initialization, disables DJL's optional CUDA subprocess
+  and avoids JNA's implicit `ldconfig` lookup. Conflicting `DJL_OFFLINE` or `RUST_FLAVOR` environment
+  values fail before native initialization. This prevents DJL metadata/telemetry and native downloads
+  on the supported bundled CPU path; it is not an OS sandbox or permission to install arbitrary
+  native-library overrides. `OfflineModelsTest` exercises both model initialization orders.
 - *Indexer* (`knowledge/indexer`, `IndexerMain`): a maintainer-run build tool that "runs during CI/CD to produce the
   pre-built index artifact", invoked by the `-Prebuild-index` profile and the `Index Release` workflow. It clones
   Apache repositories at release tags with JGit, converts AsciiDoc, downloads Camel Catalog JARs, fetches Apache JIRA
@@ -271,7 +277,7 @@ Knowledge README and code and await maintainer verification (V6).
 
 1. *MCP client → server.* Tool arguments are model output and therefore untrusted (§4.7). The server escapes free-text
    queries for Lucene (`QueryParser.escape`), clamps result counts to 25, matches identifiers as structured fields and
-   validates endpoint URIs against the bundled Camel catalog; no argument names a file, URL or command *(documented —
+   validates endpoint URIs against the bundled Camel catalog; no argument selects a filesystem target, remote fetch, executable command or index source *(documented —
    `LuceneSearchService`, `KnowledgeMcpServer`)*.
 2. *Release origin → cache.* Discovery reads `https://api.github.com/repos/apache/camel-kit/releases` (at most 10
    pages of 100 releases, each at most 2 MiB, and pagination must stay on the configured endpoint), selects only
@@ -282,7 +288,7 @@ Knowledge README and code and await maintainer verification (V6).
    version when an update fails; a pinned version never falls back to another *(documented — `knowledge/README.md`,
    "Index Distribution"; `IndexDownloader`)*. Connections time out after 3 s, manifests after 5 s and archives after
    5 min including the body; redirects are followed only after each target passes the same transport rule — `https`,
-   or `http` to a loopback host — for at most five hops, so no hop can downgrade to cleartext *(documented —
+   or `http` to a loopback host — for at most five hops, so no hop can use non-loopback cleartext *(documented —
    `IndexDownloader.send`; apache/camel-kit#143)*.
 3. *Index → results.* The index is "data, not code": it is regenerated on a branch, committed with a signed commit,
    reviewed through a pull request, built unchanged by the release workflow and published as a GitHub release asset
@@ -293,16 +299,16 @@ Knowledge README and code and await maintainer verification (V6).
    *(documented — `knowledge/README.md`, "Data Sources", "CVE enrichment and fallback")*. These are trusted upstream
    sources; a hostile document would require a compromised Apache repository or mirror (§4.7).
 
-**What the Knowledge server does to its host** (row in the §4.5 inventory): no listening socket in the default
-configuration *(documented — README; the running-process claim is inferred — V6)*; no child process *(inferred —
-V6)*; network only to the configured release endpoint, manifest and asset URLs *(documented — `IndexDownloader`; "no
-other network" inferred — V6)*; writes the cache directory — version directories, the `current` marker, the `etag`
-validator, staging files and an `.update.lock` — and the private `camel-kit-onnx-*` temporary directory *(documented —
-`IndexDownloader`, `OnnxEmbeddingProvider`)*, plus, only when index resolution fails and no version is pinned, a
-`knowledge-index*` temporary directory holding the classpath-extracted fallback index, removed on orderly shutdown
-*(documented — `LuceneSearchService`)*; nothing else *(inferred — V6)*; reads `knowledge.index.*` properties and their
-`KNOWLEDGE_INDEX_*`
-environment equivalents *(documented — README)*; "No Docker. No Docling. No external tokens." *(documented — README)*.
+**What the Knowledge server does to its host:** stdio disables the HTTP host; explicit HTTP/SSE
+opt-in listens on the configured address without built-in authentication. Set the host explicitly;
+framework defaults are not a loopback guarantee. The application fetches index releases, manifests
+and archives when acquisition needs them; a local index bypasses acquisition. Bundled models initialize
+in process under `OfflineTokenizer`'s offline CPU policy. Writes include index cache/staging/metadata/
+locks, temporary fallback and embedding data, DJL's native cache and ONNX/JNA native temporary files.
+It reads `knowledge.index.*`, `KNOWLEDGE_INDEX_*`, Quarkus, JVM home/temp and native-library/cache
+configuration. These are scoped application/dependency behaviors, not restrictions on JVM startup
+agents, custom native libraries or the operator's OS account. See the §4.5 inventory and
+[V6 evidence](security-verification.md#v6-knowledge) for regression and packaged-process checks.
 
 **Knobs** (also in §4.5a): `knowledge.index.path`; `knowledge.index.url`, which accepts `https` and `file`
 anywhere and `http` only to a loopback host (apache/camel-kit#143); `knowledge.index.version`; `knowledge.index.releases-url`; `knowledge.index.cache-dir`;
@@ -645,10 +651,9 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
 
 12. **P12 — Knowledge server transport.** "The server uses stdio by default and does not open an HTTP port"; the
     HTTP and SSE transports exist only when the operator enables them (`quarkus.http.host-enabled=true`) on the
-    configured host and port *(documented — `knowledge/README.md`)*; the no-listener claim for the running default
-    configuration is *(inferred — V6)*. *Violation:* a listening socket without the opt-in, or on a host other than
+    configured host and port *(documented — `knowledge/README.md`)*; the default and opt-in transports have packaged-process probes ([V6 evidence](security-verification.md#v6-knowledge)). *Violation:* a listening socket without the opt-in, or on a host other than
     the configured one. *Severity:* security-critical.
-13. **P13 — Knowledge index acquisition integrity.** A local `knowledge.index.path` is used in place without network.
+13. **P13 — Knowledge index acquisition integrity.** A local `knowledge.index.path` is used in place without index-acquisition network access.
     Otherwise the server fetches a published `knowledge-index-v1-*` release (the newest compatible one, or the exact
     pinned version) or the configured manifest with bounded pages and deadlines; the manifest must match the release
     tag, format version 1, the bundled embedding model and 384 dimensions; the archive's SHA-256 must equal the
@@ -667,9 +672,12 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
     sources; the published `0.0.2` server has the standalone repository's download behaviour (§4.4a).
 14. **P14 — Knowledge tool arguments are queries, not code.** `camel_docs_*` arguments are used as escaped Lucene
     query text (`QueryParser.escape`), structured field lookups, version strings and an endpoint URI validated
-    against the bundled Camel catalog; `max_results` is clamped to 25; no argument names a file path, URL or command
-    *(documented — `knowledge/README.md`, "MCP Tools"; `LuceneSearchService`; `KnowledgeMcpServer`)*. The server
-    spawns no process and performs no network access other than index acquisition *(inferred — V6)*. *Violation:*
+    against the bundled Camel catalog; `max_results` is clamped to 25; no argument selects a filesystem target, remote fetch, executable command or index source
+    *(documented — `knowledge/README.md`, "MCP Tools"; `LuceneSearchService`; `KnowledgeMcpServer`)*. `KnowledgeInputBoundaryTest` exercises query syntax, structured identifiers, every result cap and
+    HTTP/XSLT/exec/file endpoint canaries. Bundled model initialization enforces offline CPU behavior
+    through `OfflineTokenizer` and is tested by `OfflineModelsTest`. These paths do not execute tool
+    arguments or use them to select an external fetch. JVM local-interface discovery is distinct from
+    application requests; the runtime is not an OS sandbox. *Violation:*
     a tool argument reaching the filesystem, the network or a code path, or changing which index or files are read.
     *Severity:* security-critical.
 
@@ -736,8 +744,7 @@ This is the most important section for a developer adopting Camel-Kit and for an
   as information, not enforced.
 
 - **Knowledge: no authentication or authorization on the MCP transport.** stdio is the invoking user; the opt-in
-  HTTP/SSE transport carries no authentication beyond its bind address *(documented — `knowledge/README.md`; inferred
-  for the SSE posture — V6)*.
+  HTTP/SSE transport carries no authentication beyond its bind address *(documented — `application.properties`; packaged SSE probe in [V6 evidence](security-verification.md#v6-knowledge))*.
 - **Knowledge: no independent signature on the index.** Integrity rests on HTTPS to the GitHub release origin and the
   SHA-256 in a manifest served from the same origin; a configured `file://` manifest, or a loopback `http://` one, is
   trusted as operator input, and remote cleartext is refused before any request *(documented — `knowledge/README.md`;
@@ -1050,11 +1057,7 @@ own issue, linked below.
   `VALID`.
 - **V5 — Init and download path controls (Q7, Q9; #157): implemented.** Regression tests cover shared init outputs, every agent, generated leaves, cache ancestors, malicious versions and archive paths for Citrus, Forage and Knowledge. [V5 evidence](security-verification.md#v5-generated-and-extracted-paths). Redirected writes remain `VALID`.
 
-- **V6 — Knowledge section verification (Q11; #158) → §4.4a, §4.8 P12–P14.** Maintainer verification of the statements
-  drafted from code and the README: no listener in the default configuration, no process execution and no network
-  access other than index acquisition, tool-argument handling, cache permissions, the SSE posture, and the classpath
-  fallback (temporary-directory permissions; no bundled index in the monorepo runner). Related hardening: #137
-  (apache/camel-kit#143), #139 (apache/camel-kit#142), #140. *Interim triage:* a breach of P12–P14 is `VALID`.
+- **V6 — Knowledge verification (Q11; #158): implemented.** Tool argument/cap tests, pinned/temp fallback tests, real-model offline probes and packaged stdio/SSE checks are recorded in [V6 evidence](security-verification.md#v6-knowledge). Native caches are disclosed, DJL offline initialization is enforced and ordinary severity spellings work. Existing #143/#142 hardening remains covered. A P12–P14 breach remains `VALID`.
 
 ---
 

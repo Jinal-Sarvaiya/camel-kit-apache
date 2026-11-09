@@ -70,7 +70,7 @@ public class OnnxReranker {
                             if (is == null) {
                                 throw new RuntimeException(TOKENIZER_FILE + " not found on classpath");
                             }
-                            tokenizer = HuggingFaceTokenizer.newInstance(is, Map.of(
+                            tokenizer = OfflineTokenizer.load(is, Map.of(
                                     "padding", "false",
                                     "truncation", "true",
                                     "maxLength", String.valueOf(MAX_SEQ_LENGTH)));

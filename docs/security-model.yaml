@@ -339,17 +339,17 @@ claimed_properties:
     property: Knowledge server transport - stdio by default with no listening socket; the HTTP/SSE transport exists only when the operator enables it (quarkus.http.host-enabled=true) on the configured host and port.
     violation_symptom: A listening socket without the opt-in, or on a host other than the configured one.
     severity: security-critical
-    provenance: documented (knowledge/README.md "Running the MCP Server"); no-listener claim for the default configuration inferred (V6)
+    provenance: "application.properties and knowledge/README.md; packaged stdio and explicit loopback SSE probe recorded in security-verification.md V6. HTTP/SSE has no built-in authentication; configure bind host explicitly."
   - id: P13
     property: Knowledge index acquisition integrity - a local knowledge.index.path is used in place without network; otherwise a published knowledge-index-v1-* release (newest compatible, or the exact pinned version) or an explicitly configured manifest is fetched with bounded pages and deadlines, the manifest must match the release tag, format version 1, the bundled embedding model and 384 dimensions, the archive SHA-256 must equal the manifest value before unpacking, zip entries are confined to the per-download staging directory, the version directory is activated atomically and must be a real directory, a failed update keeps the previous working index, and a pinned client never falls back to another version. Remote manifest, discovery and asset URLs, and every redirect target checked before the hop, must be https, or http to a loopback host only (#143). An unpinned client whose resolution fails falls back to a classpath-bundled index extracted into a temporary knowledge-index* directory that is removed on orderly shutdown; a pinned client does not.
     violation_symptom: An archive accepted on SHA-256 mismatch; an entry written outside the staging or version directory; a version name outside the safe-name rules accepted; a pinned client using another version or the classpath fallback; a manifest from a different release tag accepted; a remote fetch or redirect issued over non-loopback http; activation of a partially unpacked version.
     severity: security-critical (integrity and path escape)
     provenance: documented (knowledge/README.md "Index Distribution", IndexDownloader, LuceneSearchService, apache/camel-kit#143)
   - id: P14
-    property: Knowledge tool arguments are queries, not code - camel_docs_* arguments are used as escaped Lucene query text, structured field lookups, version strings and an endpoint URI validated against the bundled Camel catalog; no argument names a file path, URL or command; the server spawns no process and performs no network access other than index acquisition.
+    property: Knowledge tool arguments are queries, not code - camel_docs_* arguments are used as escaped Lucene query text, structured field lookups, version strings and an endpoint URI validated against the bundled Camel catalog; no argument selects a filesystem target, remote fetch, executable command or index source. OfflineTokenizer enforces offline CPU model initialization and disables implicit DJL/JNA subprocess discovery; native libraries still use caches and temporary files. Application network is index acquisition; JVM local-interface discovery and explicit operator startup/native overrides are distinct, not OS-sandboxed.
     violation_symptom: A tool argument reaching the filesystem, the network or a code path, or changing which index or files are read.
     severity: security-critical
-    provenance: documented (knowledge/README.md tool table, LuceneSearchService QueryParser.escape, KnowledgeMcpServer MAX_RESULTS_CAP); no-process and no-other-network claims inferred (V6)
+    provenance: "KnowledgeMcpServer, LuceneSearchService, OfflineTokenizer; KnowledgeInputBoundaryTest, OfflineModelsTest and packaged-process observations (security-verification.md V6)."
 
 correctness_only_properties:
   - Deterministic graph merge order.
@@ -624,8 +624,9 @@ verification_items:
     sections: ["4.4a", "4.8 P12", "4.8 P13", "4.8 P14"]
     work: "Maintainer verification of the Knowledge statements drafted from code and README - no listener in the default configuration, no process execution and no network access other than index acquisition, tool-argument handling, cache permissions, the SSE posture, and the classpath fallback (temporary-directory permissions, no bundled index in the monorepo runner). Related hardening - #137 (PR #143), #139 (PR #142), #140."
     interim_triage: A breach of P12-P14 is VALID.
-    status: open
+    status: "implemented"
 
+    evidence: "KnowledgeInputBoundaryTest, LuceneFallbackBoundaryTest, OfflineModelsTest, existing IndexDownloader/ReleaseDiscovery regressions and packaged stdio/SSE probe; security-verification.md V6"
 revision_triggers:
   - New CLI command, parser or input format reading external content; parser moving to later compilation phase or symbol resolution.
   - Change to the graph parser timeout or the POM parser path, or addition of size, memory or symbolic-link checks in kit/camel-kit-graph (closes V2 items).

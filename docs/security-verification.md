@@ -79,3 +79,48 @@ An explicitly chosen root alias is allowed. Extraction creates ordinary files an
 materializes ZIP symlink metadata. These checks do not provide descriptor-relative isolation
 against concurrent same-account directory substitution; existing same-account exclusions apply.
 Website impact: required; initialization behavior documented in the agent reference.
+
+
+## V6: Knowledge
+
+`KnowledgeInputBoundaryTest` supplies synthetic Lucene documents to actual service/tool methods.
+It checks escaped free text, structured identifiers, upper/default/lower result bounds across all
+call sites and catalog-only HTTP/XSLT/exec/file endpoint validation. A conventional HIGH severity
+query exposed duplicate elements in `Set.of`; distinct case variants now accept HIGH/high/High.
+`LuceneFallbackBoundaryTest` checks pinned failures, readable unpinned temporary fallback,
+POSIX temporary-directory privacy where supported, cleanup, persistent-index preservation and
+failure when no bundled index exists. Existing downloader tests cover cache permissions, hash,
+transport/redirect, pin, staging and activation boundaries. Removing query escaping, increasing
+the cap or disabling fallback cleanup each made the respective regression fail.
+
+`OfflineModelsTest` forks fresh JVMs with isolated caches and real bundled embedding/reranker
+resources, in both initialization orders. Both return valid inference results with zero observed
+HTTP opens, JFR process starts or socket I/O. Four conflicting-environment cases fail before
+native/model extraction. All six cases passed directly on Java 17, 21 and 25. Normal cases start
+with deliberately conflicting system properties to check enforcement. Removing either provider's
+offline call produced four blocked EC2 metadata requests. No real metadata request was sent.
+An earlier probe caught JNA launching `ldconfig`; the shared initializer now suppresses implicit
+platform-library discovery while preserving an explicitly configured search path.
+
+The offline policy is process-wide DJL configuration for the bundled CPU runtime, not an OS
+sandbox. DJL cache and ONNX/native temporary writes remain expected. Conflicting environment
+values are rejected rather than silently enabling telemetry or GPU-native downloads.
+Packaged transport verification uses `tools/verify_knowledge_runtime.py` with a local synthetic
+index: stdio initialize/list-tools/first query, and explicit loopback SSE initialize/list-tools/
+query without authorization. It inspects the child process's sockets and syscall trace where
+available; JVM local-interface discovery is reported separately from application network.
+Website impact: required; Knowledge runtime/reference updated. Published Knowledge0.0.2 is not
+retroactively changed by these source fixes.
+
+
+### Packaged V6 observation (2026-11-09)
+
+The checked-in probe passed on Temurin 21.0.8+9 with runner SHA-256
+`d5e8e7b1a379e75bea6f432d0538d1bc54a75a1143bbb040730f7edb6575e6a6`, with no
+baseline/offline/CUDA/JNA command overrides. Both fresh JVMs initialized MCP, listed seven
+tools and returned the local fixture from the first query with reranking. Default stdio had
+no IP sockets, binds or listeners; explicit SSE had one 127.0.0.1 listener and accepted the
+unauthenticated initialization/query. Lifetime syscall traces contained only the initial JVM
+exec, no child executable and no application service connection/send. JVM netlink and UDP
+port-zero interface discovery was recorded separately. The packaged runner contained all five
+model/tokenizer resources and no `knowledge-index/` payload.

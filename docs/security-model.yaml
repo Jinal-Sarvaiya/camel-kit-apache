@@ -14,13 +14,13 @@ products:
     version: 0.0.3-SNAPSHOT
     latest_release: 0.0.2 (published under the former io.github.luigidemasi coordinates)
     index_release_channel: knowledge-index-v1-YYYY.MM.DD-HHMMSS
-kit_source_baseline_commit: 70796c02
-knowledge_source_baseline_commit: 9c8173cb
+kit_source_baseline_commit: 2863e915
+knowledge_source_baseline_commit: 2863e915
 repository_layout_commit: 9c8173cb
-revised_at_commit: a19d0529
+verification_revision: "2026-11-10; main 2863e915 plus PR6 and #153-#158"
 date: "2026-10-22"
 last_review_round: "2026-10-27"
-status: "draft - policy ratified 2026-10-27; acceptance pending verification items V1-V6 (tracked in #153-#158); revised 2026-11-02 after review round 3"
+status: "draft - policy ratified 2026-10-27; implementation verification for #153-#158 complete; maintainer acceptance and publication #131 pending (2026-11-09)"
 canonical: docs/security-model.md
 umbrella_model: https://camel.apache.org/manual/security-model.html
 reporting:
@@ -109,9 +109,9 @@ component_families:
     entry_points: [-Prebuild-index build, index-release.yml workflow]
     in_model: true
     section: "4.4a"
-    reachability: Its inputs are upstream Apache sources at release tags, trusted; a finding needs hostile upstream content (adversary not in scope) unless the indexer breaks its own path or process boundary.
+    reachability: Its inputs are selected upstream Apache product refs plus camel-website main discovery, trusted; a finding needs hostile upstream content (adversary not in scope) unless the indexer breaks its own path or process boundary.
 
-processes_inventory_status: See 4.5 - each row records what the process does to the host and whether the statement is documented, code-inspected (V4) or maintainer-verified.
+processes_inventory_status: Source-audited per-process inventory with concrete implementation references and configuration-scoped runtime evidence in security-verification.md V4; no human sign-off implied.
 
 entry_points:
   - entry: camel-kit init
@@ -256,7 +256,7 @@ configuration_variants:
     security_relevant: false
   - knob: knowledge.index.path (KNOWLEDGE_INDEX_PATH)
     default: unset
-    effect: Uses a local index directory in place; no network, no cache.
+    effect: Uses a local index directory in place; no index-acquisition network or index cache; native-library caches still apply.
     security_relevant: true
     stance: documented (air-gapped and development use)
   - knob: knowledge.index.url (KNOWLEDGE_INDEX_URL)
@@ -281,7 +281,7 @@ configuration_variants:
 
 claimed_properties:
   - id: P1
-    property: "Source-reading contract inherited from the umbrella model: no project code execution, project class loading, runtime placeholder/secret resolution, network or child processes; output is data. GraphParser confines inputs, refuses file links, limits source files to 16 MiB, recognized source total to 64 MiB and discovery to 100000 entries. GraphBuilder times out every parser including POM after 60 seconds, discards its partial result and cancels its daemon task. Cancellation is cooperative; input bounds are not a hard JVM heap/CPU quota."
+    property: "Source-reading contract inherited from the umbrella model: no project code execution, project class loading, runtime placeholder/secret resolution, network or child processes; output is data. GraphParser confines inputs, refuses file links, limits source files to 16 MiB, recognized source total to 256 MiB and discovery to 100000 visited entries. Discovery prunes .git, .svn, .hg, target, build and node_modules directories below the selected root; source/discovery overflow fails the graph with a diagnostic. GraphBuilder times out every parser including POM after 60 seconds, discards its partial result and cancels its daemon task. Cancellation is cooperative; input bounds are not a hard JVM heap/CPU quota."
     violation_symptom: Child process, class loaded or defined from the source, outbound connection, read of a file outside the analysed root (including through a symbolic link), placeholder resolved, non-termination, or unbounded memory during graph analysis.
     severity: security-critical (VALID regardless of the verification status in V1/V2)
     provenance: "Contract: umbrella and maintainer (2026-10-27, Q1/Q2). Controls: GraphParser, GraphBuilder, SecureXml and BizTalk parsers. Regressions: ParserSourceReadingContractTest, GraphInputBoundaryTest; security-verification.md V1/V2."
@@ -294,9 +294,9 @@ claimed_properties:
     property: init confines its writes to the operator-selected target directory and removes only what it generated, through no symlink. An untrusted tree or a symbolic link that redirects a write outside the target is in scope; an intentionally operator-selected destination is authorized.
     violation_symptom: File created, replaced or deleted outside the operator-selected target, or a write or deletion redirected through a symbolic link.
     severity: security-critical when reachable from an attacker-controllable input (analysed tree, registry data); otherwise correctness
-    provenance: "Contract: maintainer (2026-10-27, Q9). InitService/ConfinedPaths preflight shared and selected-agent outputs; GeneratedAssetCleaner guards deletion; generated file replacements use AtomicFileWriter. InitWriteConfinementTest covers static hostile descendant links and selected-root aliases."
+    provenance: "Contract: maintainer (2026-10-27, Q9). InitService/ConfinedPaths preflight generated leaves/ancestors and Camel-owned skill/shared/template subtrees; unrelated worktrees and data links are allowed; new atomic files use umask-default modes and replacements preserve existing POSIX modes; GeneratedAssetCleaner guards deletion; generated file replacements use AtomicFileWriter. InitWriteConfinementTest covers static hostile descendant links and selected-root aliases."
   - id: P4
-    property: Pinned, named-repository supply chain for everything fetched or configured; Ship resolver uses fixed HTTPS Maven Central, checksum fail, no redirects, exact coordinates, size caps, SHA-256 content identity, isolated URLClassLoader payloads. Kit's own handling of what it downloads is in scope - catalog JSON is read from the JAR stream in memory, Citrus schema entries are written only inside the cache directory after lexical containment and descendant-link checks; Citrus/Forage versions are safe single path components and cache ancestry is preflighted; Forage writes only the two allowlisted catalog files into fresh staging.
+    property: Pinned, named-repository supply chain for everything fetched or configured; Ship resolver uses fixed HTTPS Maven Central, checksum fail, no redirects, exact coordinates, size caps, SHA-256 content identity, isolated URLClassLoader payloads. Kit's own handling of what it downloads is in scope - catalog JSON is read from the JAR stream in memory, Citrus schema entries are written only inside the cache directory after lexical containment and descendant-link checks; Catalog/Citrus/Forage versions are safe single path components; Citrus/Forage cache ancestry is preflighted; Forage writes only the two allowlisted catalog files into fresh staging.
     violation_symptom: Unpinned coordinate, repository outside the named lists, download accepted on checksum mismatch (Ship), artifact outside its exact path, payload class loaded from elsewhere, or a downloaded artifact that escapes the cache directory or executes code through Kit's parsing or extraction.
     severity: security-critical
     provenance: documented (mcp-setup.md, distribution.properties, ShipMavenResolver, ShipJvmPayloadBootstrap, CatalogDownloader, CitrusSchemaDownloader, ForageCatalogService); in-scope clause maintainer (2026-10-27, Q7)
@@ -329,11 +329,11 @@ claimed_properties:
     property: Generated harness assets carry the accepted least-privilege posture - read-only Ship workers, read-only Codex roles, Copilot deny hook, Pi guard policy, no HTTP port for the Camel and Citrus MCP servers, and MCP grants aligned with the manifest allowed_tools (no runtime mutation or control tools) - as availability filters for Codex (enabled_tools), Copilot (tools), Pi (directTools) and Qwen (includeTools), as Bob 2's auto-approval list, with Codex, Copilot, Qwen and OpenCode prompting before MCP calls and Antigravity receiving the full tool set without generated approval. Accepted Claude posture - explicit per-tool grants aligned with the manifest. Generated Claude settings.json implements explicit manifest-listed per-tool grants (V3). Claim is about the generated artifact; enforcement is the harness's.
     violation_symptom: "Generated asset grants more than the accepted posture: a worker with edit/shell tools, a filter or auto-approval list wider than manifest allowed_tools, a prompt-mode target auto-approved, or a hook/guard failing open on a documented pattern. Former wildcard exception applied only to the pre-V3 template (review of #6, 2026-10-27); newly generated wildcards are regressions. Any demonstrated breach is evaluated on its impact."
     severity: hardening; security-critical when the widened grant reaches a credential or destructive action without a prompt
-    provenance: "documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates/mcp-configs/*, templates/claude/settings.json, Claude Code permissions reference); current Claude grant - maintainer, 2026-10-22 (review of #6); accepted posture - maintainer, 2026-10-27 (Q3)"
+    provenance: "documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates/mcp-configs/*, templates/claude/settings.json, Claude Code permissions reference); historical wildcard grant - maintainer, 2026-10-22 (review of #6); accepted posture - maintainer, 2026-10-27 (Q3); implementation and generated-host checks - V3, security-verification.md"
   - id: P11
-    property: Stated resource bounds - route/Citrus YAML 2 MiB, native result 16 MiB and 1000 files, Pi prompt 1 MiB, Pi log 16 MiB, session 64 MiB, evidence log 64 MiB, stage timeout 10m, resolver 64 roots/512 artifacts/128 MiB JAR/4 MiB POM, tree quotas, migration-context depth 3 and 50 nodes; all graph parsers including POM 60 s each, source16 MiB/file and64 MiB total, discovery100000 entries (serves P1); Knowledge tool results at most 25 per call, release pages at most 2 MiB and 10 pages, manifest 5 s and archive 5 min deadlines.
+    property: Stated resource bounds - route/Citrus YAML 2 MiB, native result 16 MiB and 1000 files, Pi prompt 1 MiB, Pi log 16 MiB, session 64 MiB, evidence log 64 MiB, stage timeout 10m, resolver 64 roots/512 artifacts/128 MiB JAR/4 MiB POM, tree quotas, migration-context depth 3 and 50 nodes; all graph parsers including POM 60 s each, source 16 MiB/file and 256 MiB total, discovery 100000 entries (serves P1); Knowledge tool results at most 25 per call, release pages at most 2 MiB and 10 pages, manifest 5 s and archive 5 min deadlines.
     violation_symptom: A limit not enforced at its documented value.
-    severity: hardening
+    severity: hardening except graph source-reading boundary breaches, which are security-critical under P1
     provenance: documented (ShipArtifactLimits, ShipNativeWorker, PiWorker, EvidenceRunner, ShipMavenResolver, ShipTreePolicy, docs/commands.md, KnowledgeMcpServer, IndexDownloader)
   - id: P12
     property: Knowledge server transport - stdio by default with no listening socket; the HTTP/SSE transport exists only when the operator enables it (quarkus.http.host-enabled=true) on the configured host and port.
@@ -341,7 +341,7 @@ claimed_properties:
     severity: security-critical
     provenance: "application.properties and knowledge/README.md; packaged stdio and explicit loopback SSE probe recorded in security-verification.md V6. HTTP/SSE has no built-in authentication; configure bind host explicitly."
   - id: P13
-    property: Knowledge index acquisition integrity - a local knowledge.index.path is used in place without network; otherwise a published knowledge-index-v1-* release (newest compatible, or the exact pinned version) or an explicitly configured manifest is fetched with bounded pages and deadlines, the manifest must match the release tag, format version 1, the bundled embedding model and 384 dimensions, the archive SHA-256 must equal the manifest value before unpacking, zip entries are confined to the per-download staging directory, the version directory is activated atomically and must be a real directory, a failed update keeps the previous working index, and a pinned client never falls back to another version. Remote manifest, discovery and asset URLs, and every redirect target checked before the hop, must be https, or http to a loopback host only (#143). An unpinned client whose resolution fails falls back to a classpath-bundled index extracted into a temporary knowledge-index* directory that is removed on orderly shutdown; a pinned client does not.
+    property: Knowledge index acquisition integrity - a local knowledge.index.path is used in place without index-acquisition network; otherwise a published knowledge-index-v1-* release (newest compatible, or the exact pinned version) or an explicitly configured manifest is fetched with bounded pages and deadlines, the manifest must match the release tag, format version 1, the bundled embedding model and 384 dimensions, the archive SHA-256 must equal the manifest value before unpacking, zip entries are confined to the per-download staging directory, the version directory is activated atomically and must be a real directory, a failed update keeps the previous working index, and a pinned client never falls back to another version. Remote manifest, discovery and asset URLs, and every redirect target checked before the hop, must be https, or http to a loopback host only (#143). An unpinned client whose resolution fails falls back to a classpath-bundled index extracted into a temporary knowledge-index* directory that is removed on orderly shutdown; a pinned client does not.
     violation_symptom: An archive accepted on SHA-256 mismatch; an entry written outside the staging or version directory; a version name outside the safe-name rules accepted; a pinned client using another version or the classpath fallback; a manifest from a different release tag accepted; a remote fetch or redirect issued over non-loopback http; activation of a partially unpacked version.
     severity: security-critical (integrity and path escape)
     provenance: documented (knowledge/README.md "Index Distribution", IndexDownloader, LuceneSearchService, apache/camel-kit#143)
@@ -478,7 +478,7 @@ known_non_findings:
     why: Query text is escaped with QueryParser.escape; results are bounded (P14).
     disposition: KNOWN-NON-FINDING
   - pattern: ONNX Runtime native library loaded in the Knowledge server
-    why: The bundled embedding model and reranker are packaged at build time and copied to a private temp directory; no runtime model download.
+    why: Bundled resources are packaged at build time; embedding model uses private temporary files, reranker loads bytes in memory; native libraries use separate cache/temp paths; no runtime model download.
     disposition: KNOWN-NON-FINDING
   - pattern: The Knowledge indexer clones repositories and calls Apache JIRA, NVD and CIRCL
     why: Maintainer-run build tool on trusted upstream sources; not part of the shipped server (4.4a).
@@ -599,15 +599,16 @@ verification_items:
     work: Replace mcp__camel__*, mcp__camel-knowledge__* and mcp__citrus__* with explicit per-tool grants aligned with the workflow manifest allowed_tools, and verify the generated behaviour in Claude Code.
     interim_triage: "New generated wildcard grants violate P10. Historical configuration-only reports retain the pre-V3 disposition; demonstrated breaches remain evaluated on impact."
     status: "implemented"
-    evidence: "ClaudeGeneratorTest, ShippedAssetStructureTest; actual Claude Code 2.1.316 generated-output probe with12 permission/dispatch cases; security-verification.md V3"
+    evidence: "ClaudeGeneratorTest verifies manifest-rendered grants; actual Claude Code 2.1.316 generated-output probe with 12 permission/dispatch cases; security-verification.md V3"
   - id: V4
     tracking: apache/camel-kit#156
     title: Verified per-process side-effect inventory
     from: [Q6]
     sections: ["4.5", "4.4a"]
     work: Maintainer verification of each row of the 4.5 inventory - Kit CLI, graph analysis, Ship controller, Pi worker, evidence JVMs, Knowledge server, Knowledge indexer - covering listeners, child processes, network origins, filesystem writes, environment reads, telemetry and actual parser limits, scoped to the process and configuration that support each statement.
-    interim_triage: Code-inspected statements remain inferred; a breach of a claimed property is VALID.
-    status: open
+    interim_triage: "Source audit and runtime observations are explicitly distinguished from maintainer approval; breaches of claimed properties remain VALID."
+    status: "implemented"
+    evidence: "All seven rows source-audited against named implementation classes and pinned dependency behavior; scoped executable checks recorded in security-verification.md V1-V6. Maintainer acceptance remains separate."
   - id: V5
     tracking: apache/camel-kit#157
     title: Init and download path controls through symbolic links
@@ -626,14 +627,21 @@ verification_items:
     interim_triage: A breach of P12-P14 is VALID.
     status: "implemented"
 
-    evidence: "KnowledgeInputBoundaryTest, LuceneFallbackBoundaryTest, OfflineModelsTest, existing IndexDownloader/ReleaseDiscovery regressions and packaged stdio/SSE probe; security-verification.md V6"
+    evidence: "KnowledgeInputBoundaryTest, LuceneFallbackBoundaryTest, OfflineModelsTest, existing IndexDownloader/IndexDiscoveryTest regressions and packaged stdio/SSE probe; security-verification.md V6"
 revision_triggers:
   - New CLI command, parser or input format reading external content; parser moving to later compilation phase or symbol resolution.
-  - Change to the graph parser timeout or the POM parser path, or addition of size, memory or symbolic-link checks in kit/camel-kit-graph (closes V2 items).
+  - Change to the graph parser timeout or the POM parser path, or addition of size, memory or symbolic-link checks in kit/camel-kit-graph (review V2 coverage).
   - A new Knowledge tool, a tool argument that names a path, URL or command, the SSE transport enabled by default, a new download origin or manifest scheme, a change to the IndexDownloader transport rule or redirect validation, a new index format channel, authentication added to the transport, or the indexer promoted into the runtime server.
   - Change to default oversight mode, default backend, Pi tool lists or flags, tree policy rules/quotas, expression gate, secret-scan rules, resolver origin/checksum/redirect policy.
   - init writing outside the target directory or under $HOME; Ship state moving to a user-level default.
-  - New or changed generated harness asset granting permissions, installing hooks or auto-approving tools; completion of V3 (promotes P10 to the accepted posture).
+  - New or changed generated harness asset granting permissions, installing hooks or auto-approving tools; keep V3 coverage aligned with P10.
   - New remote repository or coordinate in distribution.properties; verification added to init downloads; Kit's Knowledge pin moving to org.apache.camel coordinates.
   - Ship supporting Spring Boot/Quarkus, non-Linux hosts, binary or deletion proposals, or leaving Technology Preview.
   - Any report that is a MODEL-GAP.
+
+knowledge_jvm_initialization_policy:
+  ai.djl.offline: true
+  RUST_FLAVOR: cpu
+  ai.djl.util.cuda.fork: false
+  jna.platform.library.path: "Set to empty only if absent; explicit values are preserved"
+  scope: "Process-wide; affects other DJL/JNA users sharing the Knowledge embedding JVM"

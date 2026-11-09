@@ -20,7 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add target-specific Maven staging and maintainer-triggered index publication. Kit keeps its
   released Knowledge runner pin; group and version overrides allow explicit adoption.
 
+### Fixed
+
+- Preserve legitimate init layouts containing unrelated symlinks and normal permissions on new generated files.
+- Exclude VCS, build and dependency trees from graphs; support up to 256 MiB of recognized sources while retaining per-file limits and validation before XML sniffing.
+- Derive Claude MCP grants from the workflow manifest and validate catalog cache version components.
+
 ### Added
+
+- **Verified process inventory (#156)** — correct CLI/Ship/Knowledge host effects and clock assumptions, distinguish source evidence from runtime observations, and record the six verification outcomes.
 
 - **Knowledge runtime boundaries (#158)** — enforce offline CPU tokenizer initialization, cover query/cap/fallback and transport behavior, document native caches, and accept conventional CVE severity spellings.
 

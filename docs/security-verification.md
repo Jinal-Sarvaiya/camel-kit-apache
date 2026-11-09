@@ -26,8 +26,11 @@ parser/dependency changes. Website impact: not required; this pins existing beha
 `GraphInputBoundaryTest` exercises actual parsing and `GraphBuilder`: outside file links,
 directory links, an operator-selected root alias, direct supplied outside/oversized lists,
 16 MiB and 16 MiB+1 sources, aggregate overflow, large unrelated artifacts and a deliberately
-slow POM parser. Production bounds are 16 MiB per input, 64 MiB aggregate recognized source
-and 100,000 visited entries. Sources are checked before parser sniffing and bounded again
+slow POM parser. Production bounds are 16 MiB per input, 256 MiB aggregate recognized source
+and 100,000 visited entries. VCS/build/dependency subtrees (`.git`, `.svn`, `.hg`, `target`,
+`build`, `node_modules`) are excluded before traversal. Regressions cover a 256 MiB accepted
+source set, overflow, copied-resource exclusion, and direct unsafe XML-sniff candidates.
+Sources are checked before parser sniffing and bounded again
 when read. The POM pass uses the same timeout policy as the remaining parsers.
 
 The baseline reproduced file-link escape, missing POM timeout and oversized-input acceptance.
@@ -39,8 +42,8 @@ same-account directory substitution. Website impact: required; graph reference u
 
 ## V3: Claude permissions
 
-`ClaudeGeneratorTest` tests fresh and repeated generation; `ShippedAssetStructureTest` compares
-the shipped settings to the manifest. Both require exactly the 46 current MCP grants, with no
+`ClaudeGenerator` renders MCP grants from the workflow manifest; `ClaudeGeneratorTest` checks
+fresh and repeated generation against that manifest. It requires exactly the 46 current MCP grants, with no
 server-wide wildcard or duplicate. Existing Read and Maven command grants are unchanged.
 
 Actual Claude Code 2.1.316 was run with generated settings, isolated configuration, a benign
@@ -72,9 +75,12 @@ staging, version names and fallback.
 
 Baseline probes demonstrated outside writes for init/Citrus/Forage, including deletion of an
 outside directory selected by a malicious Forage version. All outside paths were test fixtures.
-The fix rejects unsafe versions and pre-existing descendant links before writes/deletions.
+The fix rejects unsafe Catalog/Citrus/Forage versions and links in generated paths before
+writes/deletions. Positive init fixtures retain links in worktrees, custom skills, agent files,
+Maven wrapper siblings, data, schemas, flow docs and Ship state. Managed skill links still fail.
 Generated file leaves are replaced through AtomicFileWriter rather than truncated in place;
 six hard-link regressions prove outside sentinels remain unchanged for init and Citrus outputs.
+Fresh atomic writes use umask-default modes; replacement modes are preserved.
 An explicitly chosen root alias is allowed. Extraction creates ordinary files and never
 materializes ZIP symlink metadata. These checks do not provide descriptor-relative isolation
 against concurrent same-account directory substitution; existing same-account exclusions apply.
@@ -109,8 +115,9 @@ Packaged transport verification uses `tools/verify_knowledge_runtime.py` with a 
 index: stdio initialize/list-tools/first query, and explicit loopback SSE initialize/list-tools/
 query without authorization. It inspects the child process's sockets and syscall trace where
 available; JVM local-interface discovery is reported separately from application network.
-Website impact: required; Knowledge runtime/reference updated. Published Knowledge0.0.2 is not
+Website impact: required; Knowledge runtime/reference updated. Published Knowledge 0.0.2 is not
 retroactively changed by these source fixes.
+
 
 
 ### Packaged V6 observation (2026-11-09)
@@ -124,3 +131,41 @@ unauthenticated initialization/query. Lifetime syscall traces contained only the
 exec, no child executable and no application service connection/send. JVM netlink and UDP
 port-zero interface discovery was recorded separately. The packaged runner contained all five
 model/tokenizer resources and no `knowledge-index/` payload.
+
+## V4: process inventory
+
+Every §4.5 row was checked against the following sources; this is a source audit, supplemented
+by the named runtime tests above, rather than a human maintainer attestation:
+
+| Row | Sources and verification scope |
+| --- | --- |
+| CLI | PrerequisiteChecker/ProcessRunner actual argument vectors and inherited environment; DoctorService wrapper existence check versus mvn execution; OpenCodeGenerator global/ancestor/environment configuration; InitService and Doc/NextId command destinations; CatalogDownloader/CitrusSchemaDownloader/ForageCatalogService origins and request settings. External probes retain their own effects. |
+| Graph | GraphBuilder/GraphParser concurrency, deterministic merge and bounds; GraphGenerateCommand/GraphVisualizeCommand JSON/HTML outputs; V1/V2 executable tests. |
+| Ship controller | LocalCommandRunner, PiWorker, EvidenceRunner, ShipMavenResolver, ShipNativeWorker, ShipPublicationService: launch vectors, repository and state writes, native handoff, deadlines and publication. Existing controller regression suite remains required. |
+| Pi worker | PiWorker.runRpc arguments, environment and working directory; no OS confinement. External Pi/provider implementation is not asserted to be silent or isolated. |
+| Evidence JVM | EvidenceRunner/ShipJvmPayloadBootstrap and Camel validation: private environment/temp, classpath and stubbing policy. No claim of an OS socket/process sandbox. |
+| Knowledge server | IndexDownloader, IndexResolverConfig, LuceneSearchService, KnowledgeMcpServer, application.properties and shared OfflineTokenizer; V6 tests and packaged-process probe. |
+| Indexer | IndexerMain, ApacheCamelDomain, VersionResolver, JiraFetcher, CveParser: initial camel-website main discovery, selected product refs, source/cache roots including jira-cache, index.output and its sibling index.json, client-specific limits; shared embedding/native effects. No blanket filesystem/network quota. |
+
+Dependency audit used resolved DJL 0.36.0, ONNX Runtime 1.19.0 and JNA 5.8.0 source/binary behavior:
+DJL InputStream tokenizer factories call Ec2Utils.callHome; generic platform detection consults
+CUDA before applying flavor, and JNA can invoke ldconfig unless its platform search path is set.
+V6 fixes these observed effects and preserves expected cache/native extraction writes.
+The enforced DJL properties and default empty JNA platform path are JVM-wide; explicit JNA
+platform paths are preserved. This is a standalone-process policy, not per-tokenizer isolation. ONNX
+embedding external-data files and reranker in-memory model loading are described separately.
+
+Negative inventory cells describe inspected application operations and the recorded runtime
+configuration. They do not waive P1–P14 or promise behavior for arbitrary external tools,
+JVM startup agents or operator-selected native libraries. Website impact: not required for this
+source inventory correction; behavior-changing fixes include Antora updates in V2/V3/V5/V6.
+Publication of the accepted security model remains tracked by #131.
+
+## Review follow-up (2026-11-10)
+
+The compatibility follow-up narrows init preflight, preserves umask defaults for new generated
+files, renders Claude MCP grants from the workflow manifest, and prunes graph build/VCS/dependency
+trees. The aggregate graph budget is 256 MiB; the 16 MiB per-source and 60-second parser bounds
+remain. Filename filtering precedes validation, and XML content sniffing follows it.
+The Python host probes remain explicit evidence reproducers, not CI jobs; Java regressions run
+in the normal reactor. Earlier dated host observations describe their original artifacts.

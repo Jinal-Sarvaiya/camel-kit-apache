@@ -1573,6 +1573,70 @@ class OpenCodeGeneratorTest {
     }
 
     @Test
+    void shipWorkerRemovedOnPreflightWhenRootProjectConfigHasStructuralSubstitution() throws Exception {
+        InitContext ctx = createContext();
+        new OpenCodeGenerator().generate(ctx);
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertTrue(Files.exists(workerFile), "precondition: worker exists after initial generation");
+
+        Files.writeString(tempDir.resolve("opencode.json"), "{\"mcp\":{env:MCP_SERVERS}}");
+
+        assertThrows(Exception.class, () -> new OpenCodeGenerator().preflight(ctx));
+
+        assertFalse(Files.exists(workerFile),
+                "Worker must be removed before root project config validation aborts");
+    }
+
+    @Test
+    void shipWorkerRemovedOnReinitWhenRootProjectConfigHasStructuralSubstitution() throws Exception {
+        InitContext ctx = createContext();
+        new OpenCodeGenerator().generate(ctx);
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertTrue(Files.exists(workerFile), "precondition: worker exists after initial generation");
+
+        Files.writeString(tempDir.resolve("opencode.json"), "{\"mcp\":{env:MCP_SERVERS}}");
+
+        assertThrows(Exception.class, () -> new OpenCodeGenerator().generate(ctx));
+
+        assertFalse(Files.exists(workerFile),
+                "Worker must be removed before root project config merging aborts");
+    }
+
+    @Test
+    void shipWorkerRemovedOnPreflightWhenNestedProjectConfigHasStructuralSubstitution() throws Exception {
+        InitContext ctx = createContext();
+        new OpenCodeGenerator().generate(ctx);
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertTrue(Files.exists(workerFile), "precondition: worker exists after initial generation");
+
+        Path nested = tempDir.resolve(".opencode/opencode.json");
+        Files.createDirectories(nested.getParent());
+        Files.writeString(nested, "{\"mcp\":{env:MCP_SERVERS}}");
+
+        assertThrows(Exception.class, () -> new OpenCodeGenerator().preflight(ctx));
+
+        assertFalse(Files.exists(workerFile),
+                "Worker must be removed before nested project config validation aborts");
+    }
+
+    @Test
+    void shipWorkerRemovedOnReinitWhenNestedProjectConfigHasStructuralSubstitution() throws Exception {
+        InitContext ctx = createContext();
+        new OpenCodeGenerator().generate(ctx);
+        Path workerFile = tempDir.resolve(".opencode/agents/camel-ship-worker.md");
+        assertTrue(Files.exists(workerFile), "precondition: worker exists after initial generation");
+
+        Path nested = tempDir.resolve(".opencode/opencode.json");
+        Files.createDirectories(nested.getParent());
+        Files.writeString(nested, "{\"mcp\":{env:MCP_SERVERS}}");
+
+        assertThrows(Exception.class, () -> new OpenCodeGenerator().generate(ctx));
+
+        assertFalse(Files.exists(workerFile),
+                "Worker must be removed before nested project config merging aborts");
+    }
+
+    @Test
     void shipWorkerDeniesServersFromWindowsProgramDataManagedConfigThroughGeneration() throws Exception {
         Path programData = tempDir.resolve("CompanyData");
         Files.createDirectories(programData.resolve("opencode"));

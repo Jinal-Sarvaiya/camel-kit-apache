@@ -38,11 +38,39 @@ public class OpenCodeGenerator extends DefaultGenerator {
 
     @Override
     public void preflight(InitContext ctx) throws Exception {
-        new OpenCodeConfigMerger().validateExisting(ctx.projectDir().resolve(ctx.agent().mcpConfigPath()));
+        try {
+            new OpenCodeConfigMerger().validateExisting(ctx.projectDir().resolve(ctx.agent().mcpConfigPath()));
+        } catch (Exception e) {
+            // OpenCode substitutes {env:}/{file:} before parsing, so a project config that is invalid as raw
+            // JSON may still be valid for the host. Initialization aborts here, so remove the installed worker:
+            // its denial list can no longer be shown to match the effective MCP server set. Other validation
+            // failures (e.g. duplicate keys) keep the "fail before any project writes" contract.
+            if (projectConfigMayContainSubstitution(ctx)) {
+                Files.deleteIfExists(ctx.projectDir().resolve(".opencode/agents/camel-ship-worker.md"));
+            }
+            throw e;
+        }
+    }
+
+    private static boolean projectConfigMayContainSubstitution(InitContext ctx) {
+        try {
+            for (Path configFile : OpenCodeProjectConfig.existingFiles(ctx.projectDir())) {
+                if (SUBSTITUTION_PATTERN.matcher(Files.readString(configFile)).find()) {
+                    return true;
+                }
+            }
+            return false;
+        } catch (IOException e) {
+            return true; // unreadable: fail closed
+        }
     }
 
     @Override
     public void generate(InitContext ctx) throws Exception {
+        // Invalidate the worker before project-config merging can abort; it is regenerated below only if the
+        // effective MCP inventory is bounded.
+        Files.deleteIfExists(ctx.projectDir().resolve(".opencode/agents/camel-ship-worker.md"));
+
         // Run default generation (commands, skills, MCP config)
         super.generate(ctx);
 

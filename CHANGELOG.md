@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Parser source-reading regression coverage (#153)** — exercise all nine graph parsers with execution, class-loading, placeholder and external-entity canaries.
+
 - **Google Antigravity native Ship (#95)** — eligible sessions relay controller-issued stages through a dedicated
   `camel-ship-worker` agent with `commandExecutionPolicy: "off"` and read-only tools.
   `--backend antigravity-native` reuses the native task/result, recovery, oversight and deterministic publication

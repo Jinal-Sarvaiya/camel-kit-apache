@@ -281,10 +281,10 @@ configuration_variants:
 
 claimed_properties:
   - id: P1
-    property: Source-reading contract for graph analysis, inherited in full from the umbrella model - no code execution, class loading, placeholder/secret resolution, network or child processes; always finishes in bounded time and memory; output is data. Bound in place - GraphBuilder 60-second timeout per parser other than the POM parser. Not yet verified - per-parser regression coverage (V1); POM parser bound, memory or file-size bound, confinement of reads to the analysed root when the tree contains symbolic links (V2).
+    property: Source-reading contract for graph analysis, inherited in full from the umbrella model - no code execution, class loading, placeholder/secret resolution, network or child processes; always finishes in bounded time and memory; output is data. Bound in place - GraphBuilder 60-second timeout per parser other than the POM parser. Not yet verified - POM parser bound, memory or file-size bound, confinement of reads to the analysed root when the tree contains symbolic links (V2).
     violation_symptom: Child process, class loaded or defined from the source, outbound connection, read of a file outside the analysed root (including through a symbolic link), placeholder resolved, non-termination, or unbounded memory during graph analysis.
     severity: security-critical (VALID regardless of the verification status in V1/V2)
-    provenance: contract - documented (umbrella) and maintainer (2026-10-27, Q1 and Q2); XML/StAX hardening documented (SecureXml, BizTalk parsers); GraphBuilder timeout documented; Java, Groovy, YAML, DataWeave, properties enforcement inferred (V1); confinement and resource enforcement inferred (V2)
+    provenance: contract - documented (umbrella) and maintainer (2026-10-27, Q1 and Q2); XML/StAX hardening documented (SecureXml, BizTalk parsers); GraphBuilder timeout documented; all nine parsers covered by ParserSourceReadingContractTest (security-verification.md V1); confinement and resource enforcement inferred (V2)
   - id: P2
     property: Hardened XML parsing at every XML entry point, including Ship pom.xml validation.
     violation_symptom: XXE, SSRF or local file read through XML.
@@ -580,7 +580,8 @@ verification_items:
     sections: ["4.2", "4.8 P1"]
     work: Tests pinning, for each of the nine parsers including the compiler-based Java and Groovy paths, that parsing executes no project code, loads no project class, resolves no placeholder or secret, opens no connection and spawns no process.
     interim_triage: A demonstrated breach is VALID under P1.
-    status: open
+    status: "implemented"
+    evidence: "ParserSourceReadingContractTest: nine parser fixtures, four XML external-entity cases, calibrated JFR/process/class observers and loopback network canary; security-verification.md V1"
   - id: V2
     tracking: apache/camel-kit#154
     title: Graph confinement and resource bounds

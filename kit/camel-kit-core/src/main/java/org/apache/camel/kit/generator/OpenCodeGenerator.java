@@ -6,6 +6,7 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -49,14 +50,13 @@ public class OpenCodeGenerator extends DefaultGenerator {
                 Map.of(
                         "COMMAND_PREFIX", ctx.commandPrefix()));
 
-        List<String> mcpServers = readMcpServerNames(ctx);
+        McpInventory inventory = readMcpInventory(ctx);
         Set<String> seen = new LinkedHashSet<>();
         boolean collisionDetected = false;
-        boolean unresolvedSubstitution = false;
         StringBuilder denials = new StringBuilder();
-        for (String server : mcpServers) {
+        for (String server : inventory.servers) {
             if (SUBSTITUTION_PATTERN.matcher(server).find()) {
-                unresolvedSubstitution = true;
+                inventory = new McpInventory(inventory.servers, true);
                 continue;
             }
             String normalized = normalizeServerName(server);
@@ -69,7 +69,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
         data.put("MCP_TOOL_DENIALS", denials.toString());
 
         // OpenCode-specific: generate agent definitions
-        generateAgents(ctx, data, !collisionDetected && !unresolvedSubstitution);
+        generateAgents(ctx, data, !collisionDetected && !inventory.hasUnresolvedSubstitution);
     }
 
     static String normalizeServerName(String name) {
@@ -85,45 +85,61 @@ public class OpenCodeGenerator extends DefaultGenerator {
         return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-';
     }
 
-    private List<String> readMcpServerNames(InitContext ctx) throws IOException {
+    record McpInventory(List<String> servers, boolean hasUnresolvedSubstitution) {
+    }
+
+    private McpInventory readMcpInventory(InitContext ctx) throws IOException {
         Set<String> names = new LinkedHashSet<>();
+        boolean hasSubstitution = false;
         for (Path configFile : OpenCodeProjectConfig.existingFiles(ctx.projectDir())) {
-            collectMcpServersFromFile(configFile, names);
+            hasSubstitution |= collectFromFileWithSubstitutionCheck(configFile, names);
         }
         for (Path ancestorFile : ancestorConfigFiles(ctx.projectDir())) {
-            collectMcpServersFromFile(ancestorFile, names);
+            hasSubstitution |= collectFromFileWithSubstitutionCheck(ancestorFile, names);
         }
         for (Path globalFile : globalConfigFiles()) {
-            collectMcpServersFromFile(globalFile, names);
+            hasSubstitution |= collectFromFileWithSubstitutionCheck(globalFile, names);
         }
-        collectMcpServersFromDir(customConfigDir(), names);
-        collectMcpServersFromDir(managedConfigDir(), names);
+        hasSubstitution |= collectFromDirWithSubstitutionCheck(customConfigDir(), names);
+        hasSubstitution |= collectFromDirWithSubstitutionCheck(managedConfigDir(), names);
         Path explicitConfig = explicitConfigFile();
         if (explicitConfig != null) {
-            collectMcpServersFromFile(explicitConfig, names);
+            hasSubstitution |= collectFromFileWithSubstitutionCheck(explicitConfig, names);
         }
         String inlineContent = inlineConfigContent();
         if (inlineContent != null && !inlineContent.isBlank()) {
+            if (SUBSTITUTION_PATTERN.matcher(inlineContent).find()) {
+                hasSubstitution = true;
+            }
             collectMcpServersFromContent(inlineContent, names);
         }
-        return List.copyOf(names);
+        return new McpInventory(List.copyOf(names), hasSubstitution);
     }
 
-    private static void collectMcpServersFromDir(Path dir, Set<String> names) throws IOException {
-        if (dir == null) {
-            return;
+    private static boolean collectFromFileWithSubstitutionCheck(Path configFile, Set<String> names)
+            throws IOException {
+        String rawContent = Files.readString(configFile);
+        if (rawContent.startsWith("﻿")) {
+            rawContent = rawContent.substring(1);
         }
+        boolean hasSubstitution = SUBSTITUTION_PATTERN.matcher(rawContent).find();
+        collectMcpServersFromContent(rawContent, names);
+        return hasSubstitution;
+    }
+
+    private static boolean collectFromDirWithSubstitutionCheck(Path dir, Set<String> names)
+            throws IOException {
+        if (dir == null) {
+            return false;
+        }
+        boolean hasSubstitution = false;
         for (String fileName : GLOBAL_CONFIG_FILES) {
             Path candidate = dir.resolve(fileName);
             if (Files.exists(candidate)) {
-                collectMcpServersFromFile(candidate, names);
+                hasSubstitution |= collectFromFileWithSubstitutionCheck(candidate, names);
             }
         }
-    }
-
-    static void collectMcpServersFromFile(Path configFile, Set<String> names) throws IOException {
-        collectMcpServersFromNode(
-                OpenCodeProjectConfig.newJsonMapper().readTree(configFile.toFile()), names);
+        return hasSubstitution;
     }
 
     static void collectMcpServersFromContent(String jsonContent, Set<String> names) throws IOException {
@@ -213,6 +229,13 @@ public class OpenCodeGenerator extends DefaultGenerator {
     }
 
     Path managedConfigDir() {
+        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        if (os.contains("mac") || os.contains("darwin")) {
+            return Path.of("/Library/Application Support/opencode");
+        } else if (os.contains("win")) {
+            String programData = System.getenv("ProgramData");
+            return Path.of(programData != null ? programData : "C:\\ProgramData", "opencode");
+        }
         return Path.of("/etc/opencode");
     }
 

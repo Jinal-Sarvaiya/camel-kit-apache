@@ -216,10 +216,13 @@ certification.
   time (project layers, ancestor dirs, global XDG config, `OPENCODE_CONFIG`, `OPENCODE_CONFIG_CONTENT`,
   `OPENCODE_CONFIG_DIR`, and platform managed config — `/etc/opencode` on Linux, `/Library/Application Support/opencode`
   on macOS, `%ProgramData%\opencode` on Windows). The worker is not generated — and any existing one is removed — when
-  any config source contains an unresolved `{env:…}` or `{file:…}` substitution, cannot be parsed, a server name
+  any config source contains an unresolved `{env:…}` or `{file:…}` substitution, cannot be parsed (a project config
+  that init rejects, for example for duplicate keys, also removes the worker and is left untouched), a server name
   collides with a built-in permission prefix, or macOS MDM managed preferences (`ai.opencode.managed.plist`) are
   present. The worker inherits read access from the parent. If `--backend opencode-native` is requested and dispatch
-  is unavailable the skill stops without starting a run. Verified on OpenCode 2.2.5 with 26 real host cases.
+  is unavailable the skill stops without starting a run. Cleanup never follows a symlinked `.opencode/agents`
+  directory. Native pipeline acceptance on OpenCode 2.2.5 was run on Linux; the Windows and macOS managed-config
+  handling is covered by generator tests that simulate the OS selection, not by live Windows or macOS runs.
 |===
 
 A fresh context is not an OS sandbox: read access follows the parent's permitted paths. Do not broaden permissions,

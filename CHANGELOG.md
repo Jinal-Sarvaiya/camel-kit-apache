@@ -32,10 +32,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   contract while preserving Qwen's named-agent dispatch model. Dispatch never uses `fork` or `fork_turns`.
   Fresh and regenerated workspaces receive the native skill and worker; runs retain their recorded host.
 - **OpenCode native Ship (#99)** — eligible sessions relay controller-issued stages through a dedicated
-  `camel-ship-worker` agent that denies all tools by default and allows only read, glob and grep; inherited MCP
-  servers are blocked by the deny-by-default policy. `--backend opencode-native` reuses the native task/result, recovery, oversight and deterministic
-  publication contract while preserving OpenCode's `task` tool dispatch model. Fresh and regenerated workspaces
-  receive the native skill, worker and command stub; runs retain their recorded host.
+  `camel-ship-worker` agent via OpenCode's `subagent` tool (`agent` argument). The worker denies `edit`, `write`,
+  `bash`, `notebook`, `subagent` and `mcp`, and inherits read access, per-path restrictions and external-directory
+  authorization from the parent session. Because `mcp: deny` does not match individual MCP actions, init derives
+  `<server>_*: deny` rules for every MCP server in the effective configuration (project layers, ancestor
+  directories, global, `OPENCODE_CONFIG`, `OPENCODE_CONFIG_DIR`, `OPENCODE_CONFIG_CONTENT` and the platform managed
+  directory), using OpenCode's ASCII name normalization. When that inventory cannot be established — an
+  `{env:}`/`{file:}` substitution or unparsable source, a server named like a built-in permission (`external`), or
+  macOS managed preferences — the worker is not generated, any previous worker is removed (including when
+  initialization is rejected because the project config is unparsable or has duplicate keys, which OpenCode may still
+  load), and the Ship skill falls back to CLI mode. Cleanup never follows a symlinked `.opencode/agents` directory.
+  `--backend opencode-native` reuses the native task/result, recovery, oversight and deterministic publication
+  contract. Fresh and regenerated workspaces receive the native skill, worker and command stub; runs retain their
+  recorded host.
 - **OpenAI Codex CLI native Ship (#225)** — eligible sessions relay controller-issued stages through the dedicated
   `camel_ship_worker` custom agent with `sandbox_mode = "read-only"` and instruction-level restrictions.
   `--backend codex-native` reuses the native task/result, recovery, oversight and deterministic publication contract

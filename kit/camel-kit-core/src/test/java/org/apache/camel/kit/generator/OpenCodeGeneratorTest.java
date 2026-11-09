@@ -1573,6 +1573,22 @@ class OpenCodeGeneratorTest {
     }
 
     @Test
+    @EnabledOnOs(OS.LINUX)
+    void shipWorkerCleanupDoesNotFollowSymlinkedAgentsDirectory() throws Exception {
+        Path outside = Files.createDirectory(tempDir.resolve("outside-agents"));
+        Path sentinel = outside.resolve("camel-ship-worker.md");
+        Files.writeString(sentinel, "outside");
+        Files.createDirectories(tempDir.resolve(".opencode"));
+        Files.createSymbolicLink(tempDir.resolve(".opencode/agents"), outside);
+
+        assertThrows(IOException.class, () -> new OpenCodeGenerator().preflight(createContext()));
+        assertThrows(IOException.class, () -> new OpenCodeGenerator().generate(createContext()));
+
+        assertEquals("outside", Files.readString(sentinel), "cleanup must not follow the agents symlink");
+        assertTrue(Files.isSymbolicLink(tempDir.resolve(".opencode/agents")));
+    }
+
+    @Test
     void shipWorkerRemovedOnPreflightWhenRootProjectConfigHasStructuralSubstitution() throws Exception {
         InitContext ctx = createContext();
         new OpenCodeGenerator().generate(ctx);

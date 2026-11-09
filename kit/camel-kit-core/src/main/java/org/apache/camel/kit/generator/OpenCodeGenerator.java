@@ -2,6 +2,7 @@ package org.apache.camel.kit.generator;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
@@ -38,30 +39,17 @@ public class OpenCodeGenerator extends DefaultGenerator {
 
     @Override
     public void preflight(InitContext ctx) throws Exception {
+        // Refuse to operate through a symlinked agents path before anything can be deleted or written.
+        requireRealShipWorkerPath(ctx);
         try {
             new OpenCodeConfigMerger().validateExisting(ctx.projectDir().resolve(ctx.agent().mcpConfigPath()));
         } catch (Exception e) {
-            // OpenCode substitutes {env:}/{file:} before parsing, so a project config that is invalid as raw
-            // JSON may still be valid for the host. Initialization aborts here, so remove the installed worker:
-            // its denial list can no longer be shown to match the effective MCP server set. Other validation
-            // failures (e.g. duplicate keys) keep the "fail before any project writes" contract.
-            if (projectConfigMayContainSubstitution(ctx)) {
-                Files.deleteIfExists(ctx.projectDir().resolve(".opencode/agents/camel-ship-worker.md"));
-            }
+            // OpenCode may still load a project config that Kit rejects (duplicate keys, or {env:}/{file:}
+            // substitutions that only become valid JSON after host substitution). Initialization aborts here, so
+            // the installed worker's denial list can no longer be shown to match the effective MCP server set:
+            // remove it. The user's configuration is left untouched.
+            removeShipWorker(ctx);
             throw e;
-        }
-    }
-
-    private static boolean projectConfigMayContainSubstitution(InitContext ctx) {
-        try {
-            for (Path configFile : OpenCodeProjectConfig.existingFiles(ctx.projectDir())) {
-                if (SUBSTITUTION_PATTERN.matcher(Files.readString(configFile)).find()) {
-                    return true;
-                }
-            }
-            return false;
-        } catch (IOException e) {
-            return true; // unreadable: fail closed
         }
     }
 
@@ -69,7 +57,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
     public void generate(InitContext ctx) throws Exception {
         // Invalidate the worker before project-config merging can abort; it is regenerated below only if the
         // effective MCP inventory is bounded.
-        Files.deleteIfExists(ctx.projectDir().resolve(".opencode/agents/camel-ship-worker.md"));
+        removeShipWorker(ctx);
 
         // Run default generation (commands, skills, MCP config)
         super.generate(ctx);
@@ -99,6 +87,34 @@ public class OpenCodeGenerator extends DefaultGenerator {
 
         // OpenCode-specific: generate agent definitions
         generateAgents(ctx, data, !collisionDetected && !unbounded);
+    }
+
+    private static final String[] SHIP_WORKER_PATH = {".opencode", "agents", "camel-ship-worker.md"};
+
+    /**
+     * Fails when any component of the Ship worker path below the project is a symbolic link, so that cleanup and
+     * generation never operate outside the selected workspace.
+     */
+    private static void requireRealShipWorkerPath(InitContext ctx) throws IOException {
+        Path current = ctx.projectDir();
+        for (String component : SHIP_WORKER_PATH) {
+            current = current.resolve(component);
+            if (Files.isSymbolicLink(current)) {
+                throw new IOException(
+                        "Initialization aborted: " + current + " is a symbolic link. Camel-Kit generates "
+                                      + "and removes files under the agent directories and refuses to operate "
+                                      + "through symbolic links; replace the link with a real directory and "
+                                      + "re-run init.");
+            }
+            if (!Files.exists(current, LinkOption.NOFOLLOW_LINKS)) {
+                return;
+            }
+        }
+    }
+
+    private static void removeShipWorker(InitContext ctx) throws IOException {
+        requireRealShipWorkerPath(ctx);
+        Files.deleteIfExists(ctx.projectDir().resolve(".opencode/agents/camel-ship-worker.md"));
     }
 
     static String normalizeServerName(String name) {

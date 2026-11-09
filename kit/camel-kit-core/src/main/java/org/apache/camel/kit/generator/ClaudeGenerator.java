@@ -12,7 +12,11 @@ import java.util.stream.Collectors;
 import org.apache.camel.kit.config.AgentDescriptor;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.util.AnsiColors;
+import org.apache.camel.kit.util.TemplateUtils;
 import org.apache.camel.kit.workflow.WorkflowManifestLoader;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ArrayNode;
 
 public class ClaudeGenerator extends DefaultGenerator {
 
@@ -87,7 +91,12 @@ public class ClaudeGenerator extends DefaultGenerator {
     private void generateSettings(InitContext ctx) throws Exception {
         Path settingsFile = ctx.projectDir().resolve(".claude/settings.json");
         Files.createDirectories(settingsFile.getParent());
-        copyTemplateResource("templates/claude/settings.json", settingsFile);
+        var mapper = new ObjectMapper();
+        var settings = mapper.readTree(TemplateUtils.readTemplate("templates/claude/settings.json"));
+        var allow = (ArrayNode) settings.path("permissions").path("allow");
+        WorkflowManifestLoader.loadDefault().mcpServers().forEach(server -> server.allowedTools()
+                .forEach(tool -> allow.add("mcp__" + server.id() + "__" + tool)));
+        AtomicFileWriter.write(settingsFile, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(settings));
         ctx.printer()
                 .println(AnsiColors.green("✓") + " Generated .claude/settings.json with auto-approved permissions");
     }

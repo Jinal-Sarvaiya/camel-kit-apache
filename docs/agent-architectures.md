@@ -549,3 +549,7 @@ container or VM concern.
 | Subagent recursion | Yes (no limit) | No (subagents must not spawn subagents) | Generated children do not delegate | No (parent-owned) | Unknown | N/A | Generated leaves and forks cannot dispatch | Primary executor to task-denying leaves |
 | Execute phase | Subagent with parallel dispatch | Parent task orchestrates subagents | Parent owns orchestration and report writes | Parent dispatches custom roles with inline fallback | Project skill delegates when available | Main Pi session | Primary session dispatches bounded leaves | Executor dispatches allowlisted implementation/research/review leaves |
 | Instruction composition | `CLAUDE.md` importing `AGENTS.md` | Shared skills + Bob 2 traits + modes | `AGENTS.md` + `.agents/skills/` | `AGENTS.md` + `.agents/skills` | `.github/copilot-instructions.md` + project skills | `AGENTS.md` + `.pi/skills` | Single `QWEN.md` | Ultra-minimal `AGENTS.md` |
+
+### Claude MCP approvals
+
+Fresh and regenerated Claude workspaces pre-approve only the explicit MCP tools listed in the workflow manifest. Other server tools remain visible and require Claude Code permission. Regenerate older workspaces to replace server-wide wildcard grants; review user-level settings separately. The generated Read and Maven command grants retain their existing behavior.

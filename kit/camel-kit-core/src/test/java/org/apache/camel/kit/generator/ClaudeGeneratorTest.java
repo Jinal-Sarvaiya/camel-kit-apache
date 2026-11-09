@@ -2,12 +2,15 @@ package org.apache.camel.kit.generator;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.Set;
 
 import org.apache.camel.kit.config.AgentConfig;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.output.Printer;
+import org.apache.camel.kit.workflow.WorkflowManifestLoader;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -32,6 +35,25 @@ class ClaudeGeneratorTest {
         return new InitContext(
                 agent, "claude", commandsDir, skillsDir, tempDir,
                 "camel-kit", Printer.noop());
+    }
+
+    @Test
+    void grantsOnlyManifestMcpToolsOnFreshAndRepeatedGeneration() throws Exception {
+        Set<String> expected = new HashSet<>();
+        WorkflowManifestLoader.loadDefault().mcpServers().forEach(server -> server.allowedTools()
+                .forEach(tool -> expected.add("mcp__" + server.id() + "__" + tool)));
+        for (int initialization = 0; initialization < 2; initialization++) {
+            new ClaudeGenerator().generate(createContext());
+            var allow = new ObjectMapper().readTree(tempDir.resolve(".claude/settings.json").toFile())
+                    .path("permissions").path("allow");
+            Set<String> actual = new HashSet<>();
+            allow.forEach(rule -> {
+                if (rule.asText().startsWith("mcp__")) {
+                    assertTrue(actual.add(rule.asText()), "Duplicate MCP permission: " + rule);
+                }
+            });
+            assertEquals(expected, actual);
+        }
     }
 
     @Test

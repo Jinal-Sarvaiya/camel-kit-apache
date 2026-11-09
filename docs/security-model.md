@@ -372,8 +372,8 @@ Camel-Kit is a family of postures. The knobs that move the security envelope:
 
 | Knob | Default | Effect on the model | Maintainer stance |
 | --- | --- | --- | --- |
-| `camel-kit init --ai <target>` | `bob2` | Selects which **generated harness controls** exist: Claude `settings.json` allow-list (`Read`, `Bash(mvn *)`, `Bash(./mvnw *)`, all `camel`, `camel-knowledge` and `citrus` MCP tools) and a read-only Ship worker (`tools: Read, Grep, Glob`); Codex read-only roles (`sandbox_mode = "read-only"`) and prompt-approved MCP tools; Copilot `preToolUse` deny hook; Pi guard extension and policy; OpenCode three-state permissions; Bob 2 modes; Qwen allow/block lists; Antigravity native tool lists *(documented — `docs/agent-architectures.md`, templates)*. | Documented per target; a finding that needs the user to widen a grant is `OUT-OF-MODEL: non-default-build`. The Claude MCP grant is V3. |
-| Generated MCP tool lists (`enabled_tools`, `tools`, `directTools`, `includeTools`, `alwaysAllow`/`autoApprove`, OpenCode `permission`) and the Claude `settings.json` MCP rules | the workflow manifest's `allowed_tools` — "the read-only and generation helpers used by the skills", with "runtime mutation/control tools" left out *(documented — `docs/architecture.md` §6)* | **Availability filter** (only the listed tools exist for the agent): Codex `enabled_tools`, Copilot `tools`, Pi `directTools`, Qwen `includeTools`. **Approval only** (every server tool exists; the list or rule decides what runs without a prompt): Bob 2 `alwaysAllow`/`autoApprove` = the manifest list; Claude Code `settings.json` `permissions.allow` = `mcp__camel__*`, `mcp__camel-knowledge__*`, `mcp__citrus__*`, which Claude Code reads as every tool of each server *(documented — Claude Code permissions reference: "`mcp__puppeteer__*` uses wildcard syntax and also matches all tools from the `puppeteer` server")*; the `autoApprove`/`alwaysAllow` keys in the generated Claude `.mcp.json` are not a Claude Code tool filter *(maintainer, 2026-10-22 — review of #6)*. **Prompt before every call**: Codex `default_tools_approval_mode = "prompt"`, OpenCode `permission` `ask` for `camel_*`, `camel-knowledge_*` and `citrus_*`, Qwen and Copilot permission prompts. Antigravity gets the full tool set with no generated approval *(documented — `templates/mcp-configs/*`, `docs/agent-architectures.md`)*. | **Ruled 2026-10-27 (Q3):** the Claude Code wildcard pre-approval is *not* the accepted posture. Accepted posture: explicit per-tool grants aligned with the manifest `allowed_tools`, verified in the generated behaviour. Until V3 lands the generated default is a documented deviation; a report against it is `VALID-HARDENING`. The other postures are documented. |
+| `camel-kit init --ai <target>` | `bob2` | Selects which **generated harness controls** exist: Claude `settings.json` allow-list (`Read`, `Bash(mvn *)`, `Bash(./mvnw *)`, the manifest-listed `camel`, `camel-knowledge` and `citrus` MCP tools) and a read-only Ship worker (`tools: Read, Grep, Glob`); Codex read-only roles (`sandbox_mode = "read-only"`) and prompt-approved MCP tools; Copilot `preToolUse` deny hook; Pi guard extension and policy; OpenCode three-state permissions; Bob 2 modes; Qwen allow/block lists; Antigravity native tool lists *(documented — `docs/agent-architectures.md`, templates)*. | Documented per target; a finding that needs the user to widen a grant is `OUT-OF-MODEL: non-default-build`. The Claude MCP grant is V3. |
+| Generated MCP tool lists (`enabled_tools`, `tools`, `directTools`, `includeTools`, `alwaysAllow`/`autoApprove`, OpenCode `permission`) and the Claude `settings.json` MCP rules | the workflow manifest's `allowed_tools` — "the read-only and generation helpers used by the skills", with "runtime mutation/control tools" left out *(documented — `docs/architecture.md` §6)* | **Availability filter** (only the listed tools exist for the agent): Codex `enabled_tools`, Copilot `tools`, Pi `directTools`, Qwen `includeTools`. **Approval only** (every server tool exists; the list or rule decides what runs without a prompt): Bob 2 `alwaysAllow`/`autoApprove` = the manifest list; Claude Code `settings.json` `permissions.allow` = explicit `mcp__<server>__<tool>` entries for the manifest list (46 current tools); unlisted tools remain available but require host approval; the `autoApprove`/`alwaysAllow` keys in the generated Claude `.mcp.json` are not a Claude Code tool filter *(maintainer, 2026-10-22 — review of #6)*. **Prompt before every call**: Codex `default_tools_approval_mode = "prompt"`, OpenCode `permission` `ask` for `camel_*`, `camel-knowledge_*` and `citrus_*`, Qwen and Copilot permission prompts. Antigravity gets the full tool set with no generated approval *(documented — `templates/mcp-configs/*`, `docs/agent-architectures.md`)*. | **Ruled 2026-10-27 (Q3):** the Claude Code wildcard pre-approval is *not* the accepted posture. Accepted posture: explicit per-tool grants aligned with the manifest `allowed_tools`, verified in the generated behaviour. V3 implements that posture; regression coverage and actual Claude Code permission probes are recorded in [V3 evidence](security-verification.md#v3-claude-permissions). The other postures are documented. |
 | `camel.mcp.repos`, `knowledge.mcp.repos`, `citrus.mcp.repos`, `camel.catalog.repos`; JBang launcher `//REPOS` | Maven Central, ASF public, **ASF snapshots, Central snapshots** *(documented — `distribution.properties`, `CamelKit.java`)* | Snapshot repositories serve mutable artifacts: "hosted snapshots are mutable and may lag `main`" *(documented — README)*. `-p` can repoint every list. | **Ruled 2026-10-27 (Q4):** snapshots are retained for development with their mutability documented; release defaults pin released versions; mutable snapshot content is `BY-DESIGN`, and snapshot mutability waives no other control. |
 | `camel-kit init --no-fetch` | off | Skips every `init`-time download; the workspace relies on pre-populated `.camel-kit/.cache`. | Documented; no security effect beyond removing network access. |
 | `camel-kit init --force` | off | Overwrites generated assets, including user customisations of generated files *(documented — `docs/commands.md`)*. | Data-loss, not security. |
@@ -614,21 +614,18 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
     (read-only and generation helpers, no runtime mutation or control tools *(documented — `docs/architecture.md`
     §6)*) is an availability filter for Codex, Copilot, Pi and Qwen and an auto-approval list for Bob 2; Codex,
     Copilot, Qwen and OpenCode prompt before MCP calls; Antigravity gets the full tool set with no generated
-    approval; Claude Code gets the full tool set and its generated `settings.json` pre-approves every tool of the
-    three servers through `mcp__<server>__*` rules *(documented — `templates/mcp-configs/*`,
-    `templates/claude/settings.json`, Claude Code permissions reference)* *(maintainer, 2026-10-22 — review of #6)* —
-    the **accepted** Claude posture is explicit per-tool grants aligned with the manifest, so the current generated
-    `settings.json` is a known deviation tracked as V3 *(maintainer, 2026-10-27 — Q3)*;
+    approval; Claude Code gets the full tool set and its generated `settings.json` pre-approves only
+    explicit manifest-listed tools. `ClaudeGeneratorTest` and `ShippedAssetStructureTest` pin the exact
+    set, and actual Claude Code probes confirm an unlisted call asks before dispatch
+    ([V3 evidence](security-verification.md#v3-claude-permissions)). This implements the accepted
+    posture *(maintainer, 2026-10-27 — Q3)*;
     the generated Camel and Citrus MCP launch commands disable the Quarkus HTTP port (`-Dquarkus.http.port=-1`)
     *(documented — `mcp-setup.md`)*. The claim is about the **generated artifact**; enforcement is the harness's
     (§4.9). *Violation:* a generated asset grants more than the accepted posture — a worker with edit or shell tools, a
     filter or auto-approval list containing a tool outside the manifest's `allowed_tools`, a prompt-mode target
-    generated with auto-approval, a hook or guard that fails open on a pattern it documents denying. The known Claude
-    wildcard pre-approval is a documented deviation, not a breach of this property: a report that only restates it is
-    tracked under V3 (#155) as `VALID-HARDENING` until the template changes. A report that demonstrates what the grant
-    lets through — a credential read or a destructive action reaching the developer's account without a prompt, or
-    any other in-scope boundary breach — is evaluated on that breach and its impact under the tiers below; it is
-    neither downgraded to V3 nor closed as its duplicate *(maintainer, 2026-10-27 — review of #6)*.
+    generated with auto-approval, a hook or guard that fails open on a pattern it documents denying. A widened grant is evaluated on the breach and its impact;
+    the former V3 wildcard exception no longer applies to newly generated workspaces. Historical
+    reports against the earlier template retain the 2026-10-27 review of #6 disposition.
     *Severity:* hardening; security-critical when the widened grant reaches a credential or destructive action
     without a prompt.
 11. **P11 — Stated resource bounds.** Route YAML and Citrus YAML ≤ 2 MiB each *(documented —
@@ -796,8 +793,7 @@ For the **developer** (who is also the route author and the operator of the mach
 2. **Keep the harness's permission model on.** Do not run Camel-Kit skills under a harness mode that skips
    permission prompts for shell or file tools; review the generated allow-list, hook or guard before trusting the
    workspace in the harness, and treat the generated Claude `Bash(mvn *)` / `Bash(./mvnw *)` pre-approval as a
-   deliberate grant. Until V3 lands, narrow the generated Claude `mcp__<server>__*` rules to the tools you use; the
-   wildcard is not the accepted posture *(maintainer, 2026-10-27 — Q3)*.
+   deliberate grant. Regenerate older Claude workspaces to replace the former server-wide MCP wildcard grants with the explicit manifest list. Review local settings and user-level grants too.
 3. **Review generated routes, `pom.xml`, tests and configuration before running them**, and run them under the
    Apache Camel deployment hardening guidance (production profile, security policy enforcement, vaults, TLS). Camel-Kit's
    validation is static (§4.9).
@@ -895,11 +891,9 @@ Suitable as a suppression or negative-prompt list for scanners and AI-assisted t
   target's transport before the hop (apache/camel-kit#143), so a hit on its redirect handling is a non-finding only
   while that check stands.
 - **The generated Claude `settings.json` pre-approving `mvn` and `./mvnw`**: documented posture (§4.5a).
-- **The generated Claude `settings.json` pre-approving every tool of the three MCP servers (`mcp__<server>__*`)**: a
-  known deviation from the accepted posture, tracked as V3 (#155) and triaged `VALID-HARDENING` when the report only
-  restates the configuration; duplicates of that report are closed against V3, not opened as new findings. A report
-  that demonstrates a breach *through* the grant is not a non-finding: it is triaged on the breach and its impact
-  (P10).
+- **An older Claude workspace retaining the former server-wide MCP wildcard grants**: the pre-V3
+  configuration was tracked by #155. Regenerate it to receive the explicit manifest list. A new
+  generated wildcard is a P10 regression; any demonstrated breach is triaged on its impact.
 - **A Pi-backend Ship run publishing an ordinary additional material file** (documentation, test data): the
   documented acceptance behaviour of P5, not a violation; the launch surface and the declared artifacts are what
   validation bounds.
@@ -955,7 +949,7 @@ match the Apache Camel Security Model so a triager can cite either document.
 | Disposition | Meaning | Licensed by |
 | --- | --- | --- |
 | `VALID` | Violates a §4.8 property through an in-scope adversary (§4.7) and an attacker-controllable input (§4.6). Fixed in a coordinated release; published as a CVE. | §4.8, §4.6, §4.7 |
-| `VALID-HARDENING` | No §4.8 property is violated, but a §4.11 misuse is easy enough, or a §4.11 limit fails its documented value, that the project elects to harden; also a report that only restates a documented deviation tracked by an open §4.14.2 item (today V3). Reported privately; usually no CVE. | §4.11, §4.8 P9, P11, §4.14.2 |
+| `VALID-HARDENING` | No §4.8 property is violated, but a §4.11 misuse is easy enough, or a §4.11 limit fails its documented value, that the project elects to harden; also a report that only restates a documented deviation tracked by an open §4.14.2 item (historically V3). Reported privately; usually no CVE. | §4.11, §4.8 P9, P11, §4.14.2 |
 | `OUT-OF-MODEL: trusted-input` | Requires control of a trusted input: CLI flags, config files, the developer's approval of a design, or the developer's own OS account. Covers "the user asked for an insecure route". | §4.6, §4.2 |
 | `OUT-OF-MODEL: adversary-not-in-scope` | Requires an actor §4.7 excludes: the developer or a same-user process, a compromised harness or provider, a hostile pinned origin, a transitive-dependency author. Covers operator misconfiguration of the host or harness. | §4.7 |
 | `OUT-OF-MODEL: unsupported-component` | Lands in family F (external MCP servers — route to Apache Camel or Citrus; Knowledge is family K, in model), G (the generated integration's runtime — route to the Apache Camel Security Model) or H (shipped-but-unsupported code). | §4.3, §4.2 |
@@ -968,10 +962,10 @@ A report that demonstrates an outside-root read, non-termination or unbounded me
 `VALID` under P1 whatever the status of V1 and V2; it is neither `BY-DESIGN` nor a `MODEL-GAP`. A Pi-backend run
 that publishes an ordinary additional material file is the documented behaviour of P5, not a violation. A report that
 matches an open verification item (§4.14.2) is triaged on the model's claim: a breach of a claimed property is `VALID`
-while the item is open. The Claude wildcard MCP grant (V3) is the one documented deviation: a report that only restates
-the configuration is `VALID-HARDENING` until the generated default changes, while a report that demonstrates a breach
-through the grant is evaluated on that breach and its impact under P10's tiers and is never downgraded to V3 or closed
-as its duplicate *(maintainer, 2026-10-27 — review of #6)*. Knowledge findings use the same dispositions (§4.4a).
+while the item is open. The former Claude wildcard MCP grant (V3) was a documented deviation until #155.
+A regenerated workspace uses explicit grants; a future widened grant is evaluated under P10.
+The historical configuration-only disposition does not excuse a demonstrated breach
+*(maintainer, 2026-10-27 — review of #6)*. Knowledge findings use the same dispositions (§4.4a).
 
 Mapping the categories named in apache/camel-kit#5: a **framework vulnerability** is `VALID`; an **LLM
 hallucination** or insecure suggestion is `BY-DESIGN: property-disclaimed` unless a documented tool, permission, parser or controller boundary failed
@@ -1044,11 +1038,8 @@ own issue, linked below.
 
 - **V2 — Graph confinement and resource bounds (Q2; #154): implemented.** `GraphInputBoundaryTest` covers symlink/outside inputs, selected-root aliases, oversized files and aggregate input, large unrelated artifacts and the POM timeout. [V2 evidence](security-verification.md#v2-graph-inputs) states the bounds and cancellation limits. A demonstrated P1 breach remains `VALID`.
 
-- **V3 — Narrower Claude MCP grants (Q3; #155) → §4.5a, §4.8 P10, §4.11a.** Replace `mcp__camel__*`,
-  `mcp__camel-knowledge__*` and `mcp__citrus__*` in the generated `settings.json` with explicit per-tool grants aligned
-  with the workflow manifest's `allowed_tools`, and verify the generated behaviour in Claude Code. *Interim triage:* a
-  report that only restates the current wildcard grant is `VALID-HARDENING` and is closed against this item; a report
-  that demonstrates a breach through the grant is triaged on the breach and its impact under P10, never as a duplicate.
+- **V3 — Narrower Claude MCP grants (Q3; #155): implemented.** Fresh and repeated generation emit exactly the manifest-listed MCP grants. Real Claude Code 2.1.316 probes cover allowed and unlisted tools for all three servers, plus wildcard/removal controls. [V3 evidence](security-verification.md#v3-claude-permissions).
+
 - **V4 — Verified per-process side-effect inventory (Q6; #156) → §4.5, §4.4a.** Maintainer verification of every row of the
   §4.5 inventory — Kit CLI, graph analysis, Ship controller, Pi worker, evidence JVMs, Knowledge server, Knowledge
   indexer — for listeners, child processes, network origins, filesystem writes, environment reads, telemetry and

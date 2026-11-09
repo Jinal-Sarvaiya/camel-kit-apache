@@ -200,9 +200,9 @@ configuration_variants:
     stance: documented per target in 4.5a; the Claude MCP grant is V3
   - knob: Generated MCP tool lists and Claude settings.json MCP rules
     default: workflow manifest allowed_tools (read-only and generation helpers, no runtime mutation or control tools)
-    effect: Availability filter - Codex enabled_tools, Copilot tools, Pi directTools, Qwen includeTools. Approval only - Bob 2 alwaysAllow/autoApprove = manifest list; Claude Code settings.json permissions.allow mcp__camel__*, mcp__camel-knowledge__*, mcp__citrus__* = every tool of each server (.mcp.json autoApprove/alwaysAllow keys are not a Claude Code filter). Prompt before every call - Codex default_tools_approval_mode prompt, OpenCode permission ask, Qwen and Copilot prompts. Antigravity - full tool set, no generated approval.
+    effect: Availability filter - Codex enabled_tools, Copilot tools, Pi directTools, Qwen includeTools. Approval only - Bob 2 alwaysAllow/autoApprove = manifest list; Claude Code settings.json permissions.allow explicit mcp__<server>__<tool> entries = manifest-listed tools only (.mcp.json autoApprove/alwaysAllow keys are not a Claude Code filter). Prompt before every call - Codex default_tools_approval_mode prompt, OpenCode permission ask, Qwen and Copilot prompts. Antigravity - full tool set, no generated approval.
     security_relevant: true
-    stance: ruled 2026-10-27 - the Claude wildcard pre-approval is NOT the accepted posture; accepted posture is explicit grants aligned with the manifest allowed_tools, verified in the generated behaviour (V3). Until then the generated default is a documented deviation triaged VALID-HARDENING.
+    stance: ruled 2026-10-27 - the Claude wildcard pre-approval is NOT the accepted posture; accepted posture is explicit grants aligned with the manifest allowed_tools, verified in the generated behaviour (V3). Implemented by V3; old workspaces require regeneration; see security-verification.md.
   - knob: camel.mcp.repos, knowledge.mcp.repos, citrus.mcp.repos, camel.catalog.repos, JBang //REPOS
     default: Maven Central, ASF public, ASF snapshots, Central snapshots
     effect: Snapshot repositories serve mutable artifacts.
@@ -326,8 +326,8 @@ claimed_properties:
     severity: hardening
     provenance: documented (ShipExpressionPolicy)
   - id: P10
-    property: Generated harness assets carry the accepted least-privilege posture - read-only Ship workers, read-only Codex roles, Copilot deny hook, Pi guard policy, no HTTP port for the Camel and Citrus MCP servers, and MCP grants aligned with the manifest allowed_tools (no runtime mutation or control tools) - as availability filters for Codex (enabled_tools), Copilot (tools), Pi (directTools) and Qwen (includeTools), as Bob 2's auto-approval list, with Codex, Copilot, Qwen and OpenCode prompting before MCP calls and Antigravity receiving the full tool set without generated approval. Accepted Claude posture - explicit per-tool grants aligned with the manifest. Current generated Claude settings.json deviates - mcp__<server>__* pre-approves every tool of the three servers (V3). Claim is about the generated artifact; enforcement is the harness's.
-    violation_symptom: "Generated asset grants more than the accepted posture - a worker with edit or shell tools, a filter or auto-approval list containing a tool outside the manifest allowed_tools, a prompt-mode target generated with auto-approval, a hook or guard that fails open on a documented pattern. The known Claude wildcard pre-approval is a documented deviation, not a breach - a report that only restates it is tracked under V3 (#155) as VALID-HARDENING until the template changes; a report that demonstrates a breach through the grant (a credential read or destructive action without a prompt, or any other in-scope boundary breach) is evaluated on that breach and its impact and is never downgraded to V3 or closed as its duplicate (maintainer, 2026-10-27, review of #6)."
+    property: Generated harness assets carry the accepted least-privilege posture - read-only Ship workers, read-only Codex roles, Copilot deny hook, Pi guard policy, no HTTP port for the Camel and Citrus MCP servers, and MCP grants aligned with the manifest allowed_tools (no runtime mutation or control tools) - as availability filters for Codex (enabled_tools), Copilot (tools), Pi (directTools) and Qwen (includeTools), as Bob 2's auto-approval list, with Codex, Copilot, Qwen and OpenCode prompting before MCP calls and Antigravity receiving the full tool set without generated approval. Accepted Claude posture - explicit per-tool grants aligned with the manifest. Generated Claude settings.json implements explicit manifest-listed per-tool grants (V3). Claim is about the generated artifact; enforcement is the harness's.
+    violation_symptom: "Generated asset grants more than the accepted posture: a worker with edit/shell tools, a filter or auto-approval list wider than manifest allowed_tools, a prompt-mode target auto-approved, or a hook/guard failing open on a documented pattern. Former wildcard exception applied only to the pre-V3 template (review of #6, 2026-10-27); newly generated wildcards are regressions. Any demonstrated breach is evaluated on its impact."
     severity: hardening; security-critical when the widened grant reaches a credential or destructive action without a prompt
     provenance: "documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates/mcp-configs/*, templates/claude/settings.json, Claude Code permissions reference); current Claude grant - maintainer, 2026-10-22 (review of #6); accepted posture - maintainer, 2026-10-27 (Q3)"
   - id: P11
@@ -453,7 +453,7 @@ known_non_findings:
   - pattern: Generated Claude settings.json pre-approving mvn and ./mvnw
     why: Documented posture (4.5a).
     disposition: KNOWN-NON-FINDING
-  - pattern: Generated Claude settings.json pre-approving every tool of the three MCP servers (mcp__<server>__*)
+  - pattern: Older pre-V3 Claude workspace retaining server-wide MCP grants
     why: Known deviation from the accepted posture, tracked as V3 (#155); duplicates of a report that only restates the configuration are closed against V3. A demonstrated breach through the grant is not a non-finding - it is triaged on the breach and its impact (P10).
     disposition: VALID-HARDENING (tracked) for configuration-only reports; VALID when a breach through the grant is demonstrated
   - pattern: A Pi-backend Ship run publishing an ordinary additional material file (documentation, test data)
@@ -514,7 +514,7 @@ issue_5_category_mapping:
 triage_notes:
   - Outside-root read, non-termination or unbounded memory during graph analysis is VALID under P1 regardless of the verification status in V1/V2 - neither BY-DESIGN nor MODEL-GAP.
   - A Pi-backend Ship run publishing an ordinary additional material file is documented P5 behaviour, not a violation.
-  - A report matching an open verification item is triaged on the model's claim - a breach of a claimed property is VALID while the item is open. The Claude wildcard MCP grant (V3) is the one documented deviation - a report that only restates the configuration is VALID-HARDENING until the generated default changes, while a report that demonstrates a breach through the grant is evaluated on that breach and its impact under P10 and is never downgraded to V3 or closed as its duplicate (maintainer, 2026-10-27, review of #6).
+  - A report matching an open verification item is triaged on the model's claim - a breach of a claimed property is VALID while the item is open. The historical pre-V3 Claude wildcard MCP grant was a documented deviation - a report that only restates the configuration is VALID-HARDENING until the generated default changes, while a report that demonstrates a breach through the grant is evaluated on that breach and its impact under P10 and is never downgraded to V3 or closed as its duplicate (maintainer, 2026-10-27, review of #6).
   - Knowledge findings use the same dispositions; the indexer's inputs are trusted upstream sources, so a finding there needs hostile upstream content (adversary not in scope) unless the indexer breaks its own path or process boundary.
 
 maintainer_decisions:
@@ -597,8 +597,9 @@ verification_items:
     from: [Q3]
     sections: ["4.5a", "4.8 P10", "4.11a"]
     work: Replace mcp__camel__*, mcp__camel-knowledge__* and mcp__citrus__* with explicit per-tool grants aligned with the workflow manifest allowed_tools, and verify the generated behaviour in Claude Code.
-    interim_triage: A report that only restates the current wildcard grant is VALID-HARDENING and is closed against this item; a report that demonstrates a breach through the grant is triaged on the breach and its impact under P10, never as a duplicate.
-    status: open
+    interim_triage: "New generated wildcard grants violate P10. Historical configuration-only reports retain the pre-V3 disposition; demonstrated breaches remain evaluated on impact."
+    status: "implemented"
+    evidence: "ClaudeGeneratorTest, ShippedAssetStructureTest; actual Claude Code 2.1.316 generated-output probe with12 permission/dispatch cases; security-verification.md V3"
   - id: V4
     tracking: apache/camel-kit#156
     title: Verified per-process side-effect inventory

@@ -35,3 +35,25 @@ A timed-out parser's fragment is discarded; daemon threads do not hold the CLI o
 Cancellation remains cooperative, and parser/library expansion can exceed the input byte size:
 there is no hard heap quota. Filesystem checks cover a pre-existing hostile tree, not concurrent
 same-account directory substitution. Website impact: required; graph reference updated.
+
+
+## V3: Claude permissions
+
+`ClaudeGeneratorTest` tests fresh and repeated generation; `ShippedAssetStructureTest` compares
+the shipped settings to the manifest. Both require exactly the 46 current MCP grants, with no
+server-wide wildcard or duplicate. Existing Read and Maven command grants are unchanged.
+
+Actual Claude Code 2.1.316 was run with generated settings, isolated configuration, a benign
+stdio MCP fixture and a loopback model API fixture. For each of camel, camel-knowledge and citrus:
+
+| Rule/tool | Observed behavior |
+| --- | --- |
+| Listed tool, exact grant | Dispatched without a permission request |
+| Unlisted tool, exact grants | Host permission request before dispatch; denied; zero MCP calls |
+| Same unlisted tool, former wildcard restored | Dispatched without a permission request |
+| Listed tool, its exact grant removed | Host permission request; denied; zero MCP calls |
+
+All 12 cases passed. The fixture drives the actual CLI permission protocol without a remote
+model account; it does not certify future Claude releases or unrelated user-level grants.
+The reproducible harness is `tools/verify_claude_mcp_permissions.py`; use `--help` for paths.
+Website impact: required; agent reference updated. Existing workspaces need regeneration.

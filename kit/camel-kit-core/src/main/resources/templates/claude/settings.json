@@ -3,10 +3,7 @@
     "allow": [
       "Read",
       "Bash(mvn *)",
-      "Bash(./mvnw *)",
-      "mcp__camel__*",
-      "mcp__camel-knowledge__*",
-      "mcp__citrus__*"
+      "Bash(./mvnw *)"
     ]
   }
 }

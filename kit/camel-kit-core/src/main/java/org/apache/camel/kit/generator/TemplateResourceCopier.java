@@ -18,7 +18,7 @@ class TemplateResourceCopier {
             if (parent != null) {
                 Files.createDirectories(parent);
             }
-            Files.writeString(target, new String(is.readAllBytes(), StandardCharsets.UTF_8));
+            AtomicFileWriter.write(target, new String(is.readAllBytes(), StandardCharsets.UTF_8));
         }
     }
 }

@@ -46,7 +46,7 @@ public class PiGenerator extends DefaultGenerator {
                 Files.createDirectories(parent);
             }
             if (RENDERED_TEMPLATES.contains(template.source())) {
-                Files.writeString(target, templateEngine.render(template.source(), data));
+                AtomicFileWriter.write(target, templateEngine.render(template.source(), data));
             } else {
                 copyTemplateResource(template.source(), target);
             }

@@ -1,6 +1,5 @@
 package org.apache.camel.kit.generator;
 
-import java.nio.file.Files;
 import java.util.Map;
 
 import org.apache.camel.kit.util.AnsiColors;
@@ -16,7 +15,7 @@ class AgentsMdGenerator {
                         "SKILLS_DIR", skillsDirFromProjectRoot(ctx),
                         "BOB2", "bob2".equals(ctx.agentName())));
         String content = qute.render("templates/shared/agents-md.md", data);
-        Files.writeString(ctx.projectDir().resolve("AGENTS.md"), content);
+        AtomicFileWriter.write(ctx.projectDir().resolve("AGENTS.md"), content);
         ctx.printer().println(AnsiColors.green("✓") + " Generated AGENTS.md with skill routing and iron laws");
     }
 

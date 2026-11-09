@@ -209,7 +209,7 @@ class SkillResourceInstaller {
                     .replaceAll(Matcher.quoteReplacement("$" + skill.name()));
         }
         if (!adapted.equals(content)) {
-            Files.writeString(markdown, adapted);
+            AtomicFileWriter.write(markdown, adapted);
         }
     }
 
@@ -241,7 +241,7 @@ class SkillResourceInstaller {
             }
         }
         if (inserted) {
-            Files.writeString(skillFile, updated.toString());
+            AtomicFileWriter.write(skillFile, updated.toString());
         }
     }
 
@@ -303,7 +303,7 @@ class SkillResourceInstaller {
             }
         }
         if (inserted) {
-            Files.writeString(skillFile, updated.toString());
+            AtomicFileWriter.write(skillFile, updated.toString());
         }
     }
 

@@ -18,6 +18,6 @@ class DispatchBlockAppender {
         String dispatchTemplatePath = descriptor.dispatchTemplatePath();
         String dispatchBlock = TemplateUtils.readTemplate(dispatchTemplatePath);
         String existing = Files.readString(skillMdFile);
-        Files.writeString(skillMdFile, existing + "\n---\n\n" + dispatchBlock);
+        AtomicFileWriter.write(skillMdFile, existing + "\n---\n\n" + dispatchBlock);
     }
 }

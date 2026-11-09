@@ -1,9 +1,7 @@
 package org.apache.camel.kit.generator;
 
-import java.nio.file.Files;
-import java.nio.file.LinkOption;
+import java.io.IOException;
 import java.nio.file.Path;
-import java.util.List;
 import java.util.Map;
 
 import org.apache.camel.kit.config.AgentDescriptor;
@@ -21,27 +19,16 @@ public class CodexGenerator extends DefaultGenerator {
 
     @Override
     public void generate(InitContext ctx) throws Exception {
-        rejectSymlinkedManagedPaths(ctx.projectDir());
+        rejectSymlinkedManagedPaths(ctx);
         super.generate(ctx);
         installDescriptorTemplates(ctx);
     }
 
-    private void rejectSymlinkedManagedPaths(Path projectDir) throws Exception {
-        for (Path managedPath : List.of(
-                projectDir.resolve("AGENTS.md"),
-                projectDir.resolve(".agents"),
-                projectDir.resolve(".codex"))) {
-            if (!Files.exists(managedPath, LinkOption.NOFOLLOW_LINKS)) {
-                continue;
-            }
-            try (var paths = Files.walk(managedPath)) {
-                Path symlink = paths.filter(Files::isSymbolicLink).findFirst().orElse(null);
-                if (symlink != null) {
-                    throw new IllegalStateException(
-                            "Refusing to generate Codex assets through symbolic link: "
-                                                    + projectDir.relativize(symlink));
-                }
-            }
+    private void rejectSymlinkedManagedPaths(InitContext ctx) {
+        try {
+            GeneratedAssetPreflight.check(ctx);
+        } catch (IOException e) {
+            throw new IllegalStateException("Refusing to generate Codex assets: " + e.getMessage(), e);
         }
     }
 
@@ -58,7 +45,7 @@ public class CodexGenerator extends DefaultGenerator {
             }
             Path target = ctx.projectDir().resolve(template.target());
             if (AGENTS_TEMPLATE.equals(template.source())) {
-                Files.writeString(target, templateEngine.render(
+                AtomicFileWriter.write(target, templateEngine.render(
                         template.source(), Map.of("COMMAND_PREFIX", ctx.commandPrefix())));
             } else {
                 copyTemplateResource(template.source(), target);

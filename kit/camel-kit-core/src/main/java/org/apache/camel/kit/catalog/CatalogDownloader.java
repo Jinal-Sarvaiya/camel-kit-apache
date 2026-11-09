@@ -17,6 +17,8 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.apache.camel.kit.util.ConfinedPaths;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -61,6 +63,7 @@ public class CatalogDownloader {
      * Fetch component catalog for a Camel version. Downloads from Maven Central and extracts component JSONs.
      */
     public JsonNode fetchComponentCatalog(String version, boolean forceRefresh) throws Exception {
+        ConfinedPaths.requireVersion(version);
         Path cacheFile = cacheDir.resolve("components-" + version + ".json");
 
         if (!forceRefresh && Files.exists(cacheFile)) {
@@ -126,6 +129,7 @@ public class CatalogDownloader {
      * Fetch Kamelet catalog from GitHub.
      */
     public JsonNode fetchKameletCatalog(String version, boolean forceRefresh) throws Exception {
+        ConfinedPaths.requireVersion(version);
         Path cacheFile = cacheDir.resolve("kamelets-" + version.replace(".", "_") + ".json");
 
         if (!forceRefresh && Files.exists(cacheFile)) {
@@ -184,6 +188,7 @@ public class CatalogDownloader {
      * Fetch YAML DSL schema from GitHub.
      */
     public void fetchYamlSchema(String version, boolean forceRefresh) throws Exception {
+        ConfinedPaths.requireVersion(version);
         Path cacheFile = cacheDir.resolve("camelYamlDsl-" + version + ".json");
 
         if (!forceRefresh && Files.exists(cacheFile)) {

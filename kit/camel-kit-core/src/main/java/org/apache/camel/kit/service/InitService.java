@@ -1,16 +1,18 @@
 package org.apache.camel.kit.service;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
-import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
+import java.util.Set;
 
 import org.apache.camel.kit.catalog.CitrusSchemaDownloader;
 import org.apache.camel.kit.config.AgentConfig;
@@ -18,6 +20,8 @@ import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.generator.AgentGenerator;
 import org.apache.camel.kit.generator.AgentGeneratorFactory;
+import org.apache.camel.kit.generator.AtomicFileWriter;
+import org.apache.camel.kit.generator.GeneratedAssetPreflight;
 import org.apache.camel.kit.generator.InitContext;
 import org.apache.camel.kit.generator.QuteTemplateEngine;
 import org.apache.camel.kit.graph.GraphBuildResult;
@@ -27,6 +31,7 @@ import org.apache.camel.kit.graph.ParserDiagnostic;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.RuntimeDetector;
 import org.apache.camel.kit.graph.model.NodeType;
+import org.apache.camel.kit.util.ConfinedPaths;
 import org.apache.camel.kit.util.TemplateUtils;
 
 /**
@@ -56,7 +61,7 @@ public class InitService {
                 skillsDir, targetDir,
                 request.commandPrefix(), request.distribution(), request.withCitrusMcp(), request.printer());
         AgentGenerator generator = AgentGeneratorFactory.create(request.agentName());
-        requireRealAgentDirectories(targetDir, skillsDir, commandsDir);
+        requireConfinedOutputs(targetDir, genCtx);
         generator.preflight(genCtx);
 
         List<Path> createdPaths = new ArrayList<>();
@@ -101,27 +106,22 @@ public class InitService {
                 citrusVersion, citrusSchemaCount, MAVEN_WRAPPER_VERSION, graph, createdPaths, warnings);
     }
 
-    /**
-     * Fails initialization up front — before any project files are written — when a managed agent path component is a
-     * symbolic link. Generation and retired-asset cleanup refuse to operate through symbolic links, and failing late
-     * would leave a half-initialized workspace.
-     */
-    private void requireRealAgentDirectories(Path targetDir, Path... managedDirs) throws IOException {
-        for (Path dir : managedDirs) {
-            Path current = targetDir;
-            for (Path component : targetDir.relativize(dir)) {
-                current = current.resolve(component);
-                if (Files.isSymbolicLink(current)) {
-                    throw new IOException(
-                            "Initialization aborted: " + current + " is a symbolic link. Camel-Kit generates "
-                                          + "and removes files under the agent directories and refuses to operate "
-                                          + "through symbolic links; replace the link with a real directory and "
-                                          + "re-run init.");
-                }
-                if (!Files.isDirectory(current, LinkOption.NOFOLLOW_LINKS)) {
-                    break;
-                }
+    private void requireConfinedOutputs(Path targetDir, InitContext genCtx) throws IOException {
+        Set<Path> outputs = new LinkedHashSet<>();
+        for (String relative : List.of(".camel-kit/.cache", ".camel-kit/config.properties",
+                ".camel-kit/project-graph.json", ".mvn/wrapper/maven-wrapper.properties", "mvnw", "mvnw.cmd",
+                "AGENTS.md",
+                "docs/constitution.md", "docs/flows", "test/data", "schemas")) {
+            outputs.add(Path.of(relative));
+        }
+        try {
+            for (Path output : outputs) {
+                ConfinedPaths.requirePath(targetDir, targetDir.resolve(output));
             }
+            ConfinedPaths.requireTree(targetDir, targetDir.resolve(".camel-kit/templates"));
+            GeneratedAssetPreflight.check(genCtx);
+        } catch (IOException e) {
+            throw new IOException("Initialization aborted: " + e.getMessage(), e);
         }
     }
 
@@ -168,9 +168,9 @@ public class InitService {
         }
 
         Path configFile = dir.resolve("config.properties");
-        try (var out = Files.newOutputStream(configFile)) {
-            config.store(out, "Camel-Kit Project Configuration");
-        }
+        var out = new ByteArrayOutputStream();
+        config.store(out, "Camel-Kit Project Configuration");
+        AtomicFileWriter.write(configFile, out.toByteArray());
         createdPaths.add(configFile);
     }
 
@@ -207,7 +207,7 @@ public class InitService {
                 "DATE", LocalDate.now(ZoneId.systemDefault()).toString(),
                 "CAMEL_VERSION", request.distribution().camelMainVersion()));
         Path constitution = dir.resolve("constitution.md");
-        Files.writeString(constitution, content);
+        AtomicFileWriter.write(constitution, content);
         createdPaths.add(constitution);
     }
 
@@ -229,7 +229,7 @@ public class InitService {
         for (String template : additionalTemplates) {
             String content = TemplateUtils.readTemplate("templates/" + template);
             Path target = templatesDir.resolve(template);
-            Files.writeString(target, content);
+            AtomicFileWriter.write(target, content);
             createdPaths.add(target);
         }
     }
@@ -246,18 +246,18 @@ public class InitService {
                                 """,
                         MAVEN_WRAPPER_VERSION, MAVEN_WRAPPER_VERSION);
         Path wrapperProperties = wrapperDir.resolve("maven-wrapper.properties");
-        Files.writeString(wrapperProperties, wrapperProps);
+        AtomicFileWriter.write(wrapperProperties, wrapperProps);
         createdPaths.add(wrapperProperties);
 
         String mvnwScript = TemplateUtils.readTemplate("maven/mvnw");
         Path mvnwPath = projectDir.resolve("mvnw");
-        Files.writeString(mvnwPath, mvnwScript);
+        AtomicFileWriter.write(mvnwPath, mvnwScript);
         mvnwPath.toFile().setExecutable(true);
         createdPaths.add(mvnwPath);
 
         String mvnwCmdScript = TemplateUtils.readTemplate("maven/mvnw.cmd");
         Path mvnwCmd = projectDir.resolve("mvnw.cmd");
-        Files.writeString(mvnwCmd, mvnwCmdScript);
+        AtomicFileWriter.write(mvnwCmd, mvnwCmdScript);
         createdPaths.add(mvnwCmd);
     }
 
@@ -279,7 +279,13 @@ public class InitService {
             }
             ProjectGraph projectGraph = result.graph();
             if (projectGraph.nodeCount() > 0) {
-                GraphSerializer.write(projectGraph, graphFile, targetDir.toAbsolutePath().toString());
+                Path temporary = Files.createTempFile(camelKitDir, "project-graph-", ".json");
+                try {
+                    GraphSerializer.write(projectGraph, temporary, targetDir.toAbsolutePath().toString());
+                    AtomicFileWriter.replace(temporary, graphFile);
+                } finally {
+                    Files.deleteIfExists(temporary);
+                }
                 createdPaths.add(graphFile);
                 String detectedProjectType = detectProjectType(projectGraph);
                 String detectedRuntime = updateConfigWithRuntime(camelKitDir, projectGraph, request.distribution());
@@ -340,9 +346,9 @@ public class InitService {
         String runtime = RuntimeDetector.detect(graph);
         writeVersionConfig(config, distribution, runtime);
 
-        try (var out = Files.newOutputStream(configFile)) {
-            config.store(out, "Camel-Kit Project Configuration");
-        }
+        var out = new ByteArrayOutputStream();
+        config.store(out, "Camel-Kit Project Configuration");
+        AtomicFileWriter.write(configFile, out.toByteArray());
         return runtime;
     }
 

@@ -514,10 +514,13 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
    writes must remain within the operator-selected target. An untrusted tree or symlink that redirects a write outside
    it is in scope. An intentional operator-selected destination is authorized" *(maintainer, 2026-10-27 — Q9)*. Retired generated
    assets are deleted only when inside the project, through no symbolic link, and only regular files *(documented —
-   `GeneratedAssetCleaner`)*; generated files are written atomically *(documented — `AtomicFileWriter`)*; existing
-   `.codex/config.toml` / `opencode.json` are merged, not replaced *(documented — `docs/architecture.md`)*. The
-   "writes only inside the target directory" half, including through a symbolic link inside the target, is
-   *(inferred — V5)*. *Violation:* a file created, replaced or
+   `GeneratedAssetCleaner`)*; generated file replacements use atomic writes *(documented — `AtomicFileWriter`)*; existing
+   `.codex/config.toml` / `opencode.json` are merged, not replaced *(documented — `docs/architecture.md`)*. `InitService` preflights shared generated paths and the selected agent trees before writing;
+   `ConfinedPaths` refuses pre-existing descendant links (including generated file leaves).
+   Explicitly selected target aliases remain supported. Citrus and Forage validate version components
+   and cache ancestry; Citrus also checks extracted paths and derived reference destinations.
+   Knowledge extracts into fresh staging and refuses unsafe activation paths.
+   See [V5 evidence](security-verification.md#v5-generated-and-extracted-paths). *Violation:* a file created, replaced or
    deleted outside the target directory, or a deletion through a symlink. *Severity:* security-critical when
    reachable from a §4.6 attacker-controllable row (the analysed tree, registry data); otherwise correctness.
 4. **P4 — Pinned, named-repository supply chain for everything Camel-Kit fetches or configures.** Catalog, schema and
@@ -1045,10 +1048,8 @@ own issue, linked below.
   indexer — for listeners, child processes, network origins, filesystem writes, environment reads, telemetry and
   actual parser limits. *Interim triage:* inspected statements stay *(inferred)*; a breach of a claimed property is
   `VALID`.
-- **V5 — Init and download path controls (Q7, Q9; #157) → §4.8 P3, P4.** Verify that `init` writes stay inside the
-  operator-selected target when a generated subtree is a symbolic link, and that every archive extraction (Citrus
-  schemas, Forage catalog, Knowledge index) stays inside its cache directory. *Interim triage:* a redirected write or
-  an extraction escape reachable from an untrusted tree or a downloaded artifact is `VALID`.
+- **V5 — Init and download path controls (Q7, Q9; #157): implemented.** Regression tests cover shared init outputs, every agent, generated leaves, cache ancestors, malicious versions and archive paths for Citrus, Forage and Knowledge. [V5 evidence](security-verification.md#v5-generated-and-extracted-paths). Redirected writes remain `VALID`.
+
 - **V6 — Knowledge section verification (Q11; #158) → §4.4a, §4.8 P12–P14.** Maintainer verification of the statements
   drafted from code and the README: no listener in the default configuration, no process execution and no network
   access other than index acquisition, tool-argument handling, cache permissions, the SSE posture, and the classpath

@@ -13,6 +13,9 @@ import java.util.function.Consumer;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.apache.camel.kit.generator.AtomicFileWriter;
+import org.apache.camel.kit.util.ConfinedPaths;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -29,11 +32,15 @@ public class CitrusSchemaDownloader {
     private final ObjectMapper mapper;
 
     public CitrusSchemaDownloader(Path cacheDir) {
-        this.cacheDir = cacheDir;
-        this.httpClient = HttpClient.newBuilder()
+        this(cacheDir, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofSeconds(10))
                 .followRedirects(HttpClient.Redirect.NORMAL)
-                .build();
+                .build());
+    }
+
+    CitrusSchemaDownloader(Path cacheDir, HttpClient httpClient) {
+        this.cacheDir = cacheDir;
+        this.httpClient = httpClient;
         this.mapper = new ObjectMapper();
     }
 
@@ -49,7 +56,8 @@ public class CitrusSchemaDownloader {
     }
 
     public JsonNode fetchCitrusSchemas(String version, boolean forceRefresh, Consumer<String> log) throws Exception {
-        Path citrusDir = cacheDir.resolve("citrus").resolve(version);
+        Path citrusDir = getCitrusSchemasDir(version);
+        ConfinedPaths.requireTree(cacheDir, citrusDir);
         Path indexFile = citrusDir.resolve("index.json");
 
         if (!forceRefresh && Files.exists(indexFile)) {
@@ -97,11 +105,12 @@ public class CitrusSchemaDownloader {
                                                    + name);
                     }
 
+                    ConfinedPaths.requirePath(cacheDir, targetFile);
                     // Create parent directories if needed
                     Files.createDirectories(targetFile.getParent());
 
                     byte[] data = zis.readAllBytes();
-                    Files.write(targetFile, data);
+                    AtomicFileWriter.write(targetFile, data);
                     fileCount++;
                 }
             }
@@ -125,6 +134,7 @@ public class CitrusSchemaDownloader {
      * Get the path to the cached Citrus schemas directory.
      */
     public Path getCitrusSchemasDir(String version) {
+        ConfinedPaths.requireVersion(version);
         return cacheDir.resolve("citrus").resolve(version);
     }
 }

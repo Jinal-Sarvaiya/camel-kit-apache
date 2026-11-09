@@ -1,5 +1,6 @@
 package org.apache.camel.kit.generator;
 
+import java.io.IOException;
 import java.net.JarURLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -16,6 +17,11 @@ public class AntigravityGenerator extends DefaultGenerator {
 
     @Override
     public void preflight(InitContext ctx) throws Exception {
+        try {
+            GeneratedAssetPreflight.check(ctx);
+        } catch (IOException e) {
+            throw new InvalidAgentConfigurationException(e.getMessage(), e);
+        }
         for (Path managed : List.of(ctx.projectDir().resolve("AGENTS.md"), ctx.projectDir().resolve(".agents"),
                 ctx.projectDir().resolve("GEMINI.md"))) {
             if (Files.isSymbolicLink(managed)) {
@@ -27,13 +33,6 @@ public class AntigravityGenerator extends DefaultGenerator {
                     throw new InvalidAgentConfigurationException(
                             "Antigravity requires " + managed + " to be a "
                                                                  + (directory ? "directory" : "regular file"));
-                }
-                try (var paths = Files.walk(managed)) {
-                    Path link = paths.filter(Files::isSymbolicLink).findFirst().orElse(null);
-                    if (link != null) {
-                        throw new InvalidAgentConfigurationException(
-                                "Refusing to generate through symbolic link: " + link);
-                    }
                 }
             }
         }
@@ -84,7 +83,7 @@ public class AntigravityGenerator extends DefaultGenerator {
             if (!PersonaResourceInstaller.isPersonaTemplate(template)) {
                 Path target = ctx.projectDir().resolve(template.target());
                 Files.createDirectories(target.getParent());
-                Files.writeString(target, templates.render(template.source(),
+                AtomicFileWriter.write(target, templates.render(template.source(),
                         Map.of("COMMAND_PREFIX", ctx.commandPrefix())));
             }
         }

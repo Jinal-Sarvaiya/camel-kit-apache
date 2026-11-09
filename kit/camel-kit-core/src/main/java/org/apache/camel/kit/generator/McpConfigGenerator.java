@@ -66,7 +66,7 @@ class McpConfigGenerator {
                     }
                 }
             } else {
-                Files.writeString(configFile, processed);
+                AtomicFileWriter.write(configFile, processed);
             }
 
             ctx.printer().println(AnsiColors.green("✓") + " MCP config created for " + ctx.agent().name());

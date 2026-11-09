@@ -1,6 +1,5 @@
 package org.apache.camel.kit.generator;
 
-import java.nio.file.Files;
 import java.util.List;
 import java.util.Locale;
 
@@ -18,7 +17,7 @@ class CommandStubGenerator {
         for (WorkflowCommand command : commands) {
             String content = commandContent(ctx, command);
             String filename = command.name() + "." + ctx.agent().fileFormat();
-            Files.writeString(ctx.commandsDir().resolve(filename), content);
+            AtomicFileWriter.write(ctx.commandsDir().resolve(filename), content);
         }
 
         ctx.printer().println(AnsiColors.green("✓") + " Created " + commands.size() + " command stubs");

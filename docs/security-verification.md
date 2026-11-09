@@ -57,3 +57,25 @@ All 12 cases passed. The fixture drives the actual CLI permission protocol witho
 model account; it does not certify future Claude releases or unrelated user-level grants.
 The reproducible harness is `tools/verify_claude_mcp_permissions.py`; use `--help` for paths.
 Website impact: required; agent reference updated. Existing workspaces need regeneration.
+
+
+## V5: generated and extracted paths
+
+`InitWriteConfinementTest` covers shared directory ancestors, generated file leaves,
+all eight agents' nested skill outputs and the positive selected-root-alias case.
+`ForageCatalogConfinementTest` covers linked cache ancestors, relative/absolute version escapes
+and the exact two-entry archive allowlist. `CitrusSchemaDownloaderTest` covers traversal,
+cache/schema links and both generated quick-reference leaves, with an in-memory HTTP archive.
+`IndexArchiveConfinementTest` covers traversal, absolute entries and Unix ZIP symlink metadata
+through actual hash-verified acquisition. Existing downloader tests cover unsafe activation,
+staging, version names and fallback.
+
+Baseline probes demonstrated outside writes for init/Citrus/Forage, including deletion of an
+outside directory selected by a malicious Forage version. All outside paths were test fixtures.
+The fix rejects unsafe versions and pre-existing descendant links before writes/deletions.
+Generated file leaves are replaced through AtomicFileWriter rather than truncated in place;
+six hard-link regressions prove outside sentinels remain unchanged for init and Citrus outputs.
+An explicitly chosen root alias is allowed. Extraction creates ordinary files and never
+materializes ZIP symlink metadata. These checks do not provide descriptor-relative isolation
+against concurrent same-account directory substitution; existing same-account exclusions apply.
+Website impact: required; initialization behavior documented in the agent reference.

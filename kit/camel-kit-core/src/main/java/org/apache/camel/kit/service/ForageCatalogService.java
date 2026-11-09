@@ -15,6 +15,8 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import org.apache.camel.kit.util.ConfinedPaths;
+
 /**
  * Downloads the published Forage catalog artifact and caches its two JSON files under
  * {@code .camel-kit/.cache/forage/<version>/}. Fail-soft by design: callers treat any IOException as "no Forage support
@@ -29,6 +31,11 @@ public class ForageCatalogService {
 
     public boolean isCached(Path camelKitDir, String forageVersion) {
         Path dir = cacheDir(camelKitDir, forageVersion);
+        try {
+            ConfinedPaths.requireTree(camelKitDir, dir);
+        } catch (IOException e) {
+            return false;
+        }
         return CATALOG_ENTRIES.stream()
                 .allMatch(entry -> Files.exists(dir.resolve(Path.of(entry).getFileName().toString())));
     }
@@ -36,6 +43,7 @@ public class ForageCatalogService {
     /** Resolves the artifact from Maven Central and caches the catalog files. Skips when already cached. */
     public Path cache(Path camelKitDir, String catalogArtifact, String forageVersion)
             throws IOException, InterruptedException {
+        ConfinedPaths.requireTree(camelKitDir, cacheDir(camelKitDir, forageVersion));
         if (isCached(camelKitDir, forageVersion)) {
             return cacheDir(camelKitDir, forageVersion);
         }
@@ -53,6 +61,7 @@ public class ForageCatalogService {
         HttpRequest request = HttpRequest.newBuilder(URI.create(url)).timeout(Duration.ofSeconds(60)).build();
         HttpResponse<InputStream> response = client.send(request, HttpResponse.BodyHandlers.ofInputStream());
         if (response.statusCode() != 200) {
+            response.body().close();
             throw new IOException("Forage catalog download failed: HTTP " + response.statusCode() + " for " + url);
         }
         try (InputStream body = response.body()) {
@@ -63,6 +72,7 @@ public class ForageCatalogService {
     /** Extracts the catalog JSON entries from the jar stream into the versioned cache dir (atomic: temp dir + move). */
     public Path cacheFromJar(InputStream jarStream, Path camelKitDir, String forageVersion) throws IOException {
         Path finalDir = cacheDir(camelKitDir, forageVersion);
+        ConfinedPaths.requireTree(camelKitDir, finalDir);
         Files.createDirectories(finalDir.getParent());
         Path tempDir = Files.createTempDirectory(finalDir.getParent(), "forage-dl-");
         try {
@@ -88,6 +98,7 @@ public class ForageCatalogService {
     }
 
     private Path cacheDir(Path camelKitDir, String forageVersion) {
+        ConfinedPaths.requireVersion(forageVersion);
         return camelKitDir.resolve(".cache").resolve("forage").resolve(forageVersion);
     }
 

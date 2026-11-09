@@ -84,7 +84,7 @@ final class PersonaResourceInstaller {
         String content = Files.readString(markdown);
         String rewritten = rewriteReferences(content, targetDirectory);
         if (!rewritten.equals(content)) {
-            Files.writeString(markdown, rewritten);
+            AtomicFileWriter.write(markdown, rewritten);
         }
     }
 

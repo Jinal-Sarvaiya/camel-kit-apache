@@ -194,3 +194,18 @@ v1 mode-rule files.
 == Claude MCP approvals
 
 Fresh and regenerated Claude workspaces pre-approve only the explicit MCP tools listed in the workflow manifest. Other server tools remain visible and require Claude Code permission. Regenerate older workspaces to replace server-wide wildcard grants; review user-level settings separately. The generated Read and Maven command grants retain their existing behavior.
+
+== Generated path checks
+
+Initialization checks generated paths before writing. Checks cover generated leaves and their ancestors, plus Camel-owned skill,
+shared-guide and template subtrees. Unrelated worktrees (including `.claude/worktrees`),
+custom skills, and existing data links are left alone. Fresh generated files use normal umask
+permissions; replacing an existing file preserves its POSIX mode.
+Replace symbolic links inside the managed paths with real files or directories
+before running init; this includes links at generated file destinations. The explicitly
+selected project directory may itself be an alias. Existing unrelated project directories
+are not treated as generated outputs.
+
+Catalog, Citrus and Forage cache versions must be single safe path components. Citrus and Forage refuse
+linked cache ancestors and output paths, so an existing workspace cannot redirect extraction
+or generated quick references outside the chosen destination.

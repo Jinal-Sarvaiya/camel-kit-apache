@@ -366,7 +366,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
                 continue;
             }
             String content = templateEngine.render("templates/opencode/agents/" + agentName + ".md", data);
-            Files.writeString(agentsDir.resolve(agentName + ".md"), content);
+            AtomicFileWriter.write(agentsDir.resolve(agentName + ".md"), content);
             count++;
         }
 

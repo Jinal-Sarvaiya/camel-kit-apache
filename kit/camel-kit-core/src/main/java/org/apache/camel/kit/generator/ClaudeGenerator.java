@@ -85,7 +85,7 @@ public class ClaudeGenerator extends DefaultGenerator {
                 Map.of(
                         "COMMAND_PREFIX", ctx.commandPrefix()));
         String content = templateEngine.render("templates/claude/claude-md.md", data);
-        Files.writeString(ctx.projectDir().resolve("CLAUDE.md"), content);
+        AtomicFileWriter.write(ctx.projectDir().resolve("CLAUDE.md"), content);
     }
 
     private void generateSettings(InitContext ctx) throws Exception {

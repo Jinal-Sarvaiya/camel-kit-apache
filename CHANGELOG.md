@@ -22,6 +22,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Generated and cached path confinement (#157)** — refuse descendant symlinks before init/catalog writes and validate catalog versions before extraction or replacement.
+
 - **Claude MCP permissions (#155)** — replace server-wide wildcard approvals with explicit manifest-listed tools, with generation and actual-host permission checks.
 
 - **Graph input boundaries (#154)** — reject outside-root and symlink inputs, bound source bytes and discovery, and apply the parser timeout to POM analysis.

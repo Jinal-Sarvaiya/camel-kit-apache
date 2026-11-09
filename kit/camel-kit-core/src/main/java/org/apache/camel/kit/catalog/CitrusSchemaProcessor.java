@@ -5,6 +5,8 @@ import java.nio.file.Path;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.apache.camel.kit.generator.AtomicFileWriter;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
@@ -56,7 +58,7 @@ public class CitrusSchemaProcessor {
 
         // Write the quick reference
         Path outputFile = citrusCacheDir.resolve("citrus-quick-reference.json");
-        Files.writeString(outputFile, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(reference));
+        AtomicFileWriter.write(outputFile, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(reference));
 
         // Also generate a markdown version for easier AI consumption
         generateMarkdownReference(citrusCacheDir, reference);
@@ -275,6 +277,6 @@ public class CitrusSchemaProcessor {
         md.append("\n");
 
         Path mdFile = citrusCacheDir.resolve("citrus-quick-reference.md");
-        Files.writeString(mdFile, md.toString());
+        AtomicFileWriter.write(mdFile, md.toString());
     }
 }

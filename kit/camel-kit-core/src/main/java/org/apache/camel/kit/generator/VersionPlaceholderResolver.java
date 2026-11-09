@@ -45,7 +45,7 @@ class VersionPlaceholderResolver {
             return;
         }
         matcher.appendTail(rendered);
-        Files.writeString(mdFile, rendered.toString());
+        AtomicFileWriter.write(mdFile, rendered.toString());
     }
 
     static Map<String, String> buildVersionTemplateData(DistributionConfig dist) {

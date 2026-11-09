@@ -76,7 +76,7 @@ class TraitApplicator {
         }
 
         String closeSentinel = "<!-- /TRAIT:" + ctx.agentName() + " -->";
-        Files.writeString(targetFile,
+        AtomicFileWriter.write(targetFile,
                 existing + "\n---\n\n" + sentinel + "\n" + traitContent + "\n" + closeSentinel + "\n");
         return true;
     }

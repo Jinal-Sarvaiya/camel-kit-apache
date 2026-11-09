@@ -41,7 +41,7 @@ public class QwenGenerator extends DefaultGenerator {
 
     private void generateQwenMd(InitContext ctx, Map<String, Object> data) throws Exception {
         String content = templateEngine.render("templates/qwen/qwen-md.md", data);
-        Files.writeString(ctx.projectDir().resolve("QWEN.md"), content);
+        AtomicFileWriter.write(ctx.projectDir().resolve("QWEN.md"), content);
     }
 
     private void generateSubAgents(InitContext ctx) throws Exception {

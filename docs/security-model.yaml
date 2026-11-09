@@ -294,9 +294,9 @@ claimed_properties:
     property: init confines its writes to the operator-selected target directory and removes only what it generated, through no symlink. An untrusted tree or a symbolic link that redirects a write outside the target is in scope; an intentionally operator-selected destination is authorized.
     violation_symptom: File created, replaced or deleted outside the operator-selected target, or a write or deletion redirected through a symbolic link.
     severity: security-critical when reachable from an attacker-controllable input (analysed tree, registry data); otherwise correctness
-    provenance: contract - maintainer (2026-10-27, Q9); deletion guards documented (GeneratedAssetCleaner, AtomicFileWriter); write confinement through symlinked subtrees inferred (V5)
+    provenance: "Contract: maintainer (2026-10-27, Q9). InitService/ConfinedPaths preflight shared and selected-agent outputs; GeneratedAssetCleaner guards deletion; generated file replacements use AtomicFileWriter. InitWriteConfinementTest covers static hostile descendant links and selected-root aliases."
   - id: P4
-    property: Pinned, named-repository supply chain for everything fetched or configured; Ship resolver uses fixed HTTPS Maven Central, checksum fail, no redirects, exact coordinates, size caps, SHA-256 content identity, isolated URLClassLoader payloads. Kit's own handling of what it downloads is in scope - catalog JSON is read from the JAR stream in memory, Citrus schema entries are written only inside the cache directory after a normalize/startsWith guard, Forage catalog entries are written by file name only.
+    property: Pinned, named-repository supply chain for everything fetched or configured; Ship resolver uses fixed HTTPS Maven Central, checksum fail, no redirects, exact coordinates, size caps, SHA-256 content identity, isolated URLClassLoader payloads. Kit's own handling of what it downloads is in scope - catalog JSON is read from the JAR stream in memory, Citrus schema entries are written only inside the cache directory after lexical containment and descendant-link checks; Citrus/Forage versions are safe single path components and cache ancestry is preflighted; Forage writes only the two allowlisted catalog files into fresh staging.
     violation_symptom: Unpinned coordinate, repository outside the named lists, download accepted on checksum mismatch (Ship), artifact outside its exact path, payload class loaded from elsewhere, or a downloaded artifact that escapes the cache directory or executes code through Kit's parsing or extraction.
     severity: security-critical
     provenance: documented (mcp-setup.md, distribution.properties, ShipMavenResolver, ShipJvmPayloadBootstrap, CatalogDownloader, CitrusSchemaDownloader, ForageCatalogService); in-scope clause maintainer (2026-10-27, Q7)
@@ -615,7 +615,8 @@ verification_items:
     sections: ["4.8 P3", "4.8 P4"]
     work: Verify that init writes stay inside the operator-selected target when a generated subtree is a symbolic link, and that every archive extraction path (Citrus schemas, Forage catalog, Knowledge index) stays inside its cache directory.
     interim_triage: A redirected write or an extraction escape reachable from an untrusted tree or a downloaded artifact is VALID.
-    status: open
+    status: "implemented"
+    evidence: "InitWriteConfinementTest, ForageCatalogConfinementTest, CitrusSchemaDownloaderTest, IndexArchiveConfinementTest plus existing IndexDownloader tests; security-verification.md V5"
   - id: V6
     tracking: apache/camel-kit#158
     title: Knowledge section verification

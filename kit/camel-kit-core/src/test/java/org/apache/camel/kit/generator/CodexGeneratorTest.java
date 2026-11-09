@@ -203,7 +203,7 @@ class CodexGeneratorTest {
                 IllegalStateException.class,
                 () -> new CodexGenerator().generate(createContext(project)));
 
-        assertTrue(error.getMessage().contains("symbolic link: .codex"));
+        assertTrue(error.getMessage().contains("symbolic link:") && error.getMessage().contains(".codex"));
         assertEquals(original, Files.readString(externalConfig));
         assertFalse(Files.exists(externalCodex.resolve("agents")));
     }
@@ -221,7 +221,7 @@ class CodexGeneratorTest {
                 IllegalStateException.class,
                 () -> new CodexGenerator().generate(createContext(project)));
 
-        assertTrue(error.getMessage().contains("symbolic link: .agents/skills"));
+        assertTrue(error.getMessage().contains("symbolic link:") && error.getMessage().contains(".agents/skills"));
         assertEquals("unchanged", Files.readString(marker));
         try (var files = Files.list(externalSkills)) {
             assertEquals(List.of(marker), files.toList());

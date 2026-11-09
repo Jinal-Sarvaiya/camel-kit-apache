@@ -1481,19 +1481,26 @@ class OpenCodeGeneratorTest {
     }
 
     @Test
-    void managedConfigDirIsPlatformSpecific() {
-        OpenCodeGenerator gen = new OpenCodeGenerator();
-        Path dir = gen.managedConfigDir();
-        String os = System.getProperty("os.name", "").toLowerCase(java.util.Locale.ROOT);
-        if (os.contains("mac") || os.contains("darwin")) {
-            assertEquals(Path.of("/Library/Application Support/opencode"), dir,
-                    "macOS managed dir must use /Library/Application Support/opencode");
-        } else if (os.contains("win")) {
-            assertTrue(dir.toString().endsWith("opencode"),
-                    "Windows managed dir must end with opencode");
-        } else {
-            assertEquals(Path.of("/etc/opencode"), dir,
-                    "Linux managed dir must use /etc/opencode");
-        }
+    void managedConfigDirSelectsLinuxPath() {
+        assertEquals(Path.of("/etc/opencode"),
+                OpenCodeGenerator.managedConfigDirForOs("Linux"),
+                "Linux managed dir must use /etc/opencode");
+    }
+
+    @Test
+    void managedConfigDirSelectsMacOsPath() {
+        assertEquals(Path.of("/Library/Application Support/opencode"),
+                OpenCodeGenerator.managedConfigDirForOs("Mac OS X"),
+                "macOS managed dir must use /Library/Application Support/opencode");
+        assertEquals(Path.of("/Library/Application Support/opencode"),
+                OpenCodeGenerator.managedConfigDirForOs("Darwin"),
+                "Darwin managed dir must use /Library/Application Support/opencode");
+    }
+
+    @Test
+    void managedConfigDirSelectsWindowsPath() {
+        assertEquals(Path.of("C:\\ProgramData", "opencode"),
+                OpenCodeGenerator.managedConfigDirForOs("Windows 10"),
+                "Windows managed dir must use ProgramData\\opencode");
     }
 }

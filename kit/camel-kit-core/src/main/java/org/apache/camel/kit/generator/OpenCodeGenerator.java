@@ -119,7 +119,7 @@ public class OpenCodeGenerator extends DefaultGenerator {
     private static boolean collectFromFileWithSubstitutionCheck(Path configFile, Set<String> names)
             throws IOException {
         String rawContent = Files.readString(configFile);
-        if (rawContent.startsWith("﻿")) {
+        if (rawContent.startsWith("\uFEFF")) {
             rawContent = rawContent.substring(1);
         }
         boolean hasSubstitution = SUBSTITUTION_PATTERN.matcher(rawContent).find();
@@ -229,12 +229,15 @@ public class OpenCodeGenerator extends DefaultGenerator {
     }
 
     Path managedConfigDir() {
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        return managedConfigDirForOs(System.getProperty("os.name", ""));
+    }
+
+    static Path managedConfigDirForOs(String osName) {
+        String os = osName.toLowerCase(Locale.ROOT);
         if (os.contains("mac") || os.contains("darwin")) {
             return Path.of("/Library/Application Support/opencode");
         } else if (os.contains("win")) {
-            String programData = System.getenv("ProgramData");
-            return Path.of(programData != null ? programData : "C:\\ProgramData", "opencode");
+            return Path.of("C:\\ProgramData", "opencode");
         }
         return Path.of("/etc/opencode");
     }

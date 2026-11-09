@@ -212,12 +212,14 @@ certification.
 | OpenCode
 | `/camel-ship` command stub in `.opencode/commands/` that invokes the native skill, which uses the `subagent` tool to
   dispatch a `camel-ship-worker` child with explicit tool denials (`edit`, `write`, `bash`, `notebook`, `subagent`,
-  `mcp`) and per-server glob denials for every configured MCP server (e.g. `camel_*: deny`). The worker inherits
-  read access from the parent. The entry point is the generated `/camel-ship` command stub; the native skill is
-  installed in `.opencode/skills/camel-ship/SKILL.md` and the worker in `.opencode/agents/camel-ship-worker.md`.
-  If `--backend opencode-native` is requested and dispatch is unavailable the skill stops without starting a run.
-  Generated skill and worker assets verified via a local OpenCode workspace probe; live child execution acceptance
-  is pending.
+  `mcp`) and per-server glob denials for every MCP server enumerated from the full effective configuration at init
+  time (project layers, ancestor dirs, global XDG config, `OPENCODE_CONFIG`, `OPENCODE_CONFIG_CONTENT`,
+  `OPENCODE_CONFIG_DIR`, and platform managed config — `/etc/opencode` on Linux, `/Library/Application Support/opencode`
+  on macOS, `%ProgramData%\opencode` on Windows). The worker is not generated — and any existing one is removed — when
+  any config source contains an unresolved `{env:…}` or `{file:…}` substitution, cannot be parsed, a server name
+  collides with a built-in permission prefix, or macOS MDM managed preferences (`ai.opencode.managed.plist`) are
+  present. The worker inherits read access from the parent. If `--backend opencode-native` is requested and dispatch
+  is unavailable the skill stops without starting a run. Verified on OpenCode 2.2.5 with 26 real host cases.
 |===
 
 A fresh context is not an OS sandbox: read access follows the parent's permitted paths. Do not broaden permissions,

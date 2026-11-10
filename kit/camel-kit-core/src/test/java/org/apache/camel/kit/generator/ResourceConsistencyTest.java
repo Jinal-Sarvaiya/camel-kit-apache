@@ -5,9 +5,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,6 +26,7 @@ import org.apache.camel.kit.workflow.WorkflowManifestLoader;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.tomlj.Toml;
@@ -318,6 +321,25 @@ class ResourceConsistencyTest {
         }
 
         assertTrue(unknown.isEmpty(), "Shipped guidance references unknown MCP tools:\n" + String.join("\n", unknown));
+    }
+
+    @Test
+    void securityModelSidecarRetainsIssueReferencesAndDecisions() throws IOException {
+        JsonNode model = new ObjectMapper(new YAMLFactory())
+                .readTree(repositoryRoot().resolve("docs/security-model.yaml").toFile());
+        Map<String, JsonNode> properties = new HashMap<>();
+        model.path("claimed_properties").forEach(property -> properties.put(property.path("id").asText(), property));
+        JsonNode p5 = properties.get("P5");
+        JsonNode p10 = properties.get("P10");
+        assertTrue(model.path("status").asText().contains("#153-#158"));
+        assertTrue(p5.path("provenance").asText().contains("2026-10-27 (Q8)"));
+        assertTrue(p10.path("violation_symptom").asText().contains("review of #6"));
+        assertTrue(p10.path("provenance").asText().contains("accepted posture"));
+        assertTrue(model.path("maintainer_decisions").get(0).path("decision").asText()
+                .contains("a demonstrated breach through the grant is triaged on the breach and its impact"));
+        assertTrue(model.path("maintainer_decisions").get(3).path("decision").asText()
+                .contains("Pi candidates are accepted"));
+        assertTrue(model.path("verification_items").get(5).path("work").asText().contains("#143"));
     }
 
     @Test

@@ -31,6 +31,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--backend qwen-native` reuses the native task/result, recovery, oversight and deterministic publication
   contract while preserving Qwen's named-agent dispatch model. Dispatch never uses `fork` or `fork_turns`.
   Fresh and regenerated workspaces receive the native skill and worker; runs retain their recorded host.
+- **Security model and threat model (apache/camel-kit#5)** — `SECURITY.md` with the Apache Software Foundation
+  reporting process, `docs/security-model.md` covering the Kit and Knowledge products (trust roles, component
+  families, trust boundaries, per-process side-effect inventory, claimed and disclaimed properties, known
+  non-findings, triage dispositions, maintainer answers and verification items) as the additive
+  sub-project expansion of the Apache Camel Security Model, and the derived `docs/security-model.yaml` sidecar
+  for automated triage. README, CONTRIBUTING, CLAUDE.md and a GitHub issue-template contact link point to them.
 - **OpenCode native Ship (#99)** — eligible sessions relay controller-issued stages through a dedicated
   `camel-ship-worker` agent via OpenCode's `subagent` tool (`agent` argument). The worker denies `edit`, `write`,
   `bash`, `notebook`, `subagent` and `mcp`, and inherits read access, per-path restrictions and external-directory
@@ -45,12 +51,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--backend opencode-native` reuses the native task/result, recovery, oversight and deterministic publication
   contract. Fresh and regenerated workspaces receive the native skill, worker and command stub; runs retain their
   recorded host.
-- **Security model and threat model (apache/camel-kit#5)** — `SECURITY.md` with the Apache Software Foundation
-  reporting process, `docs/security-model.md` covering the Kit and Knowledge products (trust roles, component
-  families, trust boundaries, per-process side-effect inventory, claimed and disclaimed properties, known
-  non-findings, triage dispositions, maintainer answers and verification items) as the additive
-  sub-project expansion of the Apache Camel Security Model, and the derived `docs/security-model.yaml` sidecar
-  for automated triage. README, CONTRIBUTING, CLAUDE.md and a GitHub issue-template contact link point to them.
 - **OpenAI Codex CLI native Ship (#225)** — eligible sessions relay controller-issued stages through the dedicated
   `camel_ship_worker` custom agent with `sandbox_mode = "read-only"` and instruction-level restrictions.
   `--backend codex-native` reuses the native task/result, recovery, oversight and deterministic publication contract

@@ -20,7 +20,7 @@ repository_layout_commit: 9c8173cb
 revised_at_commit: a19d0529
 date: "2026-10-22"
 last_review_round: "2026-10-27"
-status: draft - policy ratified 2026-10-27; acceptance pending verification items V1-V6 (tracked in #153-#158); revised 2026-11-02 after review round 3
+status: "draft - policy ratified 2026-10-27; acceptance pending verification items V1-V6 (tracked in #153-#158); revised 2026-11-02 after review round 3"
 canonical: docs/security-model.md
 umbrella_model: https://camel.apache.org/manual/security-model.html
 reporting:
@@ -304,7 +304,7 @@ claimed_properties:
     property: Ship controller alone writes run state, commits transitions and decides what is accepted and published. Native backends - proposals written only for the approved route and test paths, pom.xml and .camel-kit/config.properties, after a known-secret scan; other paths rejected (ShipNativeWorker.applyProposals). Pi backend (default) - the worker edits the staged candidate directly; acceptance through tree policy, artifact validation (manifest, declared routes and tests, pom policy, Camel Main Java policy FORBIDDEN, Citrus dependency policy, launch-surface validation), secret scan of changed material files and deterministic validation; ordinary additional material files are permitted and published. Publication journaled, atomic, verified against the validated candidate, recoverable.
     violation_symptom: Worker output changes a stage, pause or publication decision; a native proposal is written outside the approved set or without the secret check; a Pi candidate is accepted despite a tree-policy denial, a failing artifact or launch-surface check, or a verbatim secret; published tree differs from the validated candidate; torn publication left unrecovered.
     severity: security-critical
-    provenance: documented (docs/commands.md, docs/ship-native.md, ShipNativeWorker, ArtifactValidator, ShipCamelMainBootstrap.validateLaunchSurface, ShipPublicationService); Pi acceptance and extra material files - maintainer, 2026-10-22 (review of #6) and 2026-10-27 (Q8)
+    provenance: "documented (docs/commands.md, docs/ship-native.md, ShipNativeWorker, ArtifactValidator, ShipCamelMainBootstrap.validateLaunchSurface, ShipPublicationService); Pi acceptance and extra material files - maintainer, 2026-10-22 (review of #6) and 2026-10-27 (Q8)"
   - id: P6
     property: Ship tree policy - denied credential and state paths, protected and volatile classes, rejection of symlinks, hard links and special files, quotas (20000 entries, 64 MiB per file, 1 GiB aggregate, depth 128, 4096-char paths).
     violation_symptom: Denied path enters a snapshot, workspace, prompt or publication; a link is followed.
@@ -327,9 +327,9 @@ claimed_properties:
     provenance: documented (ShipExpressionPolicy)
   - id: P10
     property: Generated harness assets carry the accepted least-privilege posture - read-only Ship workers, read-only Codex roles, Copilot deny hook, Pi guard policy, no HTTP port for the Camel and Citrus MCP servers, and MCP grants aligned with the manifest allowed_tools (no runtime mutation or control tools) - as availability filters for Codex (enabled_tools), Copilot (tools), Pi (directTools) and Qwen (includeTools), as Bob 2's auto-approval list, with Codex, Copilot, Qwen and OpenCode prompting before MCP calls and Antigravity receiving the full tool set without generated approval. Accepted Claude posture - explicit per-tool grants aligned with the manifest. Current generated Claude settings.json deviates - mcp__<server>__* pre-approves every tool of the three servers (V3). Claim is about the generated artifact; enforcement is the harness's.
-    violation_symptom: Generated asset grants more than the accepted posture - a worker with edit or shell tools, a filter or auto-approval list containing a tool outside the manifest allowed_tools, a prompt-mode target generated with auto-approval, a hook or guard that fails open on a documented pattern. The known Claude wildcard pre-approval is a documented deviation, not a breach - a report that only restates it is tracked under V3 (#155) as VALID-HARDENING until the template changes; a report that demonstrates a breach through the grant (a credential read or destructive action without a prompt, or any other in-scope boundary breach) is evaluated on that breach and its impact and is never downgraded to V3 or closed as its duplicate (maintainer, 2026-10-27, review of #6).
+    violation_symptom: "Generated asset grants more than the accepted posture - a worker with edit or shell tools, a filter or auto-approval list containing a tool outside the manifest allowed_tools, a prompt-mode target generated with auto-approval, a hook or guard that fails open on a documented pattern. The known Claude wildcard pre-approval is a documented deviation, not a breach - a report that only restates it is tracked under V3 (#155) as VALID-HARDENING until the template changes; a report that demonstrates a breach through the grant (a credential read or destructive action without a prompt, or any other in-scope boundary breach) is evaluated on that breach and its impact and is never downgraded to V3 or closed as its duplicate (maintainer, 2026-10-27, review of #6)."
     severity: hardening; security-critical when the widened grant reaches a credential or destructive action without a prompt
-    provenance: documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates/mcp-configs/*, templates/claude/settings.json, Claude Code permissions reference); current Claude grant - maintainer, 2026-10-22 (review of #6); accepted posture - maintainer, 2026-10-27 (Q3)
+    provenance: "documented (docs/agent-architectures.md, docs/ship-claude.md, docs/ship-native.md, templates/mcp-configs/*, templates/claude/settings.json, Claude Code permissions reference); current Claude grant - maintainer, 2026-10-22 (review of #6); accepted posture - maintainer, 2026-10-27 (Q3)"
   - id: P11
     property: Stated resource bounds - route/Citrus YAML 2 MiB, native result 16 MiB and 1000 files, Pi prompt 1 MiB, Pi log 16 MiB, session 64 MiB, evidence log 64 MiB, stage timeout 10m, resolver 64 roots/512 artifacts/128 MiB JAR/4 MiB POM, tree quotas, migration-context depth 3 and 50 nodes; graph parsers other than the POM parser 60 s each (serves P1); Knowledge tool results at most 25 per call, release pages at most 2 MiB and 10 pages, manifest 5 s and archive 5 min deadlines.
     violation_symptom: A limit not enforced at its documented value.
@@ -519,7 +519,7 @@ triage_notes:
 
 maintainer_decisions:
   - date: "2026-10-27"
-    decision: Review round 3 of #6 - a report that only restates the known Claude wildcard grant is VALID-HARDENING under V3, while a demonstrated breach through the grant is triaged on the breach and its impact; the Pi inventory row distinguishes intended writes from the worker's unconfined OS-account reach; the Knowledge classpath fallback (temporary knowledge-index* directory, pinned-version exception) is part of the inventory. Each verification item has a tracking issue (#153-#158).
+    decision: "Review round 3 of #6 - a report that only restates the known Claude wildcard grant is VALID-HARDENING under V3, while a demonstrated breach through the grant is triaged on the breach and its impact; the Pi inventory row distinguishes intended writes from the worker's unconfined OS-account reach; the Knowledge classpath fallback (temporary knowledge-index* directory, pinned-version exception) is part of the inventory. Each verification item has a tracking issue (#153-#158)."
     sections: ["4.4a", "4.5", "4.8 P10", "4.8 P13", "4.11a", "4.13", "4.14.2"]
   - date: "2026-10-27"
     decision: Review round 2 answers to Q1-Q13 (see answered_questions). Policy ratified; acceptance pending V1-V6.
@@ -528,7 +528,7 @@ maintainer_decisions:
     decision: Graph source-reading contract inherited in full from the Apache Camel Security Model; enforcement gaps are tracked as verification items, not disclaimed.
     sections: ["4.1", "4.8 P1", "4.8 P11", "4.13", "V1", "V2"]
   - date: "2026-10-22"
-    decision: Review of #6 - the proposal allowlist applies to native backends only; Pi candidates are accepted through tree, artifact and launch-surface validation with ordinary extra material files permitted and published; the generated Claude settings.json wildcards grant every MCP tool and the .mcp.json autoApprove/alwaysAllow keys are not a Claude Code filter.
+    decision: "Review of #6 - the proposal allowlist applies to native backends only; Pi candidates are accepted through tree, artifact and launch-surface validation with ordinary extra material files permitted and published; the generated Claude settings.json wildcards grant every MCP tool and the .mcp.json autoApprove/alwaysAllow keys are not a Claude Code filter."
     sections: ["4.5a", "4.6", "4.8 P5", "4.8 P10", "4.9", "4.11a"]
 
 answered_questions:
@@ -618,7 +618,7 @@ verification_items:
     title: Knowledge section verification
     from: [Q11]
     sections: ["4.4a", "4.8 P12", "4.8 P13", "4.8 P14"]
-    work: Maintainer verification of the Knowledge statements drafted from code and README - no listener in the default configuration, no process execution and no network access other than index acquisition, tool-argument handling, cache permissions, the SSE posture, and the classpath fallback (temporary-directory permissions, no bundled index in the monorepo runner). Related hardening - #137 (PR #143), #139 (PR #142), #140.
+    work: "Maintainer verification of the Knowledge statements drafted from code and README - no listener in the default configuration, no process execution and no network access other than index acquisition, tool-argument handling, cache permissions, the SSE posture, and the classpath fallback (temporary-directory permissions, no bundled index in the monorepo runner). Related hardening - #137 (PR #143), #139 (PR #142), #140."
     interim_triage: A breach of P12-P14 is VALID.
     status: open
 

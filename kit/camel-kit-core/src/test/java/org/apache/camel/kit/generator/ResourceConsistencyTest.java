@@ -1532,8 +1532,8 @@ class ResourceConsistencyTest {
         String execute = Files.readString(skills.resolve("camel-execute/SKILL.md"));
         String plan = Files.readString(skills.resolve("camel-plan/SKILL.md"));
 
-        for (String field : List.of("status", "reason", "timestamp", "revision", "dirty", "testCount", "tests",
-                "nonPassing")) {
+        for (String field : List.of("status", "reason", "timestamp", "revision", "dirty", "complete", "testCount",
+                "tests", "nonPassing")) {
             assertTrue(writer.contains("\"" + field + "\"") || writer.contains("putObject(\"" + field + "\")")
                     || writer.contains("putArray(\"" + field + "\")"), "init no longer writes baseline field " + field);
             assertTrue(validate.contains("\"" + field + "\""), "camel-validate must document baseline field " + field);
@@ -1545,7 +1545,7 @@ class ResourceConsistencyTest {
                 "the dirty flag must ignore init's own untracked output");
 
         // validation compares test identities, never counts, and cannot establish the baseline after the edits
-        assertTrue(validate.contains("by test identity") && validate.contains("`class#method`"),
+        assertTrue(validate.contains("by test identity") && validate.contains("`[module:]class#method`"),
                 "camel-validate must compare per-test identities");
         assertTrue(validate.contains("**REGRESSION** unless the design spec"),
                 "a baseline test that disappeared must be a regression unless approved");

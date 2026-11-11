@@ -74,13 +74,15 @@ public class PomParser implements GraphParser {
 
             // Version evidence from the parent and from dependencyManagement (imported BOMs). These carry the platform
             // version (Spring Boot, Quarkus platform, Camel BOM) that dependencies without a version rely on. They are
-            // recorded as separate nodes so they never masquerade as a dependency of the project. Versions are resolved
+            // recorded with module provenance in their IDs to prevent cross-module overwriting. Versions are resolved
             // against the declaring POM's own properties to prevent cross-module property collision.
             String pomRelative = projectRoot.relativize(pomFile).toString();
             if (model.getParent() != null) {
                 String parentVersion = resolveProperty(model.getParent().getVersion(), model);
+                // Include module provenance in node ID to preserve per-module parent versions
                 graph.addNode(new GraphNode(
-                        "maven-parent:" + model.getParent().getGroupId() + ":" + model.getParent().getArtifactId(),
+                        "maven-parent:" + pomRelative + ":" + model.getParent().getGroupId() + ":"
+                                            + model.getParent().getArtifactId(),
                         NodeType.CONFIG_PROPERTY,
                         Map.of("kind", "parent",
                                 "groupId", model.getParent().getGroupId(),
@@ -93,8 +95,9 @@ public class PomParser implements GraphParser {
                 for (Dependency managed : management.getDependencies()) {
                     String rawVersion = managed.getVersion();
                     String resolvedVersion = rawVersion != null ? resolveProperty(rawVersion, model) : "managed";
+                    // Include module provenance in node ID to preserve per-module managed versions
                     graph.addNode(new GraphNode(
-                            "maven-managed:" + managed.getGroupId() + ":" + managed.getArtifactId(),
+                            "maven-managed:" + pomRelative + ":" + managed.getGroupId() + ":" + managed.getArtifactId(),
                             NodeType.CONFIG_PROPERTY,
                             Map.of("kind", "managed",
                                     "groupId", managed.getGroupId(),
@@ -148,11 +151,12 @@ public class PomParser implements GraphParser {
         DependencyManagement management = model.getDependencyManagement();
         if (management != null) {
             for (Dependency managed : management.getDependencies()) {
-                // Only Camel core BOMs (org.apache.camel group) represent Camel core versions.
+                // Camel core BOMs (org.apache.camel and org.apache.camel.springboot groups) represent Camel core versions.
                 // Camel Quarkus extension BOMs (org.apache.camel.quarkus group) have independent versioning.
-                if ("pom".equals(managed.getType()) && "org.apache.camel".equals(managed.getGroupId())
-                        && managed.getArtifactId() != null
-                        && managed.getArtifactId().startsWith("camel-") && managed.getArtifactId().endsWith("-bom")) {
+                if ("pom".equals(managed.getType()) && managed.getArtifactId() != null
+                        && managed.getArtifactId().startsWith("camel-") && managed.getArtifactId().endsWith("-bom")
+                        && ("org.apache.camel".equals(managed.getGroupId())
+                                || "org.apache.camel.springboot".equals(managed.getGroupId()))) {
                     addCamelVersionEvidence(graph, pomRelative, "imported BOM " + managed.getArtifactId(),
                             managed.getVersion(), model);
                 }

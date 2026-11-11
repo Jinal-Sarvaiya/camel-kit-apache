@@ -930,7 +930,7 @@ public class InitService {
             }
             writeBaselineFile(projectRoot, baselineResultsFile,
                     BaselineTestResults.toJson(status, reason, sourceRevision(projectRoot),
-                            sourceTreeDirty(projectRoot), tests));
+                            sourceTreeDirty(projectRoot), collectionResult.complete(), tests));
             config.setProperty("project.baselineTestStatus", status);
         } catch (Exception e) {
             writeBaselineStatus(baselineResultsFile, "not_run", "Could not execute tests: " + e.getMessage(),
@@ -998,9 +998,10 @@ public class InitService {
      */
     private void writeBaselineStatus(Path file, String status, String reason, Path projectRoot) {
         try {
+            // Error statuses (not_run, timeout) have no collection, so complete=true (no parse failures)
             writeBaselineFile(projectRoot, file,
                     BaselineTestResults.toJson(status, reason, sourceRevision(projectRoot),
-                            sourceTreeDirty(projectRoot), java.util.Map.of()));
+                            sourceTreeDirty(projectRoot), true, java.util.Map.of()));
         } catch (Exception e) {
             // Best-effort - ignore write failures
         }

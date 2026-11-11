@@ -261,16 +261,18 @@ Read `.camel-kit/config.properties`:
 
 6. **Capture the test baseline BEFORE the first edit (existing projects only):**
    - Read `.camel-kit/baseline-test-results.json`. If `status` is `passed` or `failed`, `tests` is not empty, `dirty`
-     is `false`, and `revision` equals the current `git rev-parse HEAD`, the baseline already exists. Do not touch it.
+     is `false`, `complete` is `true`, and `revision` equals the current `git rev-parse HEAD`, the baseline already
+     exists. Do not touch it.
    - Otherwise nothing has been edited yet, so this is the last moment a baseline can exist. Note the current timestamp
      (to reject stale reports), run the project's tests with its own wrapper (`./mvnw test -B`), then write
      `.camel-kit/baseline-test-results.json` in the schema that `camel-validate` Step 1 documents: `status`, `reason`,
      `timestamp`, `revision` (`git rev-parse HEAD`), `dirty` (`true` if `git status --porcelain --untracked-files=no`
-     is not empty), and every test under `tests` keyed `class#method` with `passed`, `failed`, `error` or `skipped`,
-     read from `target/surefire-reports/TEST-*.xml` and `target/failsafe-reports/TEST-*.xml` **modified after the
-     noted timestamp**. Reports older than the test invocation are stale and must be ignored. If the tests exit 0 but
-     produce no fresh reports, set `status` to `not_run` with reason "Tests did not run (no reports produced)" rather
-     than claiming they passed.
+     is not empty), `complete` (`true` if all reports parsed successfully, `false` if any were malformed), and every
+     test under `tests` keyed `[module:]class#method` (module prefix only for non-root modules) with `passed`, `failed`,
+     `error` or `skipped`, read from `target/surefire-reports/TEST-*.xml` and `target/failsafe-reports/TEST-*.xml`
+     **modified after the noted timestamp**. Reports older than the test invocation are stale and must be ignored. If
+     the tests exit 0 but produce no fresh reports, set `status` to `not_run` with reason "Tests did not run (no reports
+     produced)" rather than claiming they passed. If any report cannot be parsed, set `complete` to `false`.
    - If the tests cannot be run (no wrapper, build broken, timeout), write the file with `status` `not_run` or
      `timeout` and the reason, and tell the user that baseline preservation will be reported as UNVERIFIED. Do not
      proceed as if a baseline existed.

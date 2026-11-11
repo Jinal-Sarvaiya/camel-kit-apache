@@ -91,4 +91,31 @@ class YamlRouteParserTest {
 
         assertTrue(parser.warnings().stream().anyMatch(warning -> warning.contains("route-level steps")));
     }
+
+    @Test
+    void recordsYamlBeansAsBeanNodesWithoutTouchingClassNodes(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("beans.yaml"), """
+                - beans:
+                    - name: helper
+                      type: x.Helper
+                    - type: x.NoName
+                - route:
+                    id: r1
+                    from:
+                      uri: timer:t
+                      steps:
+                        - log: hi
+                """);
+        ProjectGraph beanGraph = new ProjectGraph();
+
+        new YamlRouteParser().parse(root, beanGraph);
+
+        GraphNode bean = beanGraph.getNode("yaml-bean:helper");
+        assertNotNull(bean);
+        assertEquals("true", bean.properties().get("bean"));
+        assertEquals("x.Helper", bean.properties().get("type"));
+        assertEquals("beans.yaml", bean.properties().get("file"));
+        assertEquals(1, beanGraph.findByType(NodeType.CLASS).size(), "a bean without a name is skipped");
+        assertTrue(beanGraph.hasNode("route:r1"), "routes next to beans are still parsed");
+    }
 }

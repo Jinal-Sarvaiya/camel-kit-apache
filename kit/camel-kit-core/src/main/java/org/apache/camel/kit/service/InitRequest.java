@@ -8,6 +8,10 @@ import org.apache.camel.kit.output.Printer;
 
 /**
  * Request for initializing a Camel-Kit workspace.
+ *
+ * <p>
+ * {@code recordBaseline} is opt-in: when set, init runs the existing project's tests once to record a baseline result.
+ * It is off by default because that executes project build and test code.
  */
 public record InitRequest(
         String projectName,
@@ -22,7 +26,34 @@ public record InitRequest(
         DistributionConfig distribution,
         Printer printer,
         InitProgress progress,
-        InitReporter reporter) {
+        InitReporter reporter,
+        boolean dryRun,
+        boolean replaceWrapper,
+        boolean recordBaseline) {
+
+    /**
+     * Creates a request that does not run the project's tests to record a baseline.
+     */
+    public InitRequest(
+                       String projectName,
+                       String agentName,
+                       Path targetDir,
+                       String citrusVersion,
+                       boolean noFetch,
+                       boolean withCitrusMcp,
+                       String sourcePlatform,
+                       String commandPrefix,
+                       String defaultCitrusVersion,
+                       DistributionConfig distribution,
+                       Printer printer,
+                       InitProgress progress,
+                       InitReporter reporter,
+                       boolean dryRun,
+                       boolean replaceWrapper) {
+        this(projectName, agentName, targetDir, citrusVersion, noFetch, withCitrusMcp, sourcePlatform,
+             commandPrefix, defaultCitrusVersion, distribution, printer, progress, reporter, dryRun,
+             replaceWrapper, false);
+    }
 
     public InitRequest {
         Objects.requireNonNull(projectName, "projectName");

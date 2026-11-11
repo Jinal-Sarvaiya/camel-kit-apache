@@ -165,8 +165,17 @@ Read `shared/iron-laws.md` for the full Iron Laws. This phase enforces:
 
 ## Scope
 
-This skill is greenfield-only. `camel-start` routes migration and upgrade requests to `camel-migrate`; do not detect,
-scan, or execute a migration branch here.
+This skill supports both greenfield projects and adding capabilities to existing Camel 4 applications. `camel-start` routes
+migration and upgrade requests to `camel-migrate`; do not detect, scan, or execute a migration branch here.
+
+### Existing Project Detection
+
+Check `.camel-kit/config.properties` for `project.type=existing`. If found:
+1. Load `guides/existing-project-discovery.md` instead of `guides/greenfield-interview.md`
+2. Read detected project metadata from config: `project.detectedCamelVersion`, `project.primaryDsl`, `project.routeCount`
+3. Load the project graph from `.camel-kit/project-graph.json` to understand existing routes and structure
+4. Ask only unresolved questions (don't re-ask what the graph and config already answered)
+5. Design new capabilities that integrate with existing routes without changing unrelated code
 
 ---
 
@@ -177,15 +186,19 @@ You MUST complete these items in order:
 1. **Detect invocation mode** — check for `<PIPELINE_ID>` argument and existing `design-spec.md` (see Invocation Modes above). If amend mode, skip to the Amend Mode section.
 2. **Resolve pipeline** — read `shared/pipeline-infrastructure.md` for pipeline resolution logic. If no active pipeline exists, prompt the user to run `{COMMAND_PREFIX} nextId <slug>` to create one. The pipeline ID determines where artifacts are saved.
 3. **Load context** — read `docs/constitution.md` (if it exists), `.camel-kit/config.properties` (if it exists)
-4. **Run greenfield interview** — first read `shared/discovery-completeness.md`, then load
-   `guides/greenfield-interview.md`; capture explicit scope boundaries and the reason for every exclusion
-5. **Select Camel version** — load `guides/version-selection.md`
-6. **Design flows** — for each flow, load relevant `camel-design/` guides (component selection, EIPs, data formats, error handling, security, resilience)
-7. **Assemble design spec** — load `guides/design-assembly.md`
-8. **Self-review spec** — scan for placeholders, contradictions, unverified components, and any flow that crosses an
+4. **Detect project type** — check `project.type` in config.properties:
+   - If `project.type=existing`: this is an existing Camel 4 application, use existing-project interview path
+   - If `project.type=greenfield` or missing: use greenfield interview path
+5. **Run interview** — based on project type:
+   - **Greenfield:** first read `shared/discovery-completeness.md`, then load `guides/greenfield-interview.md`; capture explicit scope boundaries and the reason for every exclusion
+   - **Existing project:** load `guides/existing-project-discovery.md`; read project graph, detect existing routes/DSL/version, ask only unresolved questions
+6. **Select Camel version** — load `guides/version-selection.md` (for existing projects, bind to detected version)
+7. **Design flows** — for each flow, load relevant `camel-design/` guides (component selection, EIPs, data formats, error handling, security, resilience)
+8. **Assemble design spec** — load `guides/design-assembly.md` (for existing projects, include integration points with existing routes)
+9. **Self-review spec** — scan for placeholders, contradictions, unverified components, and any flow that crosses an
    explicit `Not Doing (and Why)` boundary
-9. **User reviews spec** — present spec, wait for explicit approval (Iron Law 3)
-10. **Transition** — depends on invocation mode:
+10. **User reviews spec** — present spec, wait for explicit approval (Iron Law 3)
+11. **Transition** — depends on invocation mode:
     - **Chained mode:** YOU invoke the `camel-plan` skill automatically (do NOT tell the user to run it)
     - **Standalone mode:** write output artifact, print confirmation, STOP
 

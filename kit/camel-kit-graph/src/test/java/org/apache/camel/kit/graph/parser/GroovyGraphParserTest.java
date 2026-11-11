@@ -33,6 +33,13 @@ class GroovyGraphParserTest {
     }
 
     @Test
+    void groovyDslRoutesRecordTheirSourceFile() {
+        String file = graph.getNode("route:groovyTimer").properties().get("file");
+        assertNotNull(file, "discovery needs the source file to tell Groovy DSL routes from YAML routes");
+        assertTrue(file.endsWith(".groovy"));
+    }
+
+    @Test
     void parsesFromEndpoint() {
         assertEquals("timer:groovyTick?period=5000",
                 graph.getNode("route:groovyTimer").properties().get("fromUri"));

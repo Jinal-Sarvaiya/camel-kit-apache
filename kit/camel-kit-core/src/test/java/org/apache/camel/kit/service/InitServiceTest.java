@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import org.apache.camel.kit.CamelKitMain;
@@ -634,7 +635,32 @@ class InitServiceTest {
                 CamelKitMain.distribution(),
                 Printer.noop(),
                 progress,
-                reporter);
+                reporter,
+                false,
+                false);
+    }
+
+    private InitRequest requestForExistingProject(
+            Path targetDir,
+            String agentName,
+            InitProgress progress,
+            InitReporter reporter) {
+        return new InitRequest(
+                "orders",
+                agentName,
+                targetDir,
+                "default",
+                true,
+                false,
+                null, // No sourcePlatform - this is an existing Camel project, not a migration
+                "camel-kit",
+                "5.0.1",
+                CamelKitMain.distribution(),
+                Printer.noop(),
+                progress,
+                reporter,
+                false,
+                false);
     }
 
     private static List<String> snapshot(Path root) throws Exception {
@@ -667,7 +693,9 @@ class InitServiceTest {
                 CamelKitMain.distribution(),
                 Printer.noop(),
                 InitProgress.noop(),
-                InitReporter.noop());
+                InitReporter.noop(),
+                false,
+                false);
     }
 
     private InitRequest request(
@@ -722,7 +750,9 @@ class InitServiceTest {
                 distribution,
                 Printer.noop(),
                 progress,
-                reporter);
+                reporter,
+                false,
+                false);
     }
 
     private static final class RecordingProgress implements InitProgress {
@@ -787,6 +817,934 @@ class InitServiceTest {
 
         boolean hasWarningContaining(String text) {
             return warnings.stream().anyMatch(warning -> warning.message().contains(text));
+        }
+    }
+
+    // Existing Project Preservation Tests (Issue #164)
+
+    @Test
+    void initOverExistingProjectPreservesPomXml() throws Exception {
+        // Setup: Create existing Camel project with pom.xml
+        Path targetDir = tempDir.resolve("existing");
+        Files.createDirectories(targetDir);
+        String originalPom = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>my-existing-app</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.camel</groupId>
+                            <artifactId>camel-core</artifactId>
+                            <version>4.8.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """;
+        Files.writeString(targetDir.resolve("pom.xml"), originalPom);
+
+        // Act: Run init (using requestForExistingProject which sets sourcePlatform=null)
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: pom.xml unchanged
+        String afterInit = Files.readString(targetDir.resolve("pom.xml"));
+        assertEquals(originalPom, afterInit, "pom.xml should not be modified during init");
+
+        // Assert: .camel-kit and skills were created
+        assertTrue(Files.exists(targetDir.resolve(".camel-kit/config.properties")));
+        assertTrue(Files.exists(targetDir.resolve(".claude/skills")));
+
+        // Assert: project.type=existing in config
+        String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
+        assertTrue(config.contains("project.type=existing"));
+    }
+
+    @Test
+    void initSkipsMavenWrapperWhenItExists() throws Exception {
+        // Setup: Create existing Camel project with Maven wrapper
+        Path targetDir = tempDir.resolve("existing-wrapper");
+        Files.createDirectories(targetDir);
+        Files.writeString(targetDir.resolve("pom.xml"),
+                "<project><dependencies><dependency><groupId>org.apache.camel</groupId><artifactId>camel-core</artifactId></dependency></dependencies></project>");
+        Files.writeString(targetDir.resolve("mvnw"), "#!/bin/sh\n# Existing wrapper");
+        Files.createDirectories(targetDir.resolve(".mvn/wrapper"));
+        Files.writeString(targetDir.resolve(".mvn/wrapper/maven-wrapper.properties"),
+                "distributionUrl=https://example.com/maven-3.8.0.zip");
+
+        String originalMvnw = Files.readString(targetDir.resolve("mvnw"));
+        String originalProps = Files.readString(targetDir.resolve(".mvn/wrapper/maven-wrapper.properties"));
+
+        // Act: Run init (using requestForExistingProject which sets sourcePlatform=null)
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: Maven wrapper unchanged
+        assertEquals(originalMvnw, Files.readString(targetDir.resolve("mvnw")));
+        assertEquals(originalProps, Files.readString(targetDir.resolve(".mvn/wrapper/maven-wrapper.properties")));
+    }
+
+    @Test
+    void initReplacesWrapperWhenExplicitlyRequested() throws Exception {
+        // Setup: Create existing project with Maven wrapper
+        Path targetDir = tempDir.resolve("replace-wrapper");
+        Files.createDirectories(targetDir);
+        Files.writeString(targetDir.resolve("pom.xml"), "<project/>");
+        Files.writeString(targetDir.resolve("mvnw"), "#!/bin/sh\n# Old wrapper");
+
+        // Act: Run init with replaceWrapper=true
+        InitRequest requestWithReplace = new InitRequest(
+                "orders",
+                "claude",
+                targetDir,
+                "default",
+                true,
+                false,
+                "mulesoft",
+                "camel-kit",
+                "5.0.1",
+                CamelKitMain.distribution(),
+                Printer.noop(),
+                InitProgress.noop(),
+                InitReporter.noop(),
+                false,
+                true); // replaceWrapper = true
+        new InitService().initialize(requestWithReplace);
+
+        // Assert: Maven wrapper was replaced
+        String newMvnw = Files.readString(targetDir.resolve("mvnw"));
+        assertFalse(newMvnw.contains("# Old wrapper"));
+        assertTrue(newMvnw.contains("mvnw")); // Contains new wrapper content
+    }
+
+    @Test
+    void reinitPreservesUserCustomizationsInAgentsMd() throws Exception {
+        // Setup: Init once
+        Path targetDir = tempDir.resolve("reinit-test");
+        Files.createDirectories(targetDir);
+        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // User adds custom content to AGENTS.md
+        String agentsMdPath = targetDir.resolve("AGENTS.md").toString();
+        String originalContent = Files.readString(targetDir.resolve("AGENTS.md"));
+        String userCustomization = "\n\n# My Custom Section\n\nThis is my custom content.";
+        Files.writeString(targetDir.resolve("AGENTS.md"), originalContent + userCustomization);
+
+        // Act: Reinit
+        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: User customization preserved
+        String afterReinit = Files.readString(targetDir.resolve("AGENTS.md"));
+        assertTrue(afterReinit.contains("# My Custom Section"),
+                "User customization should be preserved during reinit");
+        assertTrue(afterReinit.contains("This is my custom content."),
+                "User content should not be lost");
+
+        // Assert: Generated content appears exactly once (no duplication)
+        String generatedMarker = "Camel-Kit AI Agent Guidelines";
+        int firstOccurrence = afterReinit.indexOf(generatedMarker);
+        int secondOccurrence = afterReinit.indexOf(generatedMarker, firstOccurrence + 1);
+        assertEquals(-1, secondOccurrence,
+                "Generated content should appear exactly once, not duplicated on reinit");
+
+        // Assert: Managed block markers present
+        assertTrue(afterReinit.contains("<!-- CAMEL-KIT-MANAGED-BLOCK-START: camel-kit-generated -->"),
+                "Managed block start marker should be present");
+        assertTrue(afterReinit.contains("<!-- CAMEL-KIT-MANAGED-BLOCK-END: camel-kit-generated -->"),
+                "Managed block end marker should be present");
+    }
+
+    @Test
+    void reinitPreservesUserCustomizationsInClaudeMd() throws Exception {
+        // Setup: Init once
+        Path targetDir = tempDir.resolve("reinit-claude-test");
+        Files.createDirectories(targetDir);
+        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // User adds custom content to CLAUDE.md
+        String originalContent = Files.readString(targetDir.resolve("CLAUDE.md"));
+        String userCustomization = "\n\n## My Custom Documentation\n\nCustom project-specific notes here.";
+        Files.writeString(targetDir.resolve("CLAUDE.md"), originalContent + userCustomization);
+
+        // Act: Reinit
+        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: User customization preserved
+        String afterReinit = Files.readString(targetDir.resolve("CLAUDE.md"));
+        assertTrue(afterReinit.contains("## My Custom Documentation"),
+                "User customization should be preserved in CLAUDE.md during reinit");
+        assertTrue(afterReinit.contains("Custom project-specific notes here."),
+                "User content should not be lost in CLAUDE.md");
+
+        // Assert: Generated content appears exactly once (no duplication)
+        String generatedMarker = "# Camel-Kit";
+        int firstOccurrence = afterReinit.indexOf(generatedMarker);
+        int secondOccurrence = afterReinit.indexOf(generatedMarker, firstOccurrence + 1);
+        assertEquals(-1, secondOccurrence,
+                "Generated content in CLAUDE.md should appear exactly once, not duplicated on reinit");
+
+        // Assert: Managed block markers present
+        assertTrue(afterReinit.contains("<!-- CAMEL-KIT-MANAGED-BLOCK-START: camel-kit-generated -->"),
+                "CLAUDE.md managed block start marker should be present");
+        assertTrue(afterReinit.contains("<!-- CAMEL-KIT-MANAGED-BLOCK-END: camel-kit-generated -->"),
+                "CLAUDE.md managed block end marker should be present");
+    }
+
+    @Test
+    void dryRunShowsConflictsWithoutWriting() throws Exception {
+        // Setup: Create existing project
+        Path targetDir = tempDir.resolve("dry-run-test");
+        Files.createDirectories(targetDir);
+        Files.writeString(targetDir.resolve("AGENTS.md"), "# Existing AGENTS.md");
+        Files.writeString(targetDir.resolve("pom.xml"), "<project/>");
+
+        // Act: Run init with dryRun=true
+        InitRequest dryRunRequest = new InitRequest(
+                "orders",
+                "claude",
+                targetDir,
+                "default",
+                true,
+                false,
+                "mulesoft",
+                "camel-kit",
+                "5.0.1",
+                CamelKitMain.distribution(),
+                Printer.noop(),
+                InitProgress.noop(),
+                InitReporter.noop(),
+                true, // dryRun = true
+                false);
+        InitResult result = new InitService().initialize(dryRunRequest);
+
+        // Assert: No .camel-kit directory created (dry-run didn't write)
+        assertFalse(Files.exists(targetDir.resolve(".camel-kit/config.properties")),
+                "Dry-run should not create config.properties");
+
+        // Assert: AGENTS.md unchanged
+        String afterDryRun = Files.readString(targetDir.resolve("AGENTS.md"));
+        assertEquals("# Existing AGENTS.md", afterDryRun,
+                "Dry-run should not modify existing files");
+    }
+
+    @Test
+    void muleProjectIsNotMarkedAsExisting() throws Exception {
+        // Setup: Create MuleSoft project with pom.xml
+        Path targetDir = tempDir.resolve("mule-project");
+        Files.createDirectories(targetDir);
+        String mulePom = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>my-mule-app</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.mule.runtime</groupId>
+                            <artifactId>mule-core</artifactId>
+                            <version>4.4.0</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """;
+        Files.writeString(targetDir.resolve("pom.xml"), mulePom);
+
+        // Act: Run init (using requestForExistingProject which sets sourcePlatform=null)
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: NOT marked as existing (MuleSoft is a migration source, not existing Camel)
+        String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
+        assertTrue(config.contains("project.type=greenfield"),
+                "MuleSoft project should be marked as greenfield (migration target), not existing");
+        assertFalse(config.contains("project.type=existing"),
+                "MuleSoft project should NOT be marked as existing");
+    }
+
+    @Test
+    void existingProjectWithUndetectableVersionThrowsError() throws Exception {
+        // Setup: Create existing Camel project but with no version information
+        Path targetDir = tempDir.resolve("no-version-project");
+        Files.createDirectories(targetDir);
+        // Create a minimal pom with Camel but no detectable version
+        // Dependencies have no version = will be parsed as "managed" by PomParser
+        String pomWithoutVersion = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1.0.0</version>
+
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.camel</groupId>
+                            <artifactId>camel-core</artifactId>
+                            <!-- No version - parser sets to "managed" -->
+                        </dependency>
+                    </dependencies>
+                </project>
+                """;
+        Files.writeString(targetDir.resolve("pom.xml"), pomWithoutVersion);
+
+        // Act & Assert: Should throw IllegalStateException, not fall back to defaults
+        IllegalStateException exception = assertThrows(IllegalStateException.class,
+                () -> new InitService().initialize(
+                        requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop())));
+
+        // Assert: Error message is actionable
+        assertTrue(exception.getMessage().contains("Cannot detect Camel version"),
+                "Error should mention version detection failure");
+        assertTrue(exception.getMessage().contains("camel.version property"),
+                "Error should suggest adding camel.version property");
+        assertTrue(exception.getMessage().contains("-p project.camelVersion"),
+                "Error should suggest -p flag");
+        assertTrue(exception.getMessage().contains("Refusing to guess"),
+                "Error should explicitly refuse to guess");
+    }
+
+    @Test
+    void existingProjectWithUnsupportedCamelVersionWarnsTheUser() throws Exception {
+        Path targetDir = tempDir.resolve("camel3-warning");
+        Files.createDirectories(targetDir);
+        Files.writeString(targetDir.resolve("pom.xml"), minimalCamelPom("3.21.0"));
+        RecordingReporter reporter = new RecordingReporter();
+
+        new InitService().initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), reporter));
+
+        assertTrue(reporter.hasWarningContaining("Camel 3.21.0 is not supported"),
+                "the user must be told on the command line, not only through a config flag");
+        Properties config = loadConfig(targetDir);
+        assertEquals("true", config.getProperty("project.unsupportedVersion"));
+        assertEquals("3.21.0", config.getProperty("project.camelVersion"),
+                "the detected version must be kept, not replaced by a supported default");
+    }
+
+    @Test
+    void existingProjectWithoutAnyRoutesWarnsThatTheBaselineIsIncomplete() throws Exception {
+        Path targetDir = tempDir.resolve("no-routes");
+        Files.createDirectories(targetDir);
+        Files.writeString(targetDir.resolve("pom.xml"), minimalCamelPom("4.8.0"));
+        RecordingReporter reporter = new RecordingReporter();
+
+        new InitService().initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), reporter));
+
+        Properties config = loadConfig(targetDir);
+        assertEquals("existing", config.getProperty("project.type"));
+        assertNull(config.getProperty("project.routeCount"), "no routes were discovered, so no count is claimed");
+        assertNull(config.getProperty("project.primaryDsl"), "no DSL may be guessed without route files");
+        assertFalse(Files.exists(targetDir.resolve(".camel-kit/baseline-routes.txt")));
+        assertTrue(reporter.hasWarningContaining("No routes were found"),
+                "an incomplete graph must be reported instead of silently producing an empty baseline");
+        assertTrue(config.getProperty("project.discoveryGaps").contains("No routes were found"),
+                "the gap must be persisted so the workflow inspects the source instead of assuming");
+        assertNull(config.getProperty("project.unsupportedCombination"));
+    }
+
+    @Test
+    void existingProjectWithOnlyJavaDslRoutesIsReportedAsUnsupportedAndKeepsItsDsl() throws Exception {
+        Path targetDir = tempDir.resolve("java-dsl-only");
+        Path src = Files.createDirectories(targetDir.resolve("src/main/java/x"));
+        Files.writeString(targetDir.resolve("pom.xml"), minimalCamelPom("4.8.0"));
+        Files.writeString(src.resolve("Routes.java"), """
+                package x;
+                import org.apache.camel.builder.RouteBuilder;
+                public class Routes extends RouteBuilder {
+                    public void configure() { from("timer:t").routeId("t").to("log:x"); }
+                }
+                """);
+        RecordingReporter reporter = new RecordingReporter();
+
+        new InitService().initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), reporter));
+
+        Properties config = loadConfig(targetDir);
+        assertEquals("java", config.getProperty("project.primaryDsl"), "the detected DSL is kept, never converted");
+        assertEquals("4.8.0", config.getProperty("project.camelVersion"));
+        assertTrue(config.getProperty("project.unsupportedCombination").contains("No YAML routes were found"));
+        assertTrue(reporter.hasWarningContaining("No YAML routes were found"));
+    }
+
+    @Test
+    void existingProjectInventoriesContractFilesAndSkipsBuildOutput() throws Exception {
+        Path fixtureSource = Path.of("src/test/resources/fixtures/existing-project-spring-boot");
+        Path targetDir = tempDir.resolve("contracts");
+        copyDirectory(fixtureSource, targetDir);
+        Files.createDirectories(targetDir.resolve("src/main/resources/api"));
+        Files.writeString(targetDir.resolve("src/main/resources/api/openapi.yaml"), "openapi: 3.0.0\n");
+        Files.writeString(targetDir.resolve("src/main/resources/orders.xsd"), "<xs:schema/>");
+        Files.createDirectories(targetDir.resolve("target/classes"));
+        Files.writeString(targetDir.resolve("target/classes/stale.wsdl"), "<definitions/>");
+
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        assertEquals("2", loadConfig(targetDir).getProperty("project.contractFilesCount"));
+        assertEquals(List.of("src/main/resources/api/openapi.yaml", "src/main/resources/orders.xsd"),
+                Files.readAllLines(targetDir.resolve(".camel-kit/baseline-contracts.txt")));
+    }
+
+    @Test
+    void existingProjectWithoutContractFilesWritesNoContractBaseline() throws Exception {
+        Path fixtureSource = Path.of("src/test/resources/fixtures/existing-project-spring-boot");
+        Path targetDir = tempDir.resolve("no-contracts");
+        copyDirectory(fixtureSource, targetDir);
+
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        assertNull(loadConfig(targetDir).getProperty("project.contractFilesCount"));
+        assertFalse(Files.exists(targetDir.resolve(".camel-kit/baseline-contracts.txt")));
+    }
+
+    /**
+     * Scripted end-to-end check of the init side of the workflow on the representative Spring Boot fixture: every
+     * constraint downstream stages read is recorded, the existing sources are untouched, and nothing is guessed.
+     */
+    @Test
+    void existingProjectEndToEndRecordsConstraintsBaselineAndLeavesSourcesUntouched() throws Exception {
+        Path fixtureSource = Path.of("src/test/resources/fixtures/existing-project-spring-boot");
+        Path targetDir = tempDir.resolve("e2e");
+        copyDirectory(fixtureSource, targetDir);
+        Map<String, String> before = contentSnapshot(targetDir);
+
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        Properties config = loadConfig(targetDir);
+        assertEquals("existing", config.getProperty("project.type"));
+        assertEquals("spring-boot", config.getProperty("project.runtime"));
+        assertEquals("4.8.0", config.getProperty("project.camelVersion"));
+        assertEquals("yaml", config.getProperty("project.primaryDsl"));
+        assertEquals("3", config.getProperty("project.routeCount"));
+        assertEquals("not_run", config.getProperty("project.baselineTestStatus"));
+        assertNull(config.getProperty("project.unsupportedVersion"));
+        assertNull(config.getProperty("project.unsupportedCombination"));
+        assertNull(config.getProperty("project.discoveryGaps"));
+        assertTrue(Files.readAllLines(targetDir.resolve(".camel-kit/baseline-routes.txt")).stream()
+                .allMatch(f -> f.endsWith(".yaml")));
+        assertFalse(Files.readAllLines(targetDir.resolve(".camel-kit/baseline-tests.txt")).isEmpty());
+
+        // no pre-existing file was modified or removed (dependency versions and DSL stay exactly as they were)
+        Map<String, String> after = contentSnapshot(targetDir);
+        before.forEach((file, content) -> assertEquals(content, after.get(file),
+                "init must not change the existing project file " + file));
+    }
+
+    private static Map<String, String> contentSnapshot(Path root) throws java.io.IOException {
+        Map<String, String> files = new java.util.TreeMap<>();
+        try (var paths = Files.walk(root)) {
+            for (Path p : paths.filter(Files::isRegularFile).toList()) {
+                files.put(root.relativize(p).toString(), Files.readString(p));
+            }
+        }
+        return files;
+    }
+
+    @Test
+    void existingProjectWithYamlRoutesHasNoUnsupportedCombinationOrGaps() throws Exception {
+        Path fixtureSource = Path.of("src/test/resources/fixtures/existing-project-spring-boot");
+        Path targetDir = tempDir.resolve("supported-fixture");
+        copyDirectory(fixtureSource, targetDir);
+
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        Properties config = loadConfig(targetDir);
+        assertNull(config.getProperty("project.unsupportedCombination"));
+        assertNull(config.getProperty("project.discoveryGaps"));
+    }
+
+    @Test
+    void existingProjectWithMalformedPomReportsAWarningAndStillInitializes() throws Exception {
+        Path targetDir = tempDir.resolve("broken-pom");
+        Files.createDirectories(targetDir);
+        Files.writeString(targetDir.resolve("pom.xml"), "<project><dependencies><dependency>");
+        RecordingReporter reporter = new RecordingReporter();
+
+        InitResult result = new InitService().initialize(
+                requestForExistingProject(targetDir, "claude", InitProgress.noop(), reporter));
+
+        assertNotNull(result);
+        assertFalse(reporter.warnings().isEmpty(), "an unreadable pom must surface as a warning");
+        assertTrue(Files.exists(targetDir.resolve(".camel-kit/config.properties")));
+    }
+
+    @Test
+    void baselineTestsAreNotRunUnlessRequested() throws Exception {
+        Path targetDir = projectWithFakeWrapper("baseline-default", 0);
+
+        new InitService().initialize(
+                requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        assertFalse(Files.exists(targetDir.resolve("mvnw-was-run")),
+                "init must not execute project build code unless --record-baseline is given");
+        assertEquals("not_run", loadConfig(targetDir).getProperty("project.baselineTestStatus"));
+        assertTrue(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json"))
+                .contains("\"status\": \"not_run\""));
+    }
+
+    @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void recordBaselineRecordsPassedWhenTheProjectTestsPass() throws Exception {
+        Path targetDir = projectWithFakeWrapper("baseline-pass", 0);
+
+        new InitService().initialize(recordingBaselineRequest(targetDir));
+
+        assertTrue(Files.exists(targetDir.resolve("mvnw-was-run")), "the wrapper must have been invoked");
+        assertEquals("passed", loadConfig(targetDir).getProperty("project.baselineTestStatus"));
+        assertTrue(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json"))
+                .contains("\"status\": \"passed\""));
+    }
+
+    @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void recordBaselineRecordsFailedWhenTheProjectTestsFail() throws Exception {
+        Path targetDir = projectWithFakeWrapper("baseline-fail", 1);
+
+        new InitService().initialize(recordingBaselineRequest(targetDir));
+
+        assertEquals("failed", loadConfig(targetDir).getProperty("project.baselineTestStatus"));
+        assertTrue(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json"))
+                .contains("\"status\": \"failed\""));
+    }
+
+    @Test
+    void existingProjectWithUnsupportedCamelVersionIsDetected() throws Exception {
+        // Setup: Create existing project with Camel 3.x (unsupported)
+        Path targetDir = tempDir.resolve("camel3-project");
+        Files.createDirectories(targetDir);
+        String camel3Pom = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>legacy-app</artifactId>
+                    <version>1.0.0</version>
+                    <properties>
+                        <camel.version>3.21.0</camel.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.camel</groupId>
+                            <artifactId>camel-core</artifactId>
+                            <version>${camel.version}</version>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """;
+        Files.writeString(targetDir.resolve("pom.xml"), camel3Pom);
+
+        // Act: Run init
+        InitResult result = new InitService().initialize(
+                requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: Detected as existing project with unsupported version
+        String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
+        assertTrue(config.contains("project.type=existing"), "Should detect as existing project");
+        assertTrue(config.contains("project.camelVersion=3.21.0"), "Should detect Camel 3.21.0");
+        assertTrue(config.contains("project.unsupportedVersion=true"),
+                "Should flag Camel 3.x as unsupported");
+        assertTrue(config.contains("Camel 3.x is not supported"),
+                "Should provide reason for unsupported flag");
+    }
+
+    @Test
+    void greenfieldProjectWithoutCamelIsNotMarkedAsExisting() throws Exception {
+        // Setup: Create greenfield project with pom.xml but no Camel artifacts
+        Path targetDir = tempDir.resolve("greenfield-maven");
+        Files.createDirectories(targetDir);
+        String plainPom = """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>my-app</artifactId>
+                    <version>1.0.0</version>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.springframework.boot</groupId>
+                            <artifactId>spring-boot-starter</artifactId>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """;
+        Files.writeString(targetDir.resolve("pom.xml"), plainPom);
+
+        // Act: Run init
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: NOT marked as existing (no Camel artifacts)
+        String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
+        assertTrue(config.contains("project.type=greenfield"),
+                "Maven project without Camel should be marked as greenfield, not existing");
+        assertFalse(config.contains("project.type=existing"),
+                "Maven project without Camel should NOT be marked as existing");
+    }
+
+    @Test
+    void existingProjectConfigContainsDetectedMetadata() throws Exception {
+        // Setup: Copy fixture to temp directory
+        Path fixtureSource = Path.of("src/test/resources/fixtures/existing-project-spring-boot");
+        Path targetDir = tempDir.resolve("fixture-test");
+
+        // Fixture must exist - fail test if missing (don't skip silently)
+        assertTrue(Files.exists(fixtureSource),
+                "Test fixture missing at " + fixtureSource + " - existing project tests cannot run");
+
+        copyDirectory(fixtureSource, targetDir);
+
+        // Act: Run init (using requestForExistingProject which sets sourcePlatform=null)
+        new InitService()
+                .initialize(requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: Config contains detected metadata
+        String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
+        assertTrue(config.contains("project.type=existing"), "Should detect existing project");
+        assertTrue(config.contains("project.detectedCamelVersion=4.8.0"), "Should detect Camel version");
+
+        // CRITICAL: project.camelVersion must be bound to detected version, not distribution default
+        assertTrue(config.contains("project.camelVersion=4.8.0"),
+                "project.camelVersion must use detected version for existing projects");
+
+        assertTrue(config.contains("project.runtime=spring-boot"), "Should detect Spring Boot runtime");
+        assertTrue(config.contains("project.primaryDsl=yaml"), "Should detect YAML DSL");
+        assertTrue(config.contains("project.hasTests=true"), "Should detect existing tests");
+        assertTrue(config.contains("project.routeCount=3"), "Should count existing routes");
+        assertTrue(config.contains("project.configFilesCount=1"),
+                "The fixture has exactly one application.properties");
+        assertFalse(config.contains("project.moduleCount"), "The fixture is a single-module project");
+    }
+
+    @Test
+    void reinitUpdatesSkillManifestsAndGuides() throws Exception {
+        // Setup: Init once
+        Path targetDir = tempDir.resolve("skill-update-test");
+        Files.createDirectories(targetDir);
+        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Find a SKILL.md file
+        Path skillManifest = targetDir.resolve(".claude/skills/camel-start/SKILL.md");
+        assertTrue(Files.exists(skillManifest), "SKILL.md should exist after first init");
+        String originalSkillContent = Files.readString(skillManifest);
+
+        // Find a guide file
+        Path guideFile = targetDir.resolve(".claude/skills/camel-brainstorm/guides/version-selection.md");
+        if (Files.exists(guideFile)) {
+            String originalGuideContent = Files.readString(guideFile);
+
+            // Modify both files to simulate old versions
+            Files.writeString(skillManifest, "# OLD VERSION\n" + originalSkillContent);
+            Files.writeString(guideFile, "# OLD GUIDE\n" + originalGuideContent);
+
+            // Act: Reinit
+            new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+            // Assert: SKILL.md and guide files are updated (not preserved)
+            String updatedSkillContent = Files.readString(skillManifest);
+            assertFalse(updatedSkillContent.contains("# OLD VERSION"),
+                    "SKILL.md should be updated on reinit, not preserved");
+
+            String updatedGuideContent = Files.readString(guideFile);
+            assertFalse(updatedGuideContent.contains("# OLD GUIDE"),
+                    "Guide files should be updated on reinit, not preserved");
+        }
+
+        // Create a custom file in skills directory (not SKILL.md or guide)
+        Path customFile = targetDir.resolve(".claude/skills/camel-start/my-custom-notes.md");
+        String customContent = "# My Custom Notes\n\nThese are my project-specific notes.";
+        Files.writeString(customFile, customContent);
+
+        // Act: Reinit again
+        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Assert: Custom files are preserved (not overwritten)
+        assertTrue(Files.exists(customFile), "Custom skill file should be preserved on reinit");
+        String preservedCustomContent = Files.readString(customFile);
+        assertEquals(customContent, preservedCustomContent,
+                "Custom skill files should be preserved exactly, not overwritten on reinit");
+    }
+
+    @Test
+    void e2eExistingProjectWorkflow() throws Exception {
+        // This is the core acceptance test: complete workflow on existing project fixture
+        // Tests init, adding capability, running tests, verifying preservation
+        Path fixtureSource = Path.of("src/test/resources/fixtures/existing-project-spring-boot");
+        Path targetDir = tempDir.resolve("e2e-workflow");
+
+        // Fixture must exist
+        assertTrue(Files.exists(fixtureSource),
+                "E2E test fixture missing at " + fixtureSource);
+
+        copyDirectory(fixtureSource, targetDir);
+
+        // Capture original state
+        String originalPom = Files.readString(targetDir.resolve("pom.xml"));
+        String originalCamelVersion = extractMavenProperty(originalPom, "camel.version");
+        String originalSpringBootVersion = extractMavenProperty(originalPom, "spring-boot.version");
+        List<String> originalRouteFiles = listYamlFiles(targetDir.resolve("src/main/resources/camel"));
+        int originalRouteCount = originalRouteFiles.size();
+
+        // Step 1: Init existing project
+        InitResult initResult = new InitService().initialize(
+                requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        // Verify: Detection worked
+        String config = Files.readString(targetDir.resolve(".camel-kit/config.properties"));
+        assertTrue(config.contains("project.type=existing"), "Should detect existing project");
+        assertTrue(config.contains("project.camelVersion=4.8.0"), "Should detect Camel 4.8.0");
+        assertTrue(config.contains("project.runtime=spring-boot"), "Should detect Spring Boot");
+        assertTrue(config.contains("project.primaryDsl=yaml"), "Should detect YAML DSL");
+        assertTrue(config.contains("project.dslTypes=YAML"), "Should record all DSL types");
+        assertTrue(config.contains("project.routeCount=3"), "Should count 3 existing routes");
+
+        // Verify: Baseline files created for regression verification (#169 requirement)
+        Path baselineRoutes = targetDir.resolve(".camel-kit/baseline-routes.txt");
+        assertTrue(Files.exists(baselineRoutes), "Should create baseline-routes.txt for regression checks");
+        // baseline-routes.txt lists route files (3 routes live in 2 files); routeCount counts routes
+        assertEquals(List.of("src/main/resources/camel/api-routes.yaml", "src/main/resources/camel/timer-routes.yaml"),
+                Files.readAllLines(baselineRoutes),
+                "Should record each existing route file exactly once");
+
+        Path baselineTests = targetDir.resolve(".camel-kit/baseline-tests.txt");
+        assertTrue(Files.exists(baselineTests), "Should create baseline-tests.txt for regression checks");
+        List<String> recordedTests = Files.readAllLines(baselineTests);
+        assertTrue(recordedTests.size() > 0, "Should record existing test files");
+
+        // Verify: pom.xml unchanged after init
+        String pomAfterInit = Files.readString(targetDir.resolve("pom.xml"));
+        assertEquals(originalPom, pomAfterInit, "pom.xml should not be modified by init");
+
+        // Step 2: Add a new capability (real YAML route that would work with existing routes)
+        // Use unique route ID to avoid conflicts with existing routes
+        Path newRouteFile = targetDir.resolve("src/main/resources/camel/monitoring-routes.yaml");
+        String newRouteContent = """
+                - route:
+                    id: monitoring-heartbeat
+                    description: Monitoring heartbeat capability added to existing project
+                    from:
+                      uri: timer:monitoring
+                      parameters:
+                        period: 60000
+                      steps:
+                        - log:
+                            message: "Monitoring heartbeat: system OK"
+                        - setBody:
+                            constant: "Status: OK"
+                """;
+        Files.writeString(newRouteFile, newRouteContent);
+
+        // A test proving the new capability is actually loaded and started by the existing application
+        Path newCapabilityTest = targetDir.resolve(
+                "src/test/java/org/apache/camel/kit/test/fixture/MonitoringRouteTest.java");
+        Files.writeString(newCapabilityTest,
+                """
+                        package org.apache.camel.kit.test.fixture;
+
+                        import org.apache.camel.CamelContext;
+                        import org.apache.camel.test.spring.junit5.CamelSpringBootTest;
+                        import org.junit.jupiter.api.Test;
+                        import org.springframework.beans.factory.annotation.Autowired;
+                        import org.springframework.boot.test.context.SpringBootTest;
+
+                        import static org.junit.jupiter.api.Assertions.assertTrue;
+
+                        @CamelSpringBootTest
+                        @SpringBootTest
+                        public class MonitoringRouteTest {
+
+                            @Autowired
+                            private CamelContext camelContext;
+
+                            @Test
+                            public void monitoringHeartbeatIsStarted() {
+                                assertTrue(camelContext.getRouteController().getRouteStatus("monitoring-heartbeat").isStarted());
+                            }
+                        }
+                        """);
+
+        // Step 3: Run the project's own tests with the wrapper that init installed.
+        // Explicitly skip (not pass) when Maven cannot run here, e.g. offline CI without access to Maven Central.
+        Path mvnw = targetDir.resolve("mvnw");
+        assertTrue(Files.exists(mvnw), "init must install the Maven wrapper into a project that has none");
+        mvnw.toFile().setExecutable(true);
+        Path probeLog = tempDir.resolve("mvnw-probe.log");
+        org.junit.jupiter.api.Assumptions.assumeTrue(
+                runMaven(targetDir, probeLog, 120, "-v") == 0,
+                "Skipping: Maven wrapper cannot run in this environment (see " + probeLog + ")");
+
+        Path testLog = tempDir.resolve("mvnw-test.log");
+        int exitCode = runMaven(targetDir, testLog, 600, "test", "-B", "-q");
+        if (exitCode != 0) {
+            fail("Maven tests failed (exit code " + exitCode + ").\n"
+                 + "This indicates the new capability broke existing tests or has issues.\n"
+                 + "Maven output:\n" + Files.readString(testLog));
+        }
+        assertTrue(
+                Files.exists(targetDir.resolve(
+                        "target/surefire-reports/TEST-org.apache.camel.kit.test.fixture.MonitoringRouteTest.xml")),
+                "The new capability test must actually have run");
+
+        // Tests passed - verify all expectations
+        // Verify: pom.xml still unchanged after tests
+        String pomAfterTests = Files.readString(targetDir.resolve("pom.xml"));
+        assertEquals(originalPom, pomAfterTests,
+                "pom.xml should remain unchanged after adding capability and running tests");
+
+        // Verify: Versions not upgraded
+        String currentCamelVersion = extractMavenProperty(pomAfterTests, "camel.version");
+        String currentSpringBootVersion = extractMavenProperty(pomAfterTests, "spring-boot.version");
+        assertEquals(originalCamelVersion, currentCamelVersion,
+                "Camel version should not be upgraded");
+        assertEquals(originalSpringBootVersion, currentSpringBootVersion,
+                "Spring Boot version should not be upgraded");
+
+        // Verify: All original routes still exist
+        List<String> finalRouteFiles = listYamlFiles(targetDir.resolve("src/main/resources/camel"));
+        assertEquals(originalRouteCount + 1, finalRouteFiles.size(),
+                "Should have original routes + new capability route");
+        for (String routeFile : originalRouteFiles) {
+            assertTrue(finalRouteFiles.contains(routeFile),
+                    "Original route file should still exist: " + routeFile);
+        }
+
+        // SUCCESS: E2E test passed - init, add capability, tests pass, preservation verified
+
+        // Verify: New capability added
+        assertTrue(Files.exists(newRouteFile), "New route file should be created");
+
+        // Verify: Original files still unchanged
+        List<String> routeFilesAfterAddition = listYamlFiles(targetDir.resolve("src/main/resources/camel"));
+        assertEquals(originalRouteCount + 1, routeFilesAfterAddition.size(),
+                "Should have original routes + 1 new route");
+
+        for (String routeFile : originalRouteFiles) {
+            assertTrue(routeFilesAfterAddition.contains(routeFile),
+                    "Original route file should still exist after adding new capability: " + routeFile);
+        }
+
+        // Verify: Skills and workspace created
+        assertTrue(Files.exists(targetDir.resolve(".claude/skills")),
+                "Skills directory should be created");
+        assertTrue(Files.exists(targetDir.resolve("AGENTS.md")),
+                "AGENTS.md should be created");
+        assertTrue(Files.exists(targetDir.resolve("CLAUDE.md")),
+                "CLAUDE.md should be created");
+    }
+
+    private static String minimalCamelPom(String camelVersion) {
+        return String.format(java.util.Locale.ROOT, """
+                <?xml version="1.0" encoding="UTF-8"?>
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                    <modelVersion>4.0.0</modelVersion>
+                    <groupId>com.example</groupId>
+                    <artifactId>app</artifactId>
+                    <version>1.0.0</version>
+                    <properties>
+                        <camel.version>%s</camel.version>
+                    </properties>
+                    <dependencies>
+                        <dependency>
+                            <groupId>org.apache.camel</groupId>
+                            <artifactId>camel-core</artifactId>
+                            <version>${camel.version}</version>
+                        </dependency>
+                        <dependency>
+                            <groupId>org.junit.jupiter</groupId>
+                            <artifactId>junit-jupiter</artifactId>
+                            <version>5.10.0</version>
+                            <scope>test</scope>
+                        </dependency>
+                    </dependencies>
+                </project>
+                """, camelVersion);
+    }
+
+    private static Properties loadConfig(Path targetDir) throws IOException {
+        Properties config = new Properties();
+        try (var in = Files.newInputStream(targetDir.resolve(".camel-kit/config.properties"))) {
+            config.load(in);
+        }
+        return config;
+    }
+
+    /**
+     * An existing Camel project whose Maven wrapper is a stub that records its invocation and exits with the given
+     * code, so baseline behaviour can be checked without running a real build.
+     */
+    private Path projectWithFakeWrapper(String name, int exitCode) throws IOException {
+        Path targetDir = tempDir.resolve(name);
+        Files.createDirectories(targetDir);
+        Files.writeString(targetDir.resolve("pom.xml"), minimalCamelPom("4.8.0"));
+        Path mvnw = targetDir.resolve("mvnw");
+        Files.writeString(mvnw, "#!/bin/sh\ntouch mvnw-was-run\nexit " + exitCode + "\n");
+        mvnw.toFile().setExecutable(true);
+        return targetDir;
+    }
+
+    private InitRequest recordingBaselineRequest(Path targetDir) {
+        return new InitRequest(
+                "orders", "claude", targetDir, "default", true, false, null, "camel-kit", "5.0.1",
+                CamelKitMain.distribution(), Printer.noop(), InitProgress.noop(), InitReporter.noop(),
+                false, false, true);
+    }
+
+    /**
+     * Runs the project's Maven wrapper with output redirected to a file (no pipe to fill) and returns the exit code; a
+     * run that exceeds the timeout is killed and reported as -1.
+     */
+    private static int runMaven(Path projectDir, Path log, int timeoutSeconds, String... args) throws Exception {
+        List<String> command = new ArrayList<>();
+        command.add("./mvnw");
+        command.addAll(List.of(args));
+        Process process = new ProcessBuilder(command)
+                .directory(projectDir.toFile())
+                .redirectErrorStream(true)
+                .redirectOutput(log.toFile())
+                .start();
+        if (!process.waitFor(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            return -1;
+        }
+        return process.exitValue();
+    }
+
+    private String extractMavenProperty(String pomXml, String propertyName) {
+        // Simple regex to extract <propertyName>value</propertyName>
+        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile(
+                "<" + propertyName + ">([^<]+)</" + propertyName + ">");
+        java.util.regex.Matcher matcher = pattern.matcher(pomXml);
+        return matcher.find() ? matcher.group(1) : null;
+    }
+
+    private List<String> listYamlFiles(Path directory) throws IOException {
+        if (!Files.exists(directory)) {
+            return List.of();
+        }
+        try (var paths = Files.walk(directory)) {
+            return paths
+                    .filter(Files::isRegularFile)
+                    .filter(p -> p.getFileName().toString().endsWith(".yaml"))
+                    .map(p -> directory.relativize(p).toString())
+                    .sorted()
+                    .toList();
+        }
+    }
+
+    private void copyDirectory(Path source, Path target) throws IOException {
+        Files.createDirectories(target);
+        try (var paths = Files.walk(source)) {
+            for (Path sourcePath : paths.toList()) {
+                Path targetPath = target.resolve(source.relativize(sourcePath));
+                if (Files.isDirectory(sourcePath)) {
+                    Files.createDirectories(targetPath);
+                } else {
+                    Files.copy(sourcePath, targetPath);
+                }
+            }
         }
     }
 }

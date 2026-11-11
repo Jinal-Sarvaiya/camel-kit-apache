@@ -21,6 +21,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 public class ClaudeGenerator extends DefaultGenerator {
 
     private final QuteTemplateEngine templateEngine = new QuteTemplateEngine();
+    private final ManagedBlockMerger merger = new ManagedBlockMerger();
 
     private static final String LEGACY_COMMAND_DIR = ".claude/commands";
 
@@ -85,7 +86,10 @@ public class ClaudeGenerator extends DefaultGenerator {
                 Map.of(
                         "COMMAND_PREFIX", ctx.commandPrefix()));
         String content = templateEngine.render("templates/claude/claude-md.md", data);
-        AtomicFileWriter.write(ctx.projectDir().resolve("CLAUDE.md"), content);
+
+        // Always use managed block (even on first init) to enable preservation on reinit
+        Path claudeMd = ctx.projectDir().resolve("CLAUDE.md");
+        merger.mergeBlock(claudeMd, "camel-kit-generated", content);
     }
 
     private void generateSettings(InitContext ctx) throws Exception {

@@ -1364,9 +1364,158 @@ class ResourceConsistencyTest {
         assertTrue(biztalkMap.contains("Do not select an implementation engine per functoid"));
         assertTrue(biztalkMap.contains("Count all source and target leaf fields"));
         assertTrue(componentMap.contains("canonical inline Groovy or XSLT DataMapper"));
-        assertTrue(brainstorm.contains("This skill is greenfield-only"));
+
+        // Issue #164: camel-brainstorm now supports both greenfield AND existing Camel 4 projects
+        // (but NOT migration, which is still handled separately by camel-migrate)
+        assertTrue(brainstorm.contains(
+                "This skill supports both greenfield projects and adding capabilities to existing Camel 4 applications"));
+        assertTrue(brainstorm.contains("project.type=existing"));
+        assertTrue(brainstorm.contains("project.type=greenfield"));
         assertFalse(brainstorm.contains("Load migration-discovery.md"));
         assertFalse(brainstorm.contains("mg_graph"));
+    }
+
+    @Test
+    void existingProjectScopeProtectionRulesExist() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String plan = Files.readString(root.resolve("camel-plan/SKILL.md"));
+        String execute = Files.readString(root.resolve("camel-execute/SKILL.md"));
+
+        // camel-plan must have existing project scope protection section
+        assertTrue(plan.contains("Existing Project Scope Protection"),
+                "camel-plan must document existing project scope protection");
+
+        // camel-plan must load discovered constraints
+        assertTrue(plan.contains("project.camelVersion"),
+                "camel-plan must read project.camelVersion from config.properties");
+        assertTrue(plan.contains("project.primaryDsl"),
+                "camel-plan must read project.primaryDsl constraint");
+        assertTrue(plan.contains("baseline-routes.txt") || plan.contains("baseline inventory"),
+                "camel-plan must reference baseline inventory files");
+
+        // camel-plan must reference design spec scope
+        assertTrue(plan.contains("Affected Files"),
+                "camel-plan must reference Affected Files from design spec");
+        assertTrue(plan.contains("LOCKED") || plan.contains("cannot upgrade"),
+                "camel-plan must document locked version constraints");
+
+        // camel-execute must have scope enforcement section
+        assertTrue(execute.contains("Step 0.6: Existing Project Scope Enforcement"),
+                "camel-execute must have Step 0.6 scope enforcement section");
+
+        // camel-execute must load constraints and baseline
+        assertTrue(execute.contains("project.camelVersion"),
+                "camel-execute must read project.camelVersion constraint");
+        assertTrue(execute.contains("baseline-routes.txt"),
+                "camel-execute must reference baseline-routes.txt");
+        assertTrue(execute.contains("project.primaryDsl"),
+                "camel-execute must check primaryDsl constraint");
+    }
+
+    /**
+     * Context propagation (#170): the constraints discovery writes into config.properties must be the ones the workflow
+     * reads. A key renamed or dropped on either side makes this fail.
+     */
+    @Test
+    void planSkillDocumentsExactlyTheExistingProjectKeysInitWrites() throws IOException {
+        Path core = repositoryRoot().resolve("kit/camel-kit-core/src/main");
+        String initService = Files.readString(core.resolve("java/org/apache/camel/kit/service/InitService.java"));
+        String plan = Files.readString(core.resolve("resources/skills/camel-plan/SKILL.md"));
+
+        int start = plan.indexOf("## Existing Project Scope Protection");
+        int fence = plan.indexOf("```properties", start);
+        int end = plan.indexOf("```", fence + 3);
+        assertTrue(start >= 0 && fence > start && end > fence, "camel-plan must keep its properties block");
+
+        Set<String> documented = new LinkedHashSet<>();
+        Matcher keys = Pattern.compile("^(project\\.\\w+)=", Pattern.MULTILINE).matcher(plan.substring(fence, end));
+        while (keys.find()) {
+            documented.add(keys.group(1));
+        }
+
+        Set<String> written = new LinkedHashSet<>();
+        Matcher setters = Pattern.compile("setProperty\\(\\s*\"(project\\.\\w+)\"").matcher(initService);
+        while (setters.find()) {
+            written.add(setters.group(1));
+        }
+
+        // keys init writes only for greenfield or internal bookkeeping are not workflow constraints
+        Set<String> notConstraints
+                = Set.of("project.type", "project.unsupportedReason",
+                        "project.detectedPlatformBomVersion", "project.sourcePlatform", "project.springBootVersion");
+        Set<String> documentedButNeverWritten = new LinkedHashSet<>(documented);
+        documentedButNeverWritten.removeAll(written);
+        assertTrue(documentedButNeverWritten.isEmpty(),
+                "camel-plan documents keys init never writes: " + documentedButNeverWritten);
+
+        Set<String> writtenButNotConsumed = new LinkedHashSet<>(written);
+        writtenButNotConsumed.removeAll(documented);
+        writtenButNotConsumed.removeAll(notConstraints);
+        writtenButNotConsumed.removeIf(k -> k.equals("project.name") || k.equals("project.agent"));
+        assertTrue(writtenButNotConsumed.isEmpty(),
+                "init writes existing-project keys the plan skill does not read: " + writtenButNotConsumed);
+    }
+
+    @Test
+    void existingProjectRoutingAndUnsupportedVersionStopAreDocumentedForTheWorkflow() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String start = Files.readString(root.resolve("camel-start/SKILL.md"));
+        String plan = Files.readString(root.resolve("camel-plan/SKILL.md"));
+        String discovery = Files.readString(root.resolve("camel-brainstorm/guides/existing-project-discovery.md"));
+
+        // routing: existing projects reach brainstorm, migrations stay on camel-migrate
+        assertTrue(start.contains("/camel-brainstorm (auto-detects project.type=existing) → /camel-plan"),
+                "camel-start must route existing projects through brainstorm into the shared pipeline");
+        assertTrue(start.contains("camel-migrate"), "camel-start must still route migrations to camel-migrate");
+
+        // unsupported combinations and discovery gaps must reach every stage that acts on the project
+        String execute = Files.readString(root.resolve("camel-execute/SKILL.md"));
+        for (String key : List.of("project.unsupportedCombination", "project.discoveryGaps")) {
+            assertTrue(plan.contains(key), "camel-plan must document " + key);
+            assertTrue(discovery.contains(key), "the discovery guide must handle " + key);
+        }
+        assertTrue(execute.contains("project.unsupportedCombination"),
+                "camel-execute must stop on an unsupported combination");
+
+        // unsupported versions stop both discovery and planning instead of being planned around
+        assertTrue(discovery.contains("project.unsupportedVersion"));
+        assertTrue(plan.contains("`project.unsupportedVersion=true` is a hard stop"),
+                "camel-plan must stop on an unsupported version");
+    }
+
+    @Test
+    void existingProjectBaselineValidationRulesExist() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String validate = Files.readString(root.resolve("camel-validate/SKILL.md"));
+
+        // camel-validate must have baseline validation section
+        assertTrue(validate.contains("Existing Project Baseline Validation"),
+                "camel-validate must have 'Existing Project Baseline Validation' section");
+
+        // Must check for project.type=existing
+        assertTrue(validate.contains("project.type=existing"),
+                "camel-validate must check for project.type=existing");
+
+        // Must use baseline inventory files
+        assertTrue(validate.contains("baseline-routes.txt"),
+                "camel-validate must read baseline-routes.txt");
+        assertTrue(validate.contains("baseline-tests.txt"),
+                "camel-validate must read baseline-tests.txt");
+
+        // Must distinguish existing vs new files
+        assertTrue(validate.contains("Identify Existing vs. New Files")
+                || validate.contains("existing routes") && validate.contains("new routes"),
+                "camel-validate must separate existing from new files");
+
+        // Must detect regressions
+        assertTrue(validate.contains("regression") || validate.contains("REGRESSION"),
+                "camel-validate must mention regression detection");
+
+        // Must report checks that could not run instead of treating them as passes (#170)
+        assertTrue(validate.contains("### Unavailable Evidence"),
+                "camel-validate must report unavailable evidence");
+        assertTrue(validate.contains("`UNVERIFIED`"),
+                "camel-validate must not report an unrunnable baseline check as preserved");
     }
 
     @Test

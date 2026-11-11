@@ -143,6 +143,19 @@ class SkillResourceInstaller {
             InitContext ctx, Path source, Path destination, WorkflowManifest workflow)
             throws Exception {
         Files.createDirectories(destination.getParent());
+
+        // Always update SKILL.md and guide files (in guides/ subdirectory)
+        // Preserve user files (anything outside guides/ that isn't SKILL.md)
+        String fileName = destination.getFileName().toString();
+        boolean isSkillManifest = fileName.equals("SKILL.md");
+        boolean isGuideFile = destination.getParent().getFileName().toString().equals("guides");
+        boolean shouldUpdate = isSkillManifest || isGuideFile;
+
+        if (Files.exists(destination) && !shouldUpdate) {
+            // Skip existing user files to preserve customizations
+            return;
+        }
+
         try (InputStream in = Files.newInputStream(source)) {
             Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
         }

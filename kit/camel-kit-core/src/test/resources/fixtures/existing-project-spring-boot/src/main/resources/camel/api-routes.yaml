@@ -1,0 +1,19 @@
+- route:
+    id: get-users-api
+    from:
+      uri: rest:get:/api/users
+      steps:
+        - setHeader:
+            name: Content-Type
+            constant: application/json
+        - setBody:
+            constant: '[{"id":1,"name":"Alice"},{"id":2,"name":"Bob"}]'
+        - to: log:api-response
+
+- route:
+    id: health-check
+    from:
+      uri: rest:get:/health
+      steps:
+        - setBody:
+            constant: '{"status":"UP"}'

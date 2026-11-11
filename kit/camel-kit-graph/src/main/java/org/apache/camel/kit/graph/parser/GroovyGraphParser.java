@@ -236,6 +236,11 @@ public class GroovyGraphParser implements GraphParser {
         Map<String, String> routeProps = new HashMap<>();
         routeProps.put("fromUri", fromUri);
         routeProps.put("routeId", routeId);
+        // Source file lets discovery tell Java/Groovy DSL routes apart from YAML ones
+        GraphNode declaringClass = graph.getNode(classNodeId);
+        if (declaringClass != null && declaringClass.properties().get("file") != null) {
+            routeProps.put("file", declaringClass.properties().get("file"));
+        }
         graph.addNode(new GraphNode(routeNodeId, NodeType.CAMEL_ROUTE, routeProps));
 
         // Create from endpoint

@@ -13,6 +13,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.camel.kit.catalog.CitrusSchemaDownloader;
 import org.apache.camel.kit.config.AgentConfig;
@@ -29,7 +30,6 @@ import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ParserDiagnostic;
 import org.apache.camel.kit.graph.ProjectGraph;
-import org.apache.camel.kit.graph.RuntimeDetector;
 import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.util.ConfinedPaths;
 import org.apache.camel.kit.util.TemplateUtils;
@@ -40,6 +40,9 @@ import org.apache.camel.kit.util.TemplateUtils;
 public class InitService {
 
     private static final String MAVEN_WRAPPER_VERSION = "3.9.9";
+
+    /** Upper bound for the opt-in baseline test run. */
+    private static final long BASELINE_TEST_TIMEOUT_SECONDS = 600;
 
     public InitResult initialize(InitRequest request) throws Exception {
         AgentConfig agent = AgentRegistry.get(request.agentName());
@@ -55,6 +58,21 @@ public class InitService {
                 : skillsDir;
         Path docsDir = targetDir.resolve("docs");
         String citrusVersion = request.resolvedCitrusVersion();
+
+        // Detect if this is an existing Camel 4 project (not MuleSoft or other platforms)
+        boolean isExistingProject = isExistingCamelProject(targetDir, request.sourcePlatform());
+
+        // Run preflight conflict detection
+        InitConflictDetector conflictDetector = new InitConflictDetector();
+        List<InitConflictDetector.ConflictingFile> conflicts = conflictDetector.detectConflicts(targetDir,
+                isExistingProject);
+
+        if (request.dryRun()) {
+            return performDryRun(request, agent, conflicts, isExistingProject);
+        }
+
+        // Report existing files that will be preserved/merged (not dry-run mode)
+        reportExistingFiles(request, conflicts, isExistingProject);
 
         InitContext genCtx = new InitContext(
                 agent, request.agentName(), commandsDir,
@@ -74,7 +92,8 @@ public class InitService {
         progress.finishTask();
 
         progress.startTask("\uD83D\uDCDD", "Writing configuration");
-        createConfigFile(camelKitDir, request.projectName(), request.agentName(), agent, request, createdPaths);
+        createConfigFile(camelKitDir, request.projectName(), request.agentName(), agent, request, createdPaths,
+                isExistingProject);
         createConstitution(docsDir, request, createdPaths);
         copyAdditionalTemplates(camelKitDir.resolve("templates"), createdPaths);
         progress.finishTask();
@@ -83,10 +102,18 @@ public class InitService {
         generator.generate(genCtx);
         progress.finishTask();
 
-        progress.startTask("\uD83D\uDD0C", "Configuring Maven wrapper");
-        createMavenWrapper(targetDir, createdPaths);
-        request.reporter().mavenWrapperCreated(MAVEN_WRAPPER_VERSION);
-        progress.finishTask();
+        // Only create Maven wrapper if it doesn't exist or if replacement is explicitly requested
+        boolean shouldCreateWrapper = !isExistingProject
+                || request.replaceWrapper()
+                || (!Files.exists(targetDir.resolve("mvnw"))
+                        && !Files.exists(targetDir.resolve(".mvn")));
+
+        if (shouldCreateWrapper) {
+            progress.startTask("\uD83D\uDD0C", "Configuring Maven wrapper");
+            createMavenWrapper(targetDir, createdPaths);
+            request.reporter().mavenWrapperCreated(MAVEN_WRAPPER_VERSION);
+            progress.finishTask();
+        }
 
         progress.startTask("\uD83D\uDD0D", "Building project graph");
         InitGraphSummary graph = buildProjectGraph(targetDir, camelKitDir, request, warnings, createdPaths);
@@ -148,10 +175,12 @@ public class InitService {
             String agentName,
             AgentConfig agent,
             InitRequest request,
-            List<Path> createdPaths)
+            List<Path> createdPaths,
+            boolean isExistingProject)
             throws Exception {
         Properties config = new Properties();
         config.setProperty("project.name", name);
+        config.setProperty("project.type", isExistingProject ? "existing" : "greenfield");
         config.setProperty("project.command-prefix", request.commandPrefix());
         config.setProperty("agent.name", agentName);
         config.setProperty("agent.folder", agent.folder());
@@ -288,7 +317,9 @@ public class InitService {
                 }
                 createdPaths.add(graphFile);
                 String detectedProjectType = detectProjectType(projectGraph);
-                String detectedRuntime = updateConfigWithRuntime(camelKitDir, projectGraph, request.distribution());
+                String detectedRuntime
+                        = updateConfigWithRuntime(camelKitDir, projectGraph, request.distribution(), request, warnings,
+                                targetDir);
                 InitGraphSummary graph = new InitGraphSummary(
                         graphFile,
                         projectGraph.nodeCount(),
@@ -301,6 +332,14 @@ public class InitService {
             InitGraphSummary graph = new InitGraphSummary(graphFile, 0, 0, "", "");
             request.reporter().graphSkipped();
             return graph;
+        } catch (IllegalStateException e) {
+            // Rethrow fatal errors for existing projects (e.g., undetectable Camel version)
+            // Graph parse failures are converted to warnings instead
+            if (e.getMessage() != null && e.getMessage().contains("Cannot detect Camel version")) {
+                throw e;
+            }
+            reportWarning(request, warnings, "Could not build project graph: " + e.getMessage());
+            return null;
         } catch (Exception e) {
             reportWarning(request, warnings, "Could not build project graph: " + e.getMessage());
             return null;
@@ -332,7 +371,13 @@ public class InitService {
         request.reporter().warning(warning);
     }
 
-    private String updateConfigWithRuntime(Path dir, ProjectGraph graph, DistributionConfig distribution)
+    private String updateConfigWithRuntime(
+            Path dir,
+            ProjectGraph graph,
+            DistributionConfig distribution,
+            InitRequest request,
+            List<InitWarning> warnings,
+            Path projectRoot)
             throws Exception {
         Path configFile = dir.resolve("config.properties");
         Properties config = new Properties();
@@ -343,8 +388,128 @@ public class InitService {
             }
         }
 
-        String runtime = RuntimeDetector.detect(graph);
-        writeVersionConfig(config, distribution, runtime);
+        // Use ProjectDiscovery for comprehensive metadata
+        org.apache.camel.kit.graph.ProjectDiscovery.DiscoveryResult discovery
+                = org.apache.camel.kit.graph.ProjectDiscovery.discover(graph);
+
+        String runtime = discovery.runtime();
+        boolean isExistingProject = "existing".equals(config.getProperty("project.type"));
+
+        if (isExistingProject) {
+            // For existing projects: use detected versions, do not overwrite with distribution defaults
+            String normalizedRuntime = normalizeRuntime(runtime);
+            config.setProperty("project.runtime", normalizedRuntime);
+
+            // Bind to detected Camel version instead of distribution default
+            if (discovery.camelVersion() != null) {
+                config.setProperty("project.camelVersion", discovery.camelVersion());
+                // Also store in detectedCamelVersion for reference
+                config.setProperty("project.detectedCamelVersion", discovery.camelVersion());
+            } else {
+                // ERROR: Cannot proceed with undetectable version on existing project
+                throw new IllegalStateException(
+                        "Cannot detect Camel version from existing project. "
+                                                + "Add a camel.version property to pom.xml, or specify the version explicitly with "
+                                                + "-p project.camelVersion=<version>. "
+                                                + "Refusing to guess a version for an existing project.");
+            }
+
+            if (discovery.platformBomVersion() != null) {
+                config.setProperty("project.platformBomVersion", discovery.platformBomVersion());
+                config.setProperty("project.detectedPlatformBomVersion", discovery.platformBomVersion());
+            }
+
+            if (!discovery.dslTypes().isEmpty()) {
+                config.setProperty("project.primaryDsl", discovery.primaryDsl());
+                // Record all DSL types for compatibility checks
+                config.setProperty("project.dslTypes",
+                        discovery.dslTypes().stream()
+                                .map(Enum::name)
+                                .sorted()
+                                .collect(java.util.stream.Collectors.joining(",")));
+            }
+            config.setProperty("project.hasTests", String.valueOf(discovery.hasTests()));
+            if (discovery.hasTests()) {
+                // Record baseline test files for regression verification
+                writeBaselineTests(dir, projectRoot);
+                if (request.recordBaseline()) {
+                    // Opt-in: executes the project's own build and tests
+                    recordBaselineTestResults(dir, projectRoot, config);
+                } else {
+                    // Default: do not run project code during init; validation establishes the baseline later
+                    writeBaselineStatus(dir.resolve("baseline-test-results.json"), "not_run",
+                            "Baseline tests were not run during init (use --record-baseline to run them)");
+                    config.setProperty("project.baselineTestStatus", "not_run");
+                }
+            }
+            if (!discovery.routes().isEmpty()) {
+                config.setProperty("project.routeCount", String.valueOf(discovery.routes().size()));
+                // Record baseline route files for regression verification
+                writeBaselineRoutes(dir, discovery.routeFiles(), projectRoot);
+            }
+
+            // Interface contract files (OpenAPI, WSDL, XSD, ...) are inventoried so later stages can protect them.
+            // Analysing their content is out of scope here (tracked separately in #111).
+            List<String> contractFiles = findContractFiles(projectRoot);
+            if (!contractFiles.isEmpty()) {
+                config.setProperty("project.contractFilesCount", String.valueOf(contractFiles.size()));
+                writeBaselineLines(dir.resolve("baseline-contracts.txt"), contractFiles);
+            }
+
+            // Gaps the graph could not fill (e.g. routes defined in unsupported layouts): workflow must inspect source
+            List<String> gaps = discovery.coverageGaps();
+            if (!gaps.isEmpty()) {
+                config.setProperty("project.discoveryGaps", String.join(" | ", gaps));
+                gaps.forEach(gap -> reportWarning(request, warnings, gap));
+            }
+
+            // Unsupported runtime/DSL combinations are reported, never silently planned around
+            List<String> unsupported = discovery.unsupportedCombinationReasons();
+            if (!unsupported.isEmpty()) {
+                config.setProperty("project.unsupportedCombination", String.join(" ", unsupported));
+                unsupported.forEach(reason -> reportWarning(request, warnings, reason));
+            }
+
+            // Record modules (for multi-module Maven projects)
+            if (!discovery.modules().isEmpty()) {
+                config.setProperty("project.modules", String.join(",", discovery.modules()));
+                config.setProperty("project.moduleCount", String.valueOf(discovery.modules().size()));
+            }
+
+            // Record beans count (Spring, CDI, Camel beans)
+            if (discovery.beansCount() > 0) {
+                config.setProperty("project.beansCount", String.valueOf(discovery.beansCount()));
+            }
+
+            // Record configuration files count
+            if (discovery.configFilesCount() > 0) {
+                config.setProperty("project.configFilesCount", String.valueOf(discovery.configFilesCount()));
+            }
+
+            // Flag unsupported versions
+            if (discovery.isUnsupportedVersion()) {
+                config.setProperty("project.unsupportedVersion", "true");
+                config.setProperty("project.unsupportedReason",
+                        "Camel 3.x is not supported. Please upgrade to Camel 4.x.");
+                reportWarning(request, warnings,
+                        "Camel " + discovery.camelVersion() + " is not supported. Please upgrade to Camel 4.x "
+                                                 + "before adding features.");
+            }
+
+            // forage.version must track project.camelVersion
+            String camelVersion = config.getProperty("project.camelVersion");
+            if (camelVersion != null) {
+                String forageVersion = distribution.forageVersionForCamel(camelVersion);
+                if (forageVersion != null) {
+                    config.setProperty("forage.version", forageVersion);
+                } else {
+                    config.remove("forage.version");
+                }
+            }
+        } else {
+            // For greenfield projects: use distribution defaults
+            writeVersionConfig(config, distribution, runtime);
+        }
 
         var out = new ByteArrayOutputStream();
         config.store(out, "Camel-Kit Project Configuration");
@@ -388,6 +553,52 @@ public class InitService {
             return "main";
         }
         return runtime;
+    }
+
+    /**
+     * Determines if the target directory contains an existing Camel 4 project that should be enhanced (as opposed to a
+     * greenfield project or a migration source like MuleSoft/BizTalk).
+     *
+     * @param  targetDir      the project directory
+     * @param  sourcePlatform the --source-platform flag value (or null)
+     * @return                true if this is an existing Camel 4 project to enhance
+     */
+    private boolean isExistingCamelProject(Path targetDir, String sourcePlatform) {
+        // If user explicitly requested migration from another platform, treat as greenfield target
+        if (sourcePlatform != null && !"auto".equals(sourcePlatform)) {
+            return false;
+        }
+
+        // Must have pom.xml to be an existing Maven project
+        Path pomXml = targetDir.resolve("pom.xml");
+        if (!Files.exists(pomXml)) {
+            return false;
+        }
+
+        // Quick heuristic: if it has MuleSoft markers, it's a migration source, not an existing Camel project
+        // (Full graph analysis happens later; this is just for early project.type classification)
+        try {
+            String pomContent = Files.readString(pomXml);
+            // Check for MuleSoft group IDs
+            if (pomContent.contains("org.mule.runtime") || pomContent.contains("com.mulesoft")) {
+                return false;
+            }
+            // Check for BizTalk project markers (no pom.xml for BizTalk, but defensive check)
+            Path bizTalkProject = targetDir.resolve("project.btproj");
+            if (Files.exists(bizTalkProject)) {
+                return false;
+            }
+            // If it has Camel artifacts, it's likely an existing Camel project
+            if (pomContent.contains("org.apache.camel")) {
+                return true;
+            }
+        } catch (Exception e) {
+            // If we can't read pom.xml, treat as greenfield
+            return false;
+        }
+
+        // Has pom.xml but no Camel artifacts - treat as greenfield
+        return false;
     }
 
     private String detectProjectType(ProjectGraph graph) {
@@ -501,5 +712,280 @@ public class InitService {
             }
         }
         return null;
+    }
+
+    private void reportExistingFiles(
+            InitRequest request,
+            List<InitConflictDetector.ConflictingFile> existingFiles,
+            boolean isExistingProject) {
+        if (existingFiles.isEmpty()) {
+            return;
+        }
+
+        // Categorize files by how they'll be handled
+        List<InitConflictDetector.ConflictingFile> willMerge = new ArrayList<>();
+        List<InitConflictDetector.ConflictingFile> willSkip = new ArrayList<>();
+
+        for (var file : existingFiles) {
+            if (file.type() == InitConflictDetector.ConflictType.AGENT_INSTRUCTIONS) {
+                willMerge.add(file);
+            } else if (file.type() == InitConflictDetector.ConflictType.MAVEN_WRAPPER && isExistingProject) {
+                willSkip.add(file);
+            }
+        }
+
+        if (!willMerge.isEmpty()) {
+            request.printer().println("ℹ️  Existing files will be preserved with managed blocks:");
+            for (var file : willMerge) {
+                request.printer().println("   - " + file.path().getFileName());
+            }
+        }
+
+        if (!willSkip.isEmpty()) {
+            request.printer()
+                    .println("ℹ️  Existing Maven wrapper will be preserved (use --replace-wrapper to replace)");
+        }
+    }
+
+    private InitResult performDryRun(
+            InitRequest request,
+            AgentConfig agent,
+            List<InitConflictDetector.ConflictingFile> conflicts,
+            boolean isExistingProject) {
+
+        request.printer().println();
+        request.printer().println("🔍 Dry-run mode: No files will be written");
+        request.printer().println();
+
+        if (isExistingProject) {
+            request.printer().println("✓ Detected existing Maven project (pom.xml found)");
+        } else {
+            request.printer().println("✓ Initializing new project");
+        }
+
+        request.printer().println();
+        request.printer().println("📋 Changes that would be made:");
+        request.printer().println();
+
+        // Report what would be created
+        request.printer().println("  Would create:");
+        request.printer().println("    - .camel-kit/config.properties");
+        request.printer().println("    - .camel-kit/templates/");
+        request.printer().println("    - docs/constitution.md");
+        request.printer().println("    - " + agent.skillsDirectory() + "/ (skills)");
+
+        if (!conflicts.isEmpty()) {
+            request.printer().println();
+            request.printer().println("  ⚠️  Would overwrite:");
+            for (var conflict : conflicts) {
+                request.printer().println("    - " + conflict.path().getFileName() + " (" + conflict.type() + ")");
+            }
+        }
+
+        boolean wouldCreateWrapper = !isExistingProject || request.replaceWrapper();
+        if (wouldCreateWrapper) {
+            request.printer().println();
+            request.printer().println("  Would create Maven wrapper:");
+            request.printer().println("    - mvnw, mvnw.cmd");
+            request.printer().println("    - .mvn/wrapper/maven-wrapper.properties");
+        }
+
+        request.printer().println();
+        request.printer().println("Run without --dry-run to apply these changes.");
+        request.printer().println();
+
+        // Return a minimal result for dry-run
+        return new InitResult(
+                request.projectName(),
+                request.agentName(),
+                agent,
+                request.targetDir(),
+                request.targetDir().resolve(".camel-kit"),
+                request.targetDir().resolve(agent.skillsDirectory()),
+                request.targetDir().resolve(agent.skillsDirectory()),
+                request.resolvedCitrusVersion(),
+                0,
+                MAVEN_WRAPPER_VERSION,
+                null,
+                List.of(),
+                List.of());
+    }
+
+    /**
+     * Records the baseline test result by running the project's own tests once. Only called when the user opted in with
+     * {@code --record-baseline}. The status is one of {@code passed}, {@code failed}, {@code timeout} or
+     * {@code not_run}; a project that has no Maven wrapper, or whose run cannot start, is recorded as {@code not_run}
+     * with the reason so validation can establish the baseline itself.
+     *
+     * @param camelKitDir .camel-kit directory
+     * @param projectRoot project root directory
+     * @param config      config properties to update
+     */
+    private void recordBaselineTestResults(Path camelKitDir, Path projectRoot, java.util.Properties config) {
+        Path mvnw = projectRoot.resolve("mvnw");
+        Path baselineResultsFile = camelKitDir.resolve("baseline-test-results.json");
+
+        if (!Files.exists(mvnw)) {
+            writeBaselineStatus(baselineResultsFile, "not_run", "Maven wrapper not found");
+            config.setProperty("project.baselineTestStatus", "not_run");
+            return;
+        }
+
+        Path output = null;
+        try {
+            mvnw.toFile().setExecutable(true);
+            // Send output to a file so the child can never block on a full pipe buffer
+            output = Files.createTempFile("camel-kit-baseline-", ".log");
+            Process testProcess = new ProcessBuilder()
+                    .command("./mvnw", "test", "-B", "-q")
+                    .directory(projectRoot.toFile())
+                    .redirectErrorStream(true)
+                    .redirectOutput(output.toFile())
+                    .start();
+
+            boolean finished = testProcess.waitFor(BASELINE_TEST_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            if (!finished) {
+                testProcess.destroyForcibly();
+                writeBaselineStatus(baselineResultsFile, "timeout",
+                        "Tests timed out after " + BASELINE_TEST_TIMEOUT_SECONDS + " seconds");
+                config.setProperty("project.baselineTestStatus", "timeout");
+                return;
+            }
+
+            if (testProcess.exitValue() == 0) {
+                writeBaselineStatus(baselineResultsFile, "passed", "All tests passed");
+                config.setProperty("project.baselineTestStatus", "passed");
+            } else {
+                writeBaselineStatus(baselineResultsFile, "failed", "Tests had failures (baseline state)");
+                config.setProperty("project.baselineTestStatus", "failed");
+            }
+        } catch (Exception e) {
+            writeBaselineStatus(baselineResultsFile, "not_run", "Could not execute tests: " + e.getMessage());
+            config.setProperty("project.baselineTestStatus", "not_run");
+        } finally {
+            if (output != null) {
+                try {
+                    Files.deleteIfExists(output);
+                } catch (IOException ignored) {
+                    // temp file cleanup only
+                }
+            }
+        }
+    }
+
+    /**
+     * Write baseline test status to JSON file.
+     */
+    private void writeBaselineStatus(Path file, String status, String reason) {
+        try {
+            String json = String.format(Locale.ROOT,
+                    "{\n  \"status\": \"%s\",\n  \"reason\": \"%s\",\n  \"timestamp\": \"%s\"\n}",
+                    status,
+                    reason.replace("\"", "\\\""),
+                    java.time.Instant.now().toString());
+            Files.writeString(file, json);
+        } catch (Exception e) {
+            // Best-effort - ignore write failures
+        }
+    }
+
+    private void writeBaselineTests(Path camelKitDir, Path projectRoot) {
+        try {
+            Path testDir = projectRoot.resolve("src/test/java");
+            if (!Files.isDirectory(testDir)) {
+                return;
+            }
+
+            List<String> testFiles = new java.util.ArrayList<>();
+            try (var paths = Files.walk(testDir)) {
+                paths.filter(Files::isRegularFile)
+                        .filter(p -> p.toString().endsWith("Test.java")
+                                || p.toString().endsWith("Tests.java")
+                                || p.toString().endsWith("IT.java"))
+                        .forEach(p -> {
+                            try {
+                                testFiles.add(testDir.relativize(p).toString());
+                            } catch (IllegalArgumentException e) {
+                                // Skip if cannot relativize
+                            }
+                        });
+            }
+
+            if (!testFiles.isEmpty()) {
+                Path baselineFile = camelKitDir.resolve("baseline-tests.txt");
+                Files.write(baselineFile, testFiles.stream().sorted().toList());
+            }
+        } catch (Exception e) {
+            // Non-fatal - baseline recording is best-effort
+        }
+    }
+
+    /**
+     * Write baseline route inventory for existing projects to enable regression verification. Records the route source
+     * files discovered so that validation can distinguish pre-existing routes from newly added capabilities.
+     *
+     * @param camelKitDir .camel-kit directory
+     * @param routeFiles  unique route source files from discovery
+     * @param projectRoot project root directory for relativizing absolute paths
+     */
+    private void writeBaselineRoutes(Path camelKitDir, List<String> routeFiles, Path projectRoot) {
+        try {
+            Path baselineFile = camelKitDir.resolve("baseline-routes.txt");
+            List<String> relativePaths = routeFiles.stream()
+                    .map(r -> {
+                        Path routePath = Path.of(r);
+                        if (routePath.isAbsolute()) {
+                            try {
+                                return projectRoot.relativize(routePath).toString();
+                            } catch (IllegalArgumentException e) {
+                                return r; // Cannot relativize, use as-is
+                            }
+                        }
+                        return r;
+                    })
+                    .sorted()
+                    .toList();
+            Files.write(baselineFile, relativePaths);
+        } catch (Exception e) {
+            // Non-fatal - baseline recording is best-effort
+        }
+    }
+
+    private static final java.util.regex.Pattern CONTRACT_FILE = java.util.regex.Pattern.compile(
+            "(?i)(.*\\.(wsdl|xsd|proto|avsc))|((openapi|swagger|asyncapi)[^/]*\\.(ya?ml|json))");
+    private static final java.util.Set<String> SKIPPED_DIRECTORIES
+            = java.util.Set.of("target", "node_modules", ".git", ".camel-kit", "build");
+
+    /**
+     * Lists interface contract files (OpenAPI/Swagger/AsyncAPI documents, WSDL, XSD, protobuf, Avro schemas) relative
+     * to the project root, sorted. Build output and tooling directories are skipped.
+     */
+    private List<String> findContractFiles(Path projectRoot) {
+        try (var paths = Files.walk(projectRoot)) {
+            return paths.filter(Files::isRegularFile)
+                    .map(projectRoot::relativize)
+                    .filter(rel -> {
+                        for (Path segment : rel.getParent() == null ? List.<Path>of() : rel.getParent()) {
+                            if (SKIPPED_DIRECTORIES.contains(segment.toString())) {
+                                return false;
+                            }
+                        }
+                        return CONTRACT_FILE.matcher(rel.getFileName().toString()).matches();
+                    })
+                    .map(rel -> rel.toString().replace('\\', '/'))
+                    .sorted()
+                    .toList();
+        } catch (Exception e) {
+            // Non-fatal - baseline recording is best-effort
+            return List.of();
+        }
+    }
+
+    private void writeBaselineLines(Path file, List<String> lines) {
+        try {
+            Files.write(file, lines);
+        } catch (Exception e) {
+            // Non-fatal - baseline recording is best-effort
+        }
     }
 }

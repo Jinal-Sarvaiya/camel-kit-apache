@@ -2,7 +2,7 @@
 
 The Camel Kit pipeline turns integration requirements into generated routes, tests and review evidence in four
 stages: design, plan, execute and validate. Every stage is a skill that the coding agent runs; the stages share their
-artifacts through files under `docs/camel-kit/<pipeline-id>/`, so a pipeline survives the end of a session.
+artifacts through files under `docs/camel-kit/<pipeline-id>/`, so a pipeline survives the end of a session. The pipeline supports three paths: xref:greenfield.adoc[greenfield projects], xref:existing-project.adoc[enhancing existing Camel 4 applications], and xref:migration.adoc[migrating from other platforms].
 
 There are two ways to run it:
 
@@ -14,6 +14,21 @@ There are two ways to run it:
 
 The manual pipeline is agent-run and enforces the Iron Laws at every stage; Ship's stages, state and gates are owned
 by the controller.
+
+[[existing-project-path]]
+== The existing-project path
+
+For an existing Camel 4 application the same four stages apply, with the context from `camel-kit init` carried through:
+
+* *Design* reads the detected runtime, versions, DSL, contracts and baseline, and records them in the design
+  specification.
+* *Plan* lists the new capability, integration points, affected files and the behavior to preserve. Files outside that
+  list are not touched.
+* *Execute* stays within the approved scope: no dependency upgrades, no DSL conversion.
+* *Validate* compares against the recorded baseline, checks the new capability and the affected existing behavior, and
+  reports every check that could not run under Unavailable Evidence instead of counting it as passed.
+
+Details and supported combinations are in xref:existing-project.adoc[].
 
 [[stages]]
 == The four stages

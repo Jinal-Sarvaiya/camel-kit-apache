@@ -1,0 +1,476 @@
+= Adding Capabilities to Existing Camel Applications
+:description: How to use Camel Kit to enhance existing Camel 4 applications
+:keywords: camel, existing project, enhancement, integration
+
+Learn how to use Camel Kit to add new capabilities to your existing Apache Camel 4 applications without disrupting working code.
+
+== Overview
+
+Camel Kit can enhance **existing Camel 4 applications** in addition to creating new greenfield projects. When you run `init` on an existing project, Camel Kit:
+
+* Detects your current Camel version, runtime, and DSL
+* Preserves your `pom.xml`, existing routes, and configuration
+* Adds Camel Kit skills without overwriting customizations
+* Uses your existing version instead of upgrading
+
+The workflow follows the same **design → plan → execute → validate** pipeline, but with additional safeguards to protect existing functionality.
+
+== Prerequisites
+
+Your existing project must meet these requirements:
+
+* **Camel 4.x** (Camel 3.x is not supported - use `/camel-migrate` to upgrade first)
+* **Maven-based** project structure
+* One of these runtimes:
+** Spring Boot
+** Quarkus
+** Karaf
+** Camel Main / JBang
+
+NOTE: Multi-module Maven projects are supported with `.camel-kit/` at the root.
+
+== Safe Adoption
+
+Camel Kit `init` is **safe to run over existing projects** with these protections:
+
+[%header,cols="2,3"]
+|===
+| What's Protected | How
+
+| `pom.xml`
+| Never modified during init
+
+| Maven wrapper (`mvnw`, `.mvn/`)
+| Skipped if exists (use `--replace-wrapper` to force replacement)
+
+| `AGENTS.md` and `CLAUDE.md`
+| Use managed blocks - customizations preserved on reinit
+
+| Skill files
+| Existing customized files are not overwritten
+
+| Existing routes
+| Never modified unless explicitly listed in design spec
+|===
+
+=== Dry-Run Mode
+
+Preview changes before writing files:
+
+[source,bash]
+----
+camel-kit init --here --ai claude --dry-run
+----
+
+This shows:
+[source]
+----
+🔍 Dry-run mode: No files will be written
+
+✓ Detected existing Maven project (pom.xml found)
+
+📋 Changes that would be made:
+
+  Would create:
+    - .camel-kit/config.properties
+    - .claude/skills/ (skills)
+    - docs/constitution.md
+
+  ⚠️  Would merge (preserving customizations):
+    - AGENTS.md (managed block)
+
+  Maven wrapper: SKIPPED (already exists)
+----
+
+== Getting Started
+
+=== 1. Initialize Camel Kit
+
+From your existing project root:
+
+[source,bash]
+----
+cd my-existing-camel-app
+camel-kit init --here --ai claude
+----
+
+Camel Kit detects:
+[source]
+----
+✓ Detected existing Maven project (pom.xml found)
+✓ Project graph: 1247 nodes, 3821 edges
+   Detected: Apache Camel 4.8.0 on Spring Boot (3 routes)
+✓ Generated .camel-kit/config.properties with detected metadata
+✓ Generated CLAUDE.md and skills
+----
+
+`init` does not run your project's build or tests. The baseline test status is recorded as `not_run`, and
+`/camel-validate` establishes the baseline before it compares results. To record the baseline during `init` instead,
+pass `--record-baseline`. This runs `./mvnw test` once in your project and stores `passed`, `failed` or `timeout` in
+`project.baselineTestStatus`.
+
+Camel Kit warns when the project uses an unsupported Camel version (3.x), an unsupported runtime or DSL, or when no
+routes were found in the project graph. In the last case the route baseline is incomplete, so read the existing route
+sources before changing them.
+
+=== 2. Review Detected Configuration
+
+Check `.camel-kit/config.properties`:
+
+[source,properties]
+----
+project.type=existing
+project.runtime=spring-boot
+project.detectedCamelVersion=4.8.0
+project.primaryDsl=yaml
+project.routeCount=3
+project.hasTests=true
+project.baselineTestStatus=not_run
+project.configFilesCount=1
+----
+
+`project.modules` and `project.moduleCount` appear only for multi-module projects. `project.beansCount` counts
+classes the graph recognizes as beans through annotations such as `@Component` or `@Service`, plus entries in a Camel
+YAML `beans:` block. Beans registered through `@Bean` methods in `@Configuration` classes are not counted.
+`project.configFilesCount` counts `application*.properties` and `application*.yml` / `.yaml` files. A key that is
+missing means discovery found nothing for it, not that the project has none.
+
+`project.contractFilesCount` counts interface contract files (OpenAPI/Swagger/AsyncAPI documents, WSDL, XSD, protobuf and
+Avro schemas) and `.camel-kit/baseline-contracts.txt` lists them. Init only inventories these files so later stages can
+protect them; it does not analyse their content (tracked in #111).
+
+Two further keys appear only when needed:
+
+* `project.discoveryGaps` - something discovery could not determine, for example no routes found in the graph or routes
+  in more than one DSL. The workflow inspects the source for these items and asks you about anything still unclear.
+* `project.unsupportedCombination` - the detected runtime or DSL is outside the supported scope (for example a Karaf
+  runtime, or no YAML routes). The workflow stops instead of guessing; Camel Kit never converts the DSL.
+
+=== 3. Add a New Capability
+
+Start the workflow:
+
+[source,bash]
+----
+# In Claude Code, VS Code, or your AI agent
+/camel-start
+----
+
+Claude Code detects this is an existing project and asks:
+
+[quote]
+____
+I've analyzed your project:
+
+* **Camel 4.8.0** on Spring Boot 3.3.4
+* **3 existing YAML routes** using rest, timer, and http components
+* Error handling via `errorHandler` with `deadLetterChannel`
+* Tests using Spring Boot Test
+
+**What new capability would you like to add to this integration?**
+____
+
+=== 4. Design the Addition
+
+The brainstorm phase:
+
+1. Reads your existing routes from the project graph
+2. Asks **only unresolved questions** (doesn't re-ask about runtime, version, or DSL)
+3. Identifies integration points with existing routes
+4. Produces a design spec with:
+   * **Requested Additions** - what's being added
+   * **Integration Points** - how new routes connect to existing ones
+   * **Affected Files** - which files will be modified
+   * **Unchanged Behavior Constraints** - routes that must stay the same
+
+=== 5. Plan and Execute
+
+The plan phase:
+
+* Limits changes to approved scope (won't modify protected files)
+* Preserves your Camel version (no upgrades)
+* Generates new routes in your primary DSL (currently YAML; XML/Java support tracked in #52)
+
+The execute phase:
+
+* Validates scope compliance before and after each task
+* Verifies no unrelated files are touched
+* Checks that versions stay unchanged
+
+=== 6. Validate
+
+The validate phase:
+
+* **Establishes a baseline** - runs existing tests first
+* **Separates concerns** - validates new routes separately from existing ones
+* **Detects regressions** - compares current test results to baseline
+
+[source]
+----
+## Baseline Test Results
+
+| Metric | Baseline | Current | Status |
+|--------|----------|---------|--------|
+| Tests Run | 15 | 18 | ✓ Increased (new tests) |
+| Failures | 0 | 0 | ✓ No regressions |
+| Errors | 0 | 0 | ✓ No regressions |
+
+VERDICT: BASELINE PRESERVED - no regressions introduced
+----
+
+== Worked Example: Add REST Endpoint
+
+=== Scenario
+
+You have an existing Camel 4.8.0 Spring Boot application with:
+
+* 3 YAML routes (REST API, timer, HTTP client)
+* Spring Boot 3.3.4
+* Tests using `camel-test-spring-junit5`
+
+**Goal:** Add a new REST endpoint `/api/orders` that reuses an existing database bean.
+
+=== Step-by-Step
+
+1. **Initialize**
++
+[source,bash]
+----
+camel-kit init --here --ai claude
+----
+
+2. **Start the workflow**
++
+[source]
+----
+/camel-start
+----
+
+3. **Request the new capability**
++
+[quote]
+____
+*User:* "Add a new REST endpoint `/api/orders` that retrieves orders from the database using the existing `orderDatabaseBean`."
+____
+
+4. **Brainstorm discovers existing structure**
++
+[quote]
+____
+*Claude:* "I see you have an `orderDatabaseBean` configured in your Spring context. Should the new endpoint follow the same error handling pattern as your existing `/api/users` route?"
+
+*User:* "Yes, same pattern."
+
+*Claude:* "Should I create integration tests similar to your existing `UserApiTest`?"
+
+*User:* "Yes."
+____
+
+5. **Design spec generated**
++
+The spec includes:
++
+[source,markdown]
+----
+## Requested Additions
+
+- New route: `get-orders-api`
+- REST endpoint: `GET /api/orders`
+- Reuse: `orderDatabaseBean` (existing)
+
+## Integration Points
+
+| New Route | Connects To | Mechanism |
+|-----------|-------------|-----------|
+| get-orders-api | orderDatabaseBean | Shared Spring bean |
+
+## Affected Files
+
+- `src/main/resources/camel/order-routes.yaml` (CREATE)
+- `src/test/java/com/example/OrderApiTest.java` (CREATE)
+
+## Unchanged Behavior Constraints
+
+- `/api/users` route: MUST remain unchanged
+- `orderDatabaseBean` configuration: MUST NOT modify
+- Error handling: Follow existing `deadLetterChannel` pattern
+----
+
+6. **Plan generated**
++
+Tasks include:
++
+* Create `order-routes.yaml` with new REST route
+* Configure route to use existing bean
+* Create integration test
+* **Validate scope compliance** (verify only approved files touched)
+* **Verify existing functionality** (rerun existing tests)
+
+7. **Execution**
++
+[source]
+----
+Task 1: Create order-routes.yaml
+Task 2: Create OrderApiTest
+Task 3: Validate scope compliance
+  ✓ Modified files: order-routes.yaml, OrderApiTest.java (approved)
+  ✓ No protected files touched
+  ✓ Camel version unchanged (4.8.0)
+Task 4: Verify existing functionality
+  ✓ Existing tests: 15 passed (baseline preserved)
+  ✓ New tests: 3 passed
+----
+
+8. **Validation report**
++
+[source,markdown]
+----
+# Validation Report (Existing Project Enhancement)
+
+## Baseline Preservation
+
+- Existing routes (3): All passed validation
+- Existing tests (15): All passed
+- No regressions detected
+
+## New Capabilities Validation
+
+- New route: get-orders-api - PASS
+- Integration test: OrderApiTest - PASS
+
+READY FOR PRODUCTION: YES
+----
+
+== Supported Combinations
+
+[%header,cols="2,2,2,1"]
+|===
+| Runtime | Camel Versions | DSL | Status
+
+| Spring Boot
+| 4.8.x
+| YAML
+| ✅ Tested (fixture)
+
+| Spring Boot
+| 4.4.x - 4.7.x
+| YAML
+| ⚠️ Expected to work (not tested)
+
+| Quarkus
+| 3.15.x (Camel 4.8.x)
+| YAML
+| ⚠️ Expected to work (not tested)
+
+| Camel Main
+| 4.8.x
+| YAML
+| ✅ Supported
+
+| Camel 3.x
+| Any
+| Any
+| ❌ Not supported (use `/camel-migrate` first)
+|===
+
+== Limitations
+
+=== Version 1 Scope
+
+* **Single-module projects** - Multi-module support planned for future release
+* **YAML DSL only** - Version 1 supports YAML DSL. XML, Java and Groovy routes are detected and reported through `project.unsupportedCombination` when no YAML routes exist, but the workflow stops instead of planning additions (broader Java DSL support is tracked in issue #52)
+* **Discovery is a starting point** - The graph reads Maven poms, Java/Groovy/XML/YAML routes, `beans:` blocks and `application*.properties` / `application*.yml`. Anything else, such as beans created by `@Bean` methods, is not counted and is listed in `project.discoveryGaps` or must be inspected in the source
+* **One runtime** - Cannot mix Spring Boot and Quarkus in the same project
+
+=== Not Supported
+
+* Upgrading Camel versions (use `/camel-migrate` instead)
+* Converting DSL types (YAML → Java, etc.)
+* Modifying protected routes not in design spec
+* Breaking existing API contracts
+
+== Troubleshooting
+
+=== "No Maven version detected"
+
+**Cause:** `pom.xml` uses `${camel.version}` property but doesn't define it.
+
+**Fix:** Define the property:
+[source,xml]
+----
+<properties>
+    <camel.version>4.8.0</camel.version>
+</properties>
+----
+
+=== "Unsupported Camel version 3.x"
+
+**Cause:** Your project uses Camel 3.x.
+
+**Fix:** Use the migration workflow:
+[source,bash]
+----
+/camel-migrate
+----
+
+=== "Mixed DSL detected"
+
+**Cause:** Your project has both YAML and XML routes.
+
+**Fix:** Camel Kit will use your **primary DSL** (most common file type). If you want consistency:
+
+1. Choose one DSL
+2. Convert routes to that DSL
+3. Reinitialize Camel Kit
+
+=== "Tests failed after adding capability"
+
+**Cause:** Regression introduced.
+
+**Fix:** Check the validation report:
+
+[source,markdown]
+----
+### Regression Analysis
+
+New failures detected:
+- TestName: testExistingUserRoute()
+  Baseline: PASS
+  Current: FAIL
+  Reason: Bean 'userDatabaseBean' not found
+----
+
+The new route may have accidentally removed a shared bean. Review the execution report and revert problematic changes.
+
+== Best Practices
+
+=== Before You Start
+
+1. ✅ **Commit your changes** - `git commit` before running `camel-kit init`
+2. ✅ **Run tests** - Verify existing tests pass
+3. ✅ **Use dry-run** - Preview changes with `--dry-run`
+
+=== During Design
+
+1. ✅ **Be specific about scope** - List files that should NOT be modified
+2. ✅ **Identify integration points** - Explicitly state how new routes connect to existing ones
+3. ✅ **Reuse existing beans** - Reference beans by exact name
+
+=== After Execution
+
+1. ✅ **Review the diff** - `git diff` to see exactly what changed
+2. ✅ **Check the validation report** - Verify no regressions
+3. ✅ **Test manually** - Run the app and test the new capability
+
+== Next Steps
+
+* Learn about xref:workflows.adoc[Camel Kit workflows]
+* Explore xref:skills.adoc[available skills]
+* Read about xref:constitution.adoc[design rules]
+* See xref:getting-started.adoc[Getting Started] for greenfield projects
+
+== Related Topics
+
+* xref:migration.adoc[Migrating from other platforms]
+* xref:validation.adoc[Route validation]
+* xref:testing.adoc[Testing integrations]

@@ -3,6 +3,7 @@
 ** xref:getting-started.adoc[Install and first project]
 ** xref:agents.adoc[Supported AI agents]
 ** xref:greenfield.adoc[Greenfield workflow]
+** xref:existing-project.adoc[Existing project enhancement]
 ** xref:migration.adoc[Migration workflow]
 *** xref:migration-mulesoft.adoc[MuleSoft]
 *** xref:migration-biztalk.adoc[BizTalk]

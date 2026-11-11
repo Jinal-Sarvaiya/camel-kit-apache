@@ -1,5 +1,6 @@
 package org.apache.camel.kit.graph.parser;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.camel.kit.graph.ProjectGraph;
@@ -7,6 +8,7 @@ import org.apache.camel.kit.graph.model.NodeType;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -65,5 +67,32 @@ class ConfigParserTest {
                 "Should capture application-specific properties");
         assertNotNull(graph.getNode("config:payment.gateway.url"),
                 "Should capture all custom properties");
+    }
+
+    @Test
+    void flattensApplicationYamlAndProfileVariantsLikeProperties(@TempDir Path root) throws Exception {
+        Path res = Files.createDirectories(root.resolve("src/main/resources"));
+        Files.writeString(res.resolve("application.yml"), """
+                camel:
+                  component:
+                    kafka:
+                      brokers: localhost:9092
+                servers:
+                  - a
+                  - b
+                port: 8080
+                """);
+        Files.writeString(res.resolve("application-dev.yaml"), "order:\n  retries: 3\n");
+        ProjectGraph yamlGraph = new ProjectGraph();
+
+        new ConfigParser().parse(root, yamlGraph);
+
+        assertEquals("localhost:9092",
+                yamlGraph.getNode("config:camel.component.kafka.brokers").properties().get("value"));
+        assertEquals("b", yamlGraph.getNode("config:servers[1]").properties().get("value"));
+        assertEquals("8080", yamlGraph.getNode("config:port").properties().get("value"));
+        assertEquals("src/main/resources/application.yml",
+                yamlGraph.getNode("config:port").properties().get("file"));
+        assertEquals("dev", yamlGraph.getNode("config:order.retries").properties().get("profile"));
     }
 }

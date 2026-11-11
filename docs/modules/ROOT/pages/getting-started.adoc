@@ -204,7 +204,26 @@ What every target gets::
 * `.camel-kit/` with the project configuration, cached catalogs and templates, and later the pipeline state.
 * The MCP configuration for the target: JSON for most agents, `.codex/config.toml` for Codex, `.mcp.json` read
   through `pi-mcp-adapter` for Pi.
-* `mvnw`, `mvnw.cmd` and `.mvn/wrapper/maven-wrapper.properties`, written or replaced even when they exist.
+* `mvnw`, `mvnw.cmd` and `.mvn/wrapper/maven-wrapper.properties`, created for new projects or when missing. For existing projects with a Maven wrapper, the existing wrapper is preserved unless `--replace-wrapper` is specified.
+
+=== Using Camel Kit with Existing Projects
+
+Camel Kit can enhance **existing Camel 4 applications** in addition to creating new projects. When you run `init` on a directory with an existing `pom.xml`:
+
+* Your `pom.xml`, existing routes, and configuration are **preserved**
+* Camel Kit detects your Camel version, runtime (Spring Boot, Quarkus, etc.), and DSL type
+* The Maven wrapper is **skipped** if it already exists
+* Skills are added without overwriting your customizations
+
+The workflow is the same (`/camel-start` → `/camel-brainstorm` → `/camel-plan` → `/camel-execute` → `/camel-validate`), but with additional safeguards:
+
+* **Scope protection** - only approved files are modified
+* **Baseline validation** - existing tests run first to detect regressions
+* **Version locking** - your Camel version is not upgraded
+
+See xref:existing-project.adoc[] for the complete guide with a worked example.
+
+TIP: Use `--dry-run` to preview changes before initializing: `camel-kit init --here --ai claude --dry-run`
 
 === Configuration
 

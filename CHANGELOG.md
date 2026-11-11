@@ -40,6 +40,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Parser source-reading regression coverage (#153)** — exercise all nine graph parsers with execution, class-loading, placeholder and external-entity canaries.
 
+- **Existing Camel 4 project enhancement (#164)** — Add capabilities to existing Camel 4 applications through the
+  design → plan → execute → validate workflow without disrupting working code. Init detects existing Camel projects
+  (excluding MuleSoft/BizTalk migration sources) and preserves `pom.xml`, routes, configuration and Maven wrapper.
+  `ManagedBlockMerger` preserves user customizations in `AGENTS.md`/`CLAUDE.md` on reinit using managed block markers.
+  `InitConflictDetector` reports existing files that will be preserved or merged. `ProjectDiscovery` detects runtime
+  (Spring Boot/Quarkus/Main), Camel version, platform BOM version, DSL types (YAML/XML/Java), routes, and tests from
+  project graph analysis. Version binding uses detected Camel version instead of distribution defaults for existing
+  projects. Skills updated: `camel-start` routes existing projects, `camel-brainstorm` supports both greenfield and
+  existing with new `existing-project-discovery.md` guide, `camel-plan`/`camel-execute`/`camel-validate` add scope
+  protection and baseline validation. Test fixture: complete Spring Boot 3.3.4 + Camel 4.8.0 app with YAML routes.
+  Documentation: `existing-project.adoc` (447 lines) with worked example, safe adoption guarantees, supported
+  combinations (YAML DSL only in v1; XML/Java tracked in #52), limitations and troubleshooting. Flags: `--dry-run`
+  previews changes, `--replace-wrapper` explicitly replaces Maven wrapper, `--record-baseline` runs the project's tests
+  once during init to record the baseline (off by default: init does not execute project build code).
+  Discovery coverage (#169, #170): `ConfigParser` reads `application*.yml`/`.yaml`; `YamlRouteParser` records `beans:`
+  entries; Java and Groovy DSL routes carry their source file so the DSL is detected. Init persists
+  `project.discoveryGaps` (what the graph could not determine) and `project.unsupportedCombination` (unsupported
+  runtime or no YAML routes), `camel-plan` stops on the latter, and `camel-validate` reports checks that could not run
+  under Unavailable Evidence instead of counting them as passes. Init also inventories interface contract files in
+  `.camel-kit/baseline-contracts.txt` (`project.contractFilesCount`); plan, execute and validate protect them.
 - **Google Antigravity native Ship (#95)** — eligible sessions relay controller-issued stages through a dedicated
   `camel-ship-worker` agent with `commandExecutionPolicy: "off"` and read-only tools.
   `--backend antigravity-native` reuses the native task/result, recovery, oversight and deterministic publication

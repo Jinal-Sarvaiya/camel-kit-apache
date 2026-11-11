@@ -21,7 +21,8 @@ Answer these questions in order. The first "yes" is your destination.
 | 3 | Is there an implementation plan derived from an approved design and ready for execution? | Execute it | `/camel-execute` |
 | 4 | Are there generated routes that need quality validation? | Validate them | `/camel-validate` |
 | 5 | Is something broken — build fails, startup errors, runtime exceptions — outside of a pipeline run? | Debug it | `/camel-debug` |
-| 6 | None of the above — new integration, new feature, or unclear? | Design it | `/camel-brainstorm` |
+| 6 | Is this adding new capability to an existing Camel 4 application? | Existing project enhancement | `/camel-brainstorm` (auto-detects existing project) |
+| 7 | None of the above — new integration, new feature, or unclear? | Design it | `/camel-brainstorm` |
 
 ### Mid-Pipeline Entry
 
@@ -43,7 +44,12 @@ Users may arrive partway through a pipeline:
 /camel-migrate → /camel-plan → /camel-execute → /camel-validate
 ```
 
-Both pipelines share plan → execute → validate. Only the entry point differs.
+**Pipeline 3 — Existing Project Enhancement:**
+```text
+/camel-brainstorm (auto-detects project.type=existing) → /camel-plan → /camel-execute → /camel-validate
+```
+
+All pipelines share plan → execute → validate. Only the entry point differs. The existing project path uses brainstorm with automatic detection (`project.type=existing` in `.camel-kit/config.properties`) to understand the current codebase before designing new capabilities.
 
 Runtime verification (`camel-verify`) runs automatically as part of `/camel-execute` — it is not a standalone pipeline stage.
 

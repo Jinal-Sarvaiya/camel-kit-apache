@@ -61,25 +61,61 @@ public class ConfigParser implements GraphParser {
      */
     private void parseYaml(Path file, Path projectRoot, ProjectGraph graph) {
         String relativePath = projectRoot.relativize(file).toString();
-        String profile = extractProfile(file.getFileName().toString());
-        Map<String, String> flattened = new LinkedHashMap<>();
+        String filenameProfile = extractProfile(file.getFileName().toString());
+        int docIndex = 0;
         try (var documents = yamlMapper.readerFor(JsonNode.class).readValues(file.toFile())) {
             while (documents.hasNextValue()) {
-                flatten("", (JsonNode) documents.nextValue(), flattened);
+                JsonNode document = (JsonNode) documents.nextValue();
+                Map<String, String> flattened = new LinkedHashMap<>();
+
+                // Check for document-level profile (spring.config.activate.on-profile)
+                String documentProfile = extractDocumentProfile(document);
+
+                flatten("", document, flattened);
+
+                // Determine effective profile (document > filename)
+                String effectiveProfile = documentProfile != null ? documentProfile : filenameProfile;
+
+                // Make docIndex effectively final for lambda
+                final int currentDocIndex = docIndex;
+                flattened.forEach((key, value) -> {
+                    Map<String, String> nodeProps = new HashMap<>();
+                    nodeProps.put("key", key);
+                    nodeProps.put("value", value);
+                    nodeProps.put("file", relativePath);
+                    nodeProps.put("documentIndex", String.valueOf(currentDocIndex));
+                    if (effectiveProfile != null) {
+                        nodeProps.put("profile", effectiveProfile);
+                    }
+                    // Use document-scoped node ID to preserve per-document values
+                    String nodeId = "config:" + key + ":doc" + currentDocIndex
+                                    + (effectiveProfile != null ? ":profile=" + effectiveProfile : "");
+                    graph.addNode(new GraphNode(nodeId, NodeType.CONFIG_PROPERTY, nodeProps));
+                });
+                docIndex++;
             }
         } catch (IOException e) {
             throw new RuntimeException("Failed to parse YAML configuration: " + file, e);
         }
-        flattened.forEach((key, value) -> {
-            Map<String, String> nodeProps = new HashMap<>();
-            nodeProps.put("key", key);
-            nodeProps.put("value", value);
-            nodeProps.put("file", relativePath);
-            if (profile != null) {
-                nodeProps.put("profile", profile);
+    }
+
+    /**
+     * Extract profile from document content (spring.config.activate.on-profile).
+     */
+    private String extractDocumentProfile(JsonNode document) {
+        if (document.has("spring")) {
+            JsonNode spring = document.get("spring");
+            if (spring.has("config")) {
+                JsonNode config = spring.get("config");
+                if (config.has("activate")) {
+                    JsonNode activate = config.get("activate");
+                    if (activate.has("on-profile")) {
+                        return activate.get("on-profile").asText();
+                    }
+                }
             }
-            graph.addNode(new GraphNode("config:" + key, NodeType.CONFIG_PROPERTY, nodeProps));
-        });
+        }
+        return null;
     }
 
     private static void flatten(String prefix, JsonNode node, Map<String, String> out) {

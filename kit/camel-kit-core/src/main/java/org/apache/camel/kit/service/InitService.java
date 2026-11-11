@@ -191,7 +191,11 @@ public class InitService {
         } else {
             config.setProperty("citrus.mcp.enabled", "false");
         }
-        writeVersionConfig(config, request.distribution(), "main");
+        // For greenfield projects only: seed distribution defaults
+        // Existing projects get versions from discovery in updateConfigWithRuntime
+        if (!isExistingProject) {
+            writeVersionConfig(config, request.distribution(), "main");
+        }
         if (request.sourcePlatform() != null && !"auto".equals(request.sourcePlatform())) {
             config.setProperty("project.sourcePlatform", request.sourcePlatform());
         }
@@ -453,7 +457,7 @@ public class InitService {
             List<String> contractFiles = findContractFiles(projectRoot);
             if (!contractFiles.isEmpty()) {
                 config.setProperty("project.contractFilesCount", String.valueOf(contractFiles.size()));
-                writeBaselineLines(dir.resolve("baseline-contracts.txt"), contractFiles);
+                writeBaselineLines(dir.resolve("baseline-contracts.txt"), contractFiles, projectRoot);
             }
 
             // Gaps the graph could not fill (e.g. routes defined in unsupported layouts): workflow must inspect source
@@ -878,12 +882,13 @@ public class InitService {
      */
     private void writeBaselineStatus(Path file, String status, String reason) {
         try {
+            org.apache.camel.kit.util.ConfinedPaths.requirePath(file.getParent().getParent(), file);
             String json = String.format(Locale.ROOT,
                     "{\n  \"status\": \"%s\",\n  \"reason\": \"%s\",\n  \"timestamp\": \"%s\"\n}",
                     status,
                     reason.replace("\"", "\\\""),
                     java.time.Instant.now().toString());
-            Files.writeString(file, json);
+            AtomicFileWriter.write(file, json);
         } catch (Exception e) {
             // Best-effort - ignore write failures
         }
@@ -913,7 +918,8 @@ public class InitService {
 
             if (!testFiles.isEmpty()) {
                 Path baselineFile = camelKitDir.resolve("baseline-tests.txt");
-                Files.write(baselineFile, testFiles.stream().sorted().toList());
+                org.apache.camel.kit.util.ConfinedPaths.requirePath(projectRoot, baselineFile);
+                AtomicFileWriter.write(baselineFile, String.join("\n", testFiles.stream().sorted().toList()));
             }
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
@@ -931,6 +937,7 @@ public class InitService {
     private void writeBaselineRoutes(Path camelKitDir, List<String> routeFiles, Path projectRoot) {
         try {
             Path baselineFile = camelKitDir.resolve("baseline-routes.txt");
+            org.apache.camel.kit.util.ConfinedPaths.requirePath(projectRoot, baselineFile);
             List<String> relativePaths = routeFiles.stream()
                     .map(r -> {
                         Path routePath = Path.of(r);
@@ -945,7 +952,7 @@ public class InitService {
                     })
                     .sorted()
                     .toList();
-            Files.write(baselineFile, relativePaths);
+            AtomicFileWriter.write(baselineFile, String.join("\n", relativePaths));
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
         }
@@ -981,9 +988,10 @@ public class InitService {
         }
     }
 
-    private void writeBaselineLines(Path file, List<String> lines) {
+    private void writeBaselineLines(Path file, List<String> lines, Path projectRoot) {
         try {
-            Files.write(file, lines);
+            org.apache.camel.kit.util.ConfinedPaths.requirePath(projectRoot, file);
+            AtomicFileWriter.write(file, String.join("\n", lines));
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
         }

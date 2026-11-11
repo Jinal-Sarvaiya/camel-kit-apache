@@ -32,6 +32,28 @@ public record InitRequest(
         boolean recordBaseline) {
 
     /**
+     * Creates a request with default flags (no dry-run, no wrapper replacement, no baseline recording). Used by tests
+     * that predate the new flags.
+     */
+    public InitRequest(
+                       String projectName,
+                       String agentName,
+                       Path targetDir,
+                       String citrusVersion,
+                       boolean noFetch,
+                       boolean withCitrusMcp,
+                       String sourcePlatform,
+                       String commandPrefix,
+                       String defaultCitrusVersion,
+                       DistributionConfig distribution,
+                       Printer printer,
+                       InitProgress progress,
+                       InitReporter reporter) {
+        this(projectName, agentName, targetDir, citrusVersion, noFetch, withCitrusMcp, sourcePlatform,
+             commandPrefix, defaultCitrusVersion, distribution, printer, progress, reporter, false, false, false);
+    }
+
+    /**
      * Creates a request that does not run the project's tests to record a baseline.
      */
     public InitRequest(

@@ -144,12 +144,14 @@ class SkillResourceInstaller {
             throws Exception {
         Files.createDirectories(destination.getParent());
 
-        // Always update SKILL.md and guide files (in guides/ subdirectory)
-        // Preserve user files (anything outside guides/ that isn't SKILL.md)
+        // Always update shipped resources: SKILL.md, guide files, and shared/ resources
+        // Preserve user files (custom skills the user created)
         String fileName = destination.getFileName().toString();
         boolean isSkillManifest = fileName.equals("SKILL.md");
         boolean isGuideFile = destination.getParent().getFileName().toString().equals("guides");
-        boolean shouldUpdate = isSkillManifest || isGuideFile;
+        boolean isSharedResource = destination.toString().contains("/shared/")
+                || destination.toString().contains("\\shared\\");
+        boolean shouldUpdate = isSkillManifest || isGuideFile || isSharedResource;
 
         if (Files.exists(destination) && !shouldUpdate) {
             // Skip existing user files to preserve customizations

@@ -60,6 +60,17 @@ public class KitInitCommand extends CamelCommand {
             description = "Source platform for migration graph analysis: mulesoft, camel, biztalk, auto (default: auto)")
     String sourcePlatform;
 
+    @Option(names = {"--dry-run"}, description = "Preview changes without writing files")
+    boolean dryRun;
+
+    @Option(names = {"--replace-wrapper"},
+            description = "Replace Maven wrapper even if it exists (default: preserve existing wrapper)")
+    boolean replaceWrapper;
+
+    @Option(names = {"--record-baseline"},
+            description = "Run existing project tests during init to record baseline (executes project build code; default: off)")
+    boolean recordBaseline;
+
     private final CamelKitMain camelKitMain;
 
     public KitInitCommand(CamelJBangMain main) {
@@ -86,6 +97,9 @@ public class KitInitCommand extends CamelCommand {
         initCommand.properties = this.properties;
         initCommand.withCitrusMcp = this.withCitrusMcp;
         initCommand.sourcePlatform = this.sourcePlatform;
+        initCommand.dryRun = this.dryRun;
+        initCommand.replaceWrapper = this.replaceWrapper;
+        initCommand.recordBaseline = this.recordBaseline;
 
         return initCommand.call();
     }

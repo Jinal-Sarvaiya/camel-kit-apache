@@ -40,7 +40,10 @@ if project.type == "existing":
     - project.camelVersion = {detected version}
     - project.platformBomVersion = {detected platform BOM}
     
-    SKIP the user selection questions below — proceed to Step 3.
+    SKIP Steps 1-4 entirely — existing projects use their detected versions AS-IS.
+    The detected versions are already stored in config.properties by init.
+    DO NOT validate against mapping tables (Step 3) — existing projects may use
+    versions not in the shipped tables, and that's acceptable.
 ```
 
 **For existing projects:**

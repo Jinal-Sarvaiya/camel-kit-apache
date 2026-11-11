@@ -665,4 +665,61 @@ class ProjectDiscoveryTest {
 
         assertEquals("4.8.0", ProjectDiscovery.discover(reactor).camelVersion());
     }
+
+    @Test
+    void camelQuarkusExtensionBomVersionIsNotCamelCoreVersion() {
+        // Camel Quarkus BOM 3.15.0 manages Camel core 4.8.0, so org.apache.camel.quarkus:camel-quarkus-bom:3.15.0
+        // must NOT be treated as evidence of Camel core 3.15.0
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(new GraphNode(
+                "maven-property:camel.version",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("value", "4.8.0", "file", "pom.xml")));
+        graph.addNode(new GraphNode(
+                "maven-managed:org.apache.camel.quarkus:camel-quarkus-bom",
+                NodeType.CONFIG_PROPERTY,
+                Map.of(
+                        "kind", "managed",
+                        "groupId", "org.apache.camel.quarkus",
+                        "artifactId", "camel-quarkus-bom",
+                        "version", "3.15.0",
+                        "file", "pom.xml")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertEquals("4.8.0", result.camelVersion(), "only the camel.version property should be used");
+        assertFalse(result.hasConflict(), "Camel Quarkus BOM 3.15.0 should not create false conflict with Camel 4.8.0");
+        assertTrue(result.allCamelVersions().contains("4.8.0"));
+        assertFalse(result.allCamelVersions().contains("3.15.0"),
+                "Camel Quarkus extension BOM version must not appear as Camel core version");
+    }
+
+    @Test
+    void camelQuarkusExtensionBomAloneDoesNotProvideCamelCoreVersion() {
+        // Without explicit Camel version, org.apache.camel.quarkus BOM should NOT be inferred as Camel core version
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(new GraphNode(
+                "maven-managed:org.apache.camel.quarkus:camel-quarkus-bom",
+                NodeType.CONFIG_PROPERTY,
+                Map.of(
+                        "kind", "managed",
+                        "groupId", "org.apache.camel.quarkus",
+                        "artifactId", "camel-quarkus-bom",
+                        "version", "3.15.0",
+                        "file", "pom.xml")));
+        graph.addNode(new GraphNode(
+                "maven:org.apache.camel.quarkus:camel-quarkus-core",
+                NodeType.MAVEN_ARTIFACT,
+                Map.of(
+                        "groupId", "org.apache.camel.quarkus",
+                        "artifactId", "camel-quarkus-core",
+                        "version", "managed")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertNull(result.camelVersion(),
+                "Camel Quarkus extension BOM alone should not provide Camel core version");
+        assertTrue(result.allCamelVersions().isEmpty(),
+                "no Camel core version evidence should be present");
+    }
 }

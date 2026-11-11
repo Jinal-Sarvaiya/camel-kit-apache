@@ -43,12 +43,24 @@ final class BaselineTestResults {
     }
 
     /**
+     * Collection result carrying both the outcomes and whether the collection was complete. If any report could not be
+     * parsed or read, {@code complete} is false and the caller must not treat the baseline as usable preservation
+     * evidence.
+     */
+    record CollectionResult(Map<String, Outcome> outcomes, boolean complete, int failedReportCount) {
+    }
+
+    /**
      * Collects every test outcome from the {@code TEST-*.xml} reports below {@code projectRoot}'s
      * {@code target/surefire-reports} and {@code target/failsafe-reports} directories, including those of Maven
-     * modules. A report that cannot be parsed is skipped; the result then simply lacks those tests and the caller
-     * records that the evidence is incomplete.
+     * modules. Only reports modified after {@code afterTimestamp} are included, so stale reports from a previous
+     * invocation are rejected. A report that cannot be parsed is skipped; the result then simply lacks those tests and
+     * the caller records that the evidence is incomplete.
+     *
+     * @param afterTimestamp only reports modified after this instant are collected; use the instant immediately before
+     *                       starting the test process to ensure only reports from the current invocation are included
      */
-    static Map<String, Outcome> collect(Path projectRoot) throws IOException {
+    static CollectionResult collect(Path projectRoot, Instant afterTimestamp) throws IOException {
         Map<String, Outcome> outcomes = new TreeMap<>();
         List<Path> reports = new ArrayList<>();
         try (Stream<Path> paths = Files.walk(projectRoot)) {
@@ -60,26 +72,47 @@ final class BaselineTestResults {
                         return normalized.contains("/target/surefire-reports/")
                                 || normalized.contains("/target/failsafe-reports/");
                     })
+                    .filter(p -> {
+                        try {
+                            return Files.getLastModifiedTime(p).toInstant().isAfter(afterTimestamp);
+                        } catch (IOException e) {
+                            return false;
+                        }
+                    })
                     .sorted()
                     .forEach(reports::add);
         }
+        int failedReports = 0;
         for (Path report : reports) {
             try {
-                readReport(report, outcomes);
+                readReport(projectRoot, report, outcomes);
             } catch (Exception e) {
-                // An unreadable report is reported by the caller as incomplete evidence.
+                failedReports++;
             }
         }
-        return outcomes;
+        boolean complete = failedReports == 0;
+        return new CollectionResult(outcomes, complete, failedReports);
     }
 
-    private static void readReport(Path report, Map<String, Outcome> outcomes) throws Exception {
+    private static void readReport(Path projectRoot, Path report, Map<String, Outcome> outcomes) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         factory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         factory.setXIncludeAware(false);
         factory.setExpandEntityReferences(false);
         var document = factory.newDocumentBuilder().parse(report.toFile());
+
+        // Extract module path from report path: e.g. "module-a/target/surefire-reports/TEST-X.xml" → "module-a"
+        // Root module reports are just "target/surefire-reports/TEST-X.xml" → "" (empty module)
+        String relativeReportPath = projectRoot.relativize(report).toString().replace('\\', '/');
+        String modulePrefix = "";
+        if (relativeReportPath.contains("/target/")) {
+            String modulePath = relativeReportPath.substring(0, relativeReportPath.indexOf("/target/"));
+            if (!modulePath.isEmpty()) {
+                modulePrefix = modulePath + ":";
+            }
+        }
+
         NodeList cases = document.getElementsByTagName("testcase");
         for (int i = 0; i < cases.getLength(); i++) {
             Element testCase = (Element) cases.item(i);
@@ -88,7 +121,15 @@ final class BaselineTestResults {
             if (name.isEmpty()) {
                 continue;
             }
-            String id = className.isEmpty() ? name : className + "#" + name;
+            String baseId = className.isEmpty() ? name : className + "#" + name;
+            String id = modulePrefix + baseId;
+
+            // Detect collisions: if the same test identity appears twice, fail the collection.
+            // This can only happen if reports are malformed or there's a bug in identity construction.
+            if (outcomes.containsKey(id)) {
+                throw new IllegalStateException(
+                        "Duplicate test identity '" + id + "' in " + report + "; baseline collection cannot continue");
+            }
             outcomes.put(id, outcomeOf(testCase));
         }
     }

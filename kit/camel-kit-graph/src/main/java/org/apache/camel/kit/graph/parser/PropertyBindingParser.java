@@ -1,6 +1,7 @@
 package org.apache.camel.kit.graph.parser;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -182,9 +183,18 @@ public class PropertyBindingParser {
             Matcher matcher = PLACEHOLDER_PATTERN.matcher(uri);
             while (matcher.find()) {
                 String key = matcher.group(1);
+                // The default value ("config:<key>") and every profile-specific variant ("config:<key>:profile=<name>")
+                // configure the endpoint; a key defined only in a profile document is still linked.
                 String configNodeId = "config:" + key;
-                if (graph.hasNode(configNodeId)) {
-                    graph.addEdge(new GraphEdge(configNodeId, node.id(), EdgeType.CONFIGURES, Map.of()));
+                for (String candidate : List.of(configNodeId)) {
+                    if (graph.hasNode(candidate)) {
+                        graph.addEdge(new GraphEdge(candidate, node.id(), EdgeType.CONFIGURES, Map.of()));
+                    }
+                }
+                for (GraphNode config : graph.findByType(NodeType.CONFIG_PROPERTY)) {
+                    if (config.id().startsWith(configNodeId + ":profile=")) {
+                        graph.addEdge(new GraphEdge(config.id(), node.id(), EdgeType.CONFIGURES, Map.of()));
+                    }
                 }
             }
         }

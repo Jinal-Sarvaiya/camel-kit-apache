@@ -1552,6 +1552,16 @@ class ResourceConsistencyTest {
         assertFalse(validate.contains("done < .camel-kit/baseline-tests.txt"),
                 "camel-validate must not derive test classes from file names and count lines");
         assertFalse(validate.contains("| Tests Run |"), "camel-validate must not compare totals");
+        // every outcome transition has a verdict: a swapped failing test (same totals), errors, removed and skipped tests
+        for (String row : List.of("| passed | failed or error | **REGRESSION** |",
+                "| passed | missing (test removed, renamed, or not run) | **REGRESSION**",
+                "| passed | skipped | **REGRESSION**",
+                "| failed or error | failed or error | Pre-existing failure",
+                "| failed or error | passed | Fixed")) {
+            assertTrue(validate.contains(row), "camel-validate verdict table lost the row: " + row);
+        }
+        assertTrue(validate.contains("one test fixed and another broken has the same totals"),
+                "a swap in failing test identity with unchanged totals must be called out as a regression");
         assertTrue(validate.contains("DO NOT run the tests and call that the baseline"));
 
         // execute captures the baseline before the first edit; plan makes sure that happens

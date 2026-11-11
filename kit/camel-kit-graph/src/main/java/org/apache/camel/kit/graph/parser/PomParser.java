@@ -103,6 +103,8 @@ public class PomParser implements GraphParser {
                 }
             }
 
+            recordCamelVersionEvidence(model, pomRelative, graph);
+
             for (Dependency dep : model.getDependencies()) {
                 String depId = "maven:" + dep.getGroupId() + ":" + dep.getArtifactId();
                 String depVersion = dep.getVersion() != null ? dep.getVersion() : "managed";
@@ -122,5 +124,53 @@ public class PomParser implements GraphParser {
         } catch (Exception e) {
             throw new RuntimeException("Failed to parse POM: " + pomFile, e);
         }
+    }
+
+    /**
+     * The graph keys properties and artifacts by name, so in a reactor the declarations of several modules collapse
+     * into one node and only the last survives. Camel version declarations are therefore also recorded once per POM
+     * under {@code maven-camel-version:<pom>:<source>}, with the property references resolved against that POM's own
+     * properties. Discovery uses them to notice modules that disagree.
+     */
+    private void recordCamelVersionEvidence(Model model, String pomRelative, ProjectGraph graph) {
+        String camelVersionProperty
+                = model.getProperties() == null ? null : model.getProperties().getProperty("camel.version");
+        addCamelVersionEvidence(graph, pomRelative, "property camel.version", camelVersionProperty, model);
+        for (Dependency dep : model.getDependencies()) {
+            if ("org.apache.camel".equals(dep.getGroupId())) {
+                addCamelVersionEvidence(graph, pomRelative, "dependency " + dep.getArtifactId(), dep.getVersion(),
+                        model);
+            }
+        }
+        DependencyManagement management = model.getDependencyManagement();
+        if (management != null) {
+            for (Dependency managed : management.getDependencies()) {
+                if ("pom".equals(managed.getType()) && managed.getGroupId() != null
+                        && managed.getGroupId().startsWith("org.apache.camel")
+                        && managed.getArtifactId().startsWith("camel-") && managed.getArtifactId().endsWith("-bom")) {
+                    addCamelVersionEvidence(graph, pomRelative, "imported BOM " + managed.getArtifactId(),
+                            managed.getVersion(), model);
+                }
+            }
+        }
+    }
+
+    private void addCamelVersionEvidence(
+            ProjectGraph graph, String pomRelative, String source, String rawVersion, Model model) {
+        String version = resolveProperty(rawVersion, model);
+        if (version == null || version.isBlank() || version.contains("${")) {
+            return;
+        }
+        graph.addNode(new GraphNode(
+                "maven-camel-version:" + pomRelative + ":" + source, NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "camel-version-evidence", "version", version, "source", source, "file", pomRelative)));
+    }
+
+    private static String resolveProperty(String value, Model model) {
+        if (value == null || !value.startsWith("${") || !value.endsWith("}") || model.getProperties() == null) {
+            return value;
+        }
+        String resolved = model.getProperties().getProperty(value.substring(2, value.length() - 1));
+        return resolved == null ? value : resolved;
     }
 }

@@ -3,7 +3,9 @@ package org.apache.camel.kit.graph.parser;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.model.EdgeType;
 import org.apache.camel.kit.graph.model.NodeType;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -126,5 +128,57 @@ class ConfigParserTest {
         assertNotNull(prod, "the profile-specific value must be preserved, not merged away");
         assertEquals("prod:9092", prod.properties().get("value"));
         assertEquals("prod", prod.properties().get("profile"));
+    }
+
+    @Test
+    void flatDottedActivationKeyIsRecognisedAsTheDocumentProfile(@TempDir Path root) throws Exception {
+        Path res = Files.createDirectories(root.resolve("src/main/resources"));
+        Files.writeString(res.resolve("application.yml"), """
+                port: 8080
+                ---
+                spring.config.activate.on-profile: prod
+                port: 9090
+                """);
+        ProjectGraph yamlGraph = new ProjectGraph();
+
+        new ConfigParser().parse(root, yamlGraph);
+
+        assertEquals("8080", yamlGraph.getNode("config:port").properties().get("value"));
+        var prod = yamlGraph.getNode("config:port:profile=prod");
+        assertNotNull(prod, "a flat dotted activation key must scope the document too");
+        assertEquals("9090", prod.properties().get("value"));
+        assertEquals("prod", prod.properties().get("profile"));
+    }
+
+    /** Connected consumer: a YAML property referenced by a route placeholder must still configure the endpoint. */
+    @Test
+    void yamlPropertiesStillConfigureTheRouteEndpointsThatReferenceThem(@TempDir Path root) throws Exception {
+        Path res = Files.createDirectories(root.resolve("src/main/resources/camel"));
+        Files.writeString(res.getParent().resolve("application.yml"), """
+                timer:
+                  name: tick
+                ---
+                spring.config.activate.on-profile: prod
+                kafka:
+                  topic: prod-topic
+                """);
+        Files.writeString(res.resolve("routes.yaml"), """
+                - route:
+                    id: ticker
+                    from:
+                      uri: "timer:{{timer.name}}"
+                      steps:
+                        - to:
+                            uri: "kafka:{{kafka.topic}}"
+                """);
+
+        ProjectGraph built = new GraphBuilder().build(root);
+
+        assertTrue(built.getEdges().stream().anyMatch(e -> e.type() == EdgeType.CONFIGURES
+                && e.from().equals("config:timer.name") && e.to().startsWith("endpoint:timer")),
+                "a default YAML property must keep its CONFIGURES edge");
+        assertTrue(built.getEdges().stream().anyMatch(e -> e.type() == EdgeType.CONFIGURES
+                && e.from().equals("config:kafka.topic:profile=prod") && e.to().startsWith("endpoint:kafka")),
+                "a property defined only in a profile document must still be linked");
     }
 }

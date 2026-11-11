@@ -190,9 +190,9 @@ names the evidence. Report it and ask the user to resolve it; do not pick one, a
 shipped version tables.
 
 **The test baseline must exist before execution.** Add a first task to the plan that confirms
-`.camel-kit/baseline-test-results.json` is usable (`status` `passed` or `failed`, non-empty `tests`, `dirty` false,
-`revision` equal to the current HEAD) and, if not, that `camel-execute` captures it before any edit (see its Step 0.6).
-If it cannot be captured, the plan must say that baseline preservation will be UNVERIFIED.
+`.camel-kit/baseline-test-results.json` is usable (`status` `passed` or `failed`, non-empty `tests`, `complete` true,
+`dirty` false, `revision` equal to the current HEAD) and, if not, that `camel-execute` captures it before any edit (see
+its Step 0.6). If it cannot be captured, the plan must say that baseline preservation will be UNVERIFIED.
 
 **`project.discoveryGaps` lists what discovery could not determine** (for example no routes found in the graph, or
 routes in more than one DSL). Inspect the source for those items and ask the user about anything still ambiguous before

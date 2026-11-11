@@ -789,4 +789,78 @@ class ProjectDiscoveryTest {
                 "Conflicting Spring Boot versions across modules should not be resolved");
         assertEquals("spring-boot", result.runtime());
     }
+
+    @Test
+    void detectsSpringBootConflictWhenOneModuleImportsAndAnotherInheritsParent() {
+        // Module A imports spring-boot-dependencies:3.3.4
+        // Module B inherits spring-boot-starter-parent:3.4.0 (no import to override)
+        // Should detect conflict and return null
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(springBootStarter("module-a/pom.xml"));
+        graph.addNode(springBootStarter("module-b/pom.xml"));
+
+        // Module-a imports spring-boot-dependencies:3.3.4
+        graph.addNode(new GraphNode(
+                "maven-managed:module-a/pom.xml:org.springframework.boot:spring-boot-dependencies",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "managed",
+                        "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-dependencies",
+                        "version", "3.3.4",
+                        "type", "pom",
+                        "scope", "import",
+                        "file", "module-a/pom.xml")));
+
+        // Module-b inherits spring-boot-starter-parent:3.4.0
+        graph.addNode(new GraphNode(
+                "maven-parent:module-b/pom.xml:org.springframework.boot:spring-boot-starter-parent",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "parent",
+                        "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-starter-parent",
+                        "version", "3.4.0",
+                        "file", "module-b/pom.xml")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertNull(result.springBootVersion(),
+                "Import in one module and parent in another with different versions should be a conflict");
+        assertEquals("spring-boot", result.runtime());
+    }
+
+    @Test
+    void importOverridesParentInSameModule() {
+        // Single module inherits spring-boot-starter-parent:3.4.0 but explicitly imports
+        // spring-boot-dependencies:3.3.4 -> import wins
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(springBootStarter("pom.xml"));
+
+        // Inherits parent 3.4.0
+        graph.addNode(new GraphNode(
+                "maven-parent:pom.xml:org.springframework.boot:spring-boot-starter-parent",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "parent",
+                        "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-starter-parent",
+                        "version", "3.4.0",
+                        "file", "pom.xml")));
+
+        // But imports 3.3.4
+        graph.addNode(new GraphNode(
+                "maven-managed:pom.xml:org.springframework.boot:spring-boot-dependencies",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "managed",
+                        "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-dependencies",
+                        "version", "3.3.4",
+                        "type", "pom",
+                        "scope", "import",
+                        "file", "pom.xml")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertEquals("3.3.4", result.springBootVersion(),
+                "Import should take precedence over parent in the same module");
+        assertEquals("spring-boot", result.runtime());
+    }
 }

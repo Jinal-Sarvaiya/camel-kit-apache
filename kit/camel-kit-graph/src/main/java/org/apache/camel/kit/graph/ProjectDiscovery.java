@@ -187,19 +187,47 @@ public final class ProjectDiscovery {
      * The Spring Boot framework version: an imported {@code spring-boot-dependencies}, otherwise the
      * {@code spring-boot-starter-parent} parent. This is a different artifact from the Camel BOM and is kept apart so
      * the two are never mixed up. Returns null if modules disagree on the version.
+     * <p>
+     * Import-over-parent precedence is applied per module first, then effective versions are compared. A module that
+     * imports a version explicitly uses that version even if it also inherits a parent; modules without imports use
+     * their parent version. If effective versions disagree across modules, the project-wide constraint remains
+     * unresolved.
      */
     private static String detectSpringBootVersion(ProjectGraph graph) {
         Map<String, Set<String>> bomVersions = collectManagedVersions(graph, "spring-boot-dependencies");
-        if (!bomVersions.isEmpty()) {
-            // If modules agree on the BOM version, use it; if they conflict, return null
-            return bomVersions.size() == 1 ? bomVersions.keySet().iterator().next() : null;
-        }
         Map<String, Set<String>> parentVersions = collectParentVersions(graph, "spring-boot-starter-parent");
-        if (!parentVersions.isEmpty()) {
-            // If modules agree on the parent version, use it; if they conflict, return null
-            return parentVersions.size() == 1 ? parentVersions.keySet().iterator().next() : null;
+
+        // Compute effective version per module: imports override parents
+        Map<String, String> effectiveVersions = new TreeMap<>();
+        Set<String> allModules = new TreeSet<>();
+        bomVersions.values().forEach(allModules::addAll);
+        parentVersions.values().forEach(allModules::addAll);
+
+        for (String module : allModules) {
+            // Check if this module has an explicit import
+            String importVersion = null;
+            for (Map.Entry<String, Set<String>> entry : bomVersions.entrySet()) {
+                if (entry.getValue().contains(module)) {
+                    importVersion = entry.getKey();
+                    break;
+                }
+            }
+            if (importVersion != null) {
+                effectiveVersions.put(module, importVersion);
+            } else {
+                // No import, use parent if present
+                for (Map.Entry<String, Set<String>> entry : parentVersions.entrySet()) {
+                    if (entry.getValue().contains(module)) {
+                        effectiveVersions.put(module, entry.getKey());
+                        break;
+                    }
+                }
+            }
         }
-        return null;
+
+        // If all modules agree on the effective version, return it; otherwise return null
+        Set<String> distinctVersions = new TreeSet<>(effectiveVersions.values());
+        return distinctVersions.size() == 1 ? distinctVersions.iterator().next() : null;
     }
 
     /**

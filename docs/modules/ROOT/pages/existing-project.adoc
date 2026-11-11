@@ -118,10 +118,10 @@ hide regressions. There are two ways to get it:
 If neither happened, `/camel-validate` reports baseline preservation as `UNVERIFIED`. It does not run the tests
 afterwards and call that the baseline.
 
-`.camel-kit/baseline-test-results.json` stores the outcome of every individual test (`class#method` mapped to `passed`,
-`failed`, `error` or `skipped`), the Git revision the tests ran against and whether tracked files had uncommitted
-changes. Validation compares tests by identity, so a test that now fails, was skipped, or disappeared is a regression
-even when the number of failures is unchanged.
+`.camel-kit/baseline-test-results.json` stores the outcome of every individual test (`[module:]class#method` mapped to
+`passed`, `failed`, `error` or `skipped`), the Git revision the tests ran against, whether tracked files had uncommitted
+changes, and whether all test reports were successfully parsed. Validation compares tests by identity, so a test that
+now fails, was skipped, or disappeared is a regression even when the number of failures is unchanged.
 
 Camel Kit warns when the project uses an unsupported Camel version (3.x), an unsupported runtime or DSL, or when no
 routes were found in the project graph. In the last case the route baseline is incomplete, so read the existing route

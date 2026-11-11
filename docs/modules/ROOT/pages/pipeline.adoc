@@ -24,9 +24,12 @@ For an existing Camel 4 application the same four stages apply, with the context
   specification.
 * *Plan* lists the new capability, integration points, affected files and the behavior to preserve. Files outside that
   list are not touched.
-* *Execute* stays within the approved scope: no dependency upgrades, no DSL conversion.
-* *Validate* compares against the recorded baseline, checks the new capability and the affected existing behavior, and
-  reports every check that could not run under Unavailable Evidence instead of counting it as passed.
+* *Execute* captures the per-test baseline before its first edit (unless `init --record-baseline` already did) and
+  stays within the approved scope: no dependency upgrades, no DSL conversion, and the existing `pom.xml` is edited in
+  place, never replaced.
+* *Validate* compares each baseline test with its current outcome, checks the new capability and the affected existing
+  behavior, and reports every check that could not run, including a missing pre-edit baseline, under Unavailable
+  Evidence instead of counting it as passed.
 
 Details and supported combinations are in xref:existing-project.adoc[].
 

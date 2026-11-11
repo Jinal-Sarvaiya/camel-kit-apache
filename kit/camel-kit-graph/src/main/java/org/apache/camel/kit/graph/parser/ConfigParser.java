@@ -87,9 +87,10 @@ public class ConfigParser implements GraphParser {
                     if (effectiveProfile != null) {
                         nodeProps.put("profile", effectiveProfile);
                     }
-                    // Use document-scoped node ID to preserve per-document values
-                    String nodeId = "config:" + key + ":doc" + currentDocIndex
-                                    + (effectiveProfile != null ? ":profile=" + effectiveProfile : "");
+                    // The node ID is "config:<key>" like every other config source, so the default value stays reachable
+                    // by key. Only a document restricted by spring.config.activate.on-profile gets a profile-qualified
+                    // ID, so its value does not overwrite the default document's.
+                    String nodeId = "config:" + key + (documentProfile != null ? ":profile=" + documentProfile : "");
                     graph.addNode(new GraphNode(nodeId, NodeType.CONFIG_PROPERTY, nodeProps));
                 });
                 docIndex++;

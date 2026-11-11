@@ -11,6 +11,7 @@ import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.*;
 
 import org.apache.maven.model.Dependency;
+import org.apache.maven.model.DependencyManagement;
 import org.apache.maven.model.Model;
 import org.apache.maven.model.io.xpp3.MavenXpp3Reader;
 
@@ -68,6 +69,37 @@ public class PomParser implements GraphParser {
                             propNodeId, NodeType.CONFIG_PROPERTY,
                             Map.of("name", propName, "value", propValue,
                                     "file", projectRoot.relativize(pomFile).toString())));
+                }
+            }
+
+            // Version evidence from the parent and from dependencyManagement (imported BOMs). These carry the platform
+            // version (Spring Boot, Quarkus platform, Camel BOM) that dependencies without a version rely on. They are
+            // recorded as separate nodes so they never masquerade as a dependency of the project.
+            String pomRelative = projectRoot.relativize(pomFile).toString();
+            if (model.getParent() != null) {
+                graph.addNode(new GraphNode(
+                        "maven-parent:" + model.getParent().getGroupId() + ":" + model.getParent().getArtifactId(),
+                        NodeType.CONFIG_PROPERTY,
+                        Map.of("kind", "parent",
+                                "groupId", model.getParent().getGroupId(),
+                                "artifactId", model.getParent().getArtifactId(),
+                                "version", String.valueOf(model.getParent().getVersion()),
+                                "file", pomRelative)));
+            }
+            DependencyManagement management = model.getDependencyManagement();
+            if (management != null) {
+                for (Dependency managed : management.getDependencies()) {
+                    String managedVersion = managed.getVersion() != null ? managed.getVersion() : "managed";
+                    graph.addNode(new GraphNode(
+                            "maven-managed:" + managed.getGroupId() + ":" + managed.getArtifactId(),
+                            NodeType.CONFIG_PROPERTY,
+                            Map.of("kind", "managed",
+                                    "groupId", managed.getGroupId(),
+                                    "artifactId", managed.getArtifactId(),
+                                    "version", managedVersion,
+                                    "scope", managed.getScope() != null ? managed.getScope() : "compile",
+                                    "type", managed.getType() != null ? managed.getType() : "jar",
+                                    "file", pomRelative)));
                 }
             }
 

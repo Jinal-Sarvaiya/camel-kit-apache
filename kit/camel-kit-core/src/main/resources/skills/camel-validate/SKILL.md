@@ -74,6 +74,11 @@ each module using the same optional relative module prefix as `camel-implement/g
   `{MODULE_PREFIX}src/main/resources/camel/*.camel.yaml`; `PROPS_FILE` is
   `{MODULE_PREFIX}src/main/resources/application.properties`.
 
+For `project.type=existing`, `ROUTE_FILES` is NOT limited to `*.camel.yaml`: existing projects keep their own file names
+(for example `api-routes.yaml`). Use every path in `.camel-kit/baseline-routes.txt` plus every route file this pipeline
+created or modified (design spec "Affected Files" and the plan tasks). Never silently drop an existing route file because
+its name does not match the pattern above.
+
 `{MODULE_PREFIX}` is empty at the project root or is the relative target module plus trailing `/`; it is never `/`.
 Record resolved file paths, not bare flow names. Pass the exact `ROUTE_FILES` and matching `PROPS_FILE` to
 `schema-validation.md`, `endpoint-validation.md`, and all later checks, and iterate every route in every module.
@@ -84,46 +89,47 @@ Record resolved file paths, not bare flow names. Pass the exact `ROUTE_FILES` an
 
 If this is an existing project, establish and verify against a baseline BEFORE validating new capabilities:
 
-### Step 1: Load or Establish Baseline
+### Step 1: Load the Baseline
 
-**First, check if baseline was already recorded during init:**
+The baseline is `.camel-kit/baseline-test-results.json`. It is written before any edit, either by
+`init --record-baseline` or by `camel-execute` (Step 0.6) before its first task. It has this shape:
 
-```bash
-# Check for baseline test results file
-if [ -f .camel-kit/baseline-test-results.json ]; then
-  # Load existing baseline
-  BASELINE_STATUS=$(jq -r '.status' .camel-kit/baseline-test-results.json)
-  # Status will be: "passed", "failed", "not_run", or "timeout"
-fi
-```
-
-**If baseline exists, use it:**
-- `status: "passed"` → Baseline tests all passed before execute
-- `status: "failed"` → Baseline had pre-existing failures (NOT a regression)
-- `status: "not_run"` → Tests were not run before execute (CANNOT verify preservation - see Unavailable Evidence)
-- `status: "timeout"` → Tests timed out during init (CANNOT verify preservation - see Unavailable Evidence)
-
-**CRITICAL: Baseline must be captured BEFORE execute modifies code.**
-If `status` is "not_run" or "timeout", you CANNOT establish baseline now (code is already modified).
-Running tests now would capture post-change results as "baseline", hiding regressions.
-
-**If baseline is unavailable (not_run/timeout/missing):**
-- Report in **Unavailable Evidence**: "Cannot verify baseline preservation - tests were not run before execute"
-- Mark "Baseline Preserved" as **UNVERIFIED**
-- DO NOT run tests and call that the baseline
-
-**Record baseline state (if not already recorded):**
 ```json
 {
-  "baseline": {
-    "status": "passed" | "failed",
-    "testsRun": N,
-    "failures": N,
-    "errors": N,
-    "timestamp": "YYYY-MM-DDTHH:mm:ss"
-  }
+  "status": "passed | failed | timeout | not_run",
+  "reason": "why",
+  "timestamp": "2026-01-01T00:00:00Z",
+  "revision": "<git HEAD the tests ran against, or unknown>",
+  "dirty": false,
+  "testCount": 2,
+  "tests": {
+    "com.example.ExistingTest#testA": {"status": "passed"},
+    "com.example.ExistingTest#testB": {"status": "failed", "reason": "..."}
+  },
+  "nonPassing": ["com.example.ExistingTest#testB"]
 }
 ```
+
+`tests` maps `class#method` to `passed`, `failed`, `error` or `skipped`. Read the file with the file-reading tool; do not
+derive anything from counts.
+
+The baseline is usable only when ALL of these hold:
+
+- `status` is `passed` or `failed` and `tests` is not empty. (`not_run`, `timeout`, a missing file, or an empty `tests`
+  means there is no per-test evidence.)
+- `revision` is a Git revision (not `unknown`) and `dirty` is `false` (no tracked file had uncommitted changes), so the
+  results describe the project as it was before this pipeline. If `git merge-base --is-ancestor <revision> HEAD` fails, the baseline belongs to different code.
+
+**Baseline must be captured BEFORE execute modifies code.** If it is not usable, you CANNOT establish it now, because
+the working tree already contains this pipeline's changes. Running the tests now and calling the result the baseline
+would hide regressions.
+
+**If the baseline is not usable:**
+- Report in **Unavailable Evidence**: "Cannot verify baseline preservation: no per-test baseline was captured before
+  execute" and give the reason from the file.
+- Mark "Baseline Preserved" as **UNVERIFIED**.
+- DO NOT run the tests and call that the baseline.
+- You may still run the current tests to report their results, labelled as current results only.
 
 ### Step 2: Identify Existing vs. New Files
 
@@ -143,14 +149,8 @@ Running tests now would capture post-change results as "baseline", hiding regres
    ```
    These tests establish the pre-existing test baseline.
 
-3. **Identify new route files:**
-   ```bash
-   # Current route files
-   find src/main/resources/camel -name "*.yaml" -o -name "*.xml"
-   
-   # Compare to baseline-routes.txt to find NEW files
-   # New files = current files NOT in baseline-routes.txt
-   ```
+3. **Identify new route files:** list the route files the pipeline created from the design spec "Affected Files" and the
+   plan tasks. Anything in `baseline-routes.txt` that is not listed there is an existing, unmodified route file.
 
 4. **Affected files** (from design spec - modified existing files):
    ```
@@ -158,11 +158,9 @@ Running tests now would capture post-change results as "baseline", hiding regres
    Files marked "modify" are existing files that were changed
    ```
 
-**Fallback (if baseline files don't exist):**
-```bash
-# Files that existed before this pipeline started
-git diff --name-only $(git merge-base HEAD origin/main)..origin/main -- 'src/main/resources/camel/*.yaml'
-```
+**If the baseline inventory files do not exist:** there is no record of which files existed before this pipeline. Do
+not reconstruct one from the current tree. Report it under **Unavailable Evidence** and mark the baseline checks
+**UNVERIFIED**.
 
 ### Step 3: Separate Validation Runs
 
@@ -220,67 +218,45 @@ baseline commit or the working-tree history). A contract file that was removed, 
 
 ### Step 4: Baseline Test Re-Run
 
-After all route validation, re-run the EXISTING tests only (tests from baseline-tests.txt):
+Run the project's tests again with the project's own wrapper, so the current results are complete and fresh:
 
 ```bash
-# Run only baseline tests (those that existed before this pipeline)
-# Read test list from baseline inventory
-while IFS= read -r test_file; do
-  # Convert path to test class name (e.g., com/example/FooTest.java -> com.example.FooTest)
-  test_class=$(echo "$test_file" | sed 's/\.java$//' | tr '/' '.')
-  ./mvnw test -Dtest="$test_class" -B
-done < .camel-kit/baseline-tests.txt
+./mvnw test -B
 ```
 
-**Fallback (if baseline-tests.txt doesn't exist):**
-```bash
-# Run all tests
-./mvnw test -Dtest='*Test' -B
-```
+Then read the current per-test outcomes from the Surefire/Failsafe XML reports (`target/surefire-reports/TEST-*.xml`,
+`target/failsafe-reports/TEST-*.xml`, including module directories). Delete stale reports first if they predate this run.
+Do not run a subset of the baseline tests and do not rely on console totals.
 
-**Compare results:**
+If the baseline is usable (Step 1), compare **by test identity** (`class#method`), never by totals:
+
+| Baseline | Current | Verdict |
+|----------|---------|---------|
+| passed | passed | OK |
+| passed | failed or error | **REGRESSION** |
+| passed | missing (test removed, renamed, or not run) | **REGRESSION** unless the design spec "Affected Files" approves it |
+| passed | skipped | **REGRESSION** (a test that used to verify behavior no longer does) |
+| failed or error | failed or error | Pre-existing failure, not a regression; list it |
+| failed or error | passed | Fixed; note as an improvement |
+| failed or error | missing | Report it; the pre-existing failure disappeared |
+| not in baseline | any | New test; validate it with the new capabilities |
+
+Equal failure counts do not mean equal outcomes: one test fixed and another broken has the same totals, and the
+comparison above reports that as a regression.
+
 ```markdown
 ## Baseline Test Results
 
-| Metric | Baseline | Current | Status |
-|--------|----------|---------|--------|
-| Tests Run | N | N | ✓ Same / ⚠ Changed |
-| Failures | N | N | ✓ Same / ❌ Regression |
-| Errors | N | N | ✓ Same / ❌ Regression |
-
-### Regression Analysis
-
-**CRITICAL: Compare per-test results, not just totals.**
-
-Parse baseline-test-results.json (if available) to get per-test outcomes:
-```json
-{
-  "tests": {
-    "com.example.ExistingTest#testA": {"status": "passed"},
-    "com.example.ExistingTest#testB": {"status": "failed", "reason": "..."}
-  }
-}
+| Test | Baseline | Current | Verdict |
+|------|----------|---------|---------|
+| com.example.FooTest#a | passed | failed | REGRESSION |
 ```
-
-Parse current test results (from Surefire XML reports or output).
-
-**For each test:**
-- If baseline=PASS and current=FAIL → **REGRESSION**
-- If baseline=FAIL and current=FAIL → Pre-existing failure (not a regression)
-- If baseline=PASS and current=PASS → OK
-- If baseline=FAIL and current=PASS → Fixed (note as improvement)
-- If test is NEW (not in baseline) → Validate separately
-
-**If baseline-test-results.json is unavailable:**
-- Totals comparison is NOT sufficient (can hide regressions where one test improves, another regresses)
-- Report in **Unavailable Evidence**: "Cannot verify per-test preservation - baseline-test-results.json missing"
-- Mark "Baseline Preserved" as **UNVERIFIED**
 
 **Verdict:**
-- **BASELINE PRESERVED**: No tests went from PASS→FAIL
-- **REGRESSION**: At least one test went from PASS→FAIL (list them)
-- **UNVERIFIED**: Cannot verify (see Unavailable Evidence)
-```
+- **BASELINE PRESERVED**: no baseline test has a REGRESSION verdict.
+- **REGRESSION**: at least one does (list each).
+- **UNVERIFIED**: the baseline is not usable (Step 1) or the current tests could not run. State why under
+  **Unavailable Evidence**.
 
 ### Step 5: Report Structure for Existing Projects
 
@@ -298,10 +274,10 @@ The validation report for existing projects MUST have this structure:
 **Existing Routes (modified):** N routes
 **New Routes:** N routes
 
-**Baseline Test Results:**
-- Baseline: N tests, N failures, N errors
-- Current: N tests, N failures, N errors
-- Regressions: YES/NO
+**Baseline Test Results (per-test comparison):**
+- Baseline revision: <revision> (dirty: false)
+- Baseline tests compared: N; regressions: N (list each `class#method`); pre-existing failures: N; fixed: N
+- Regressions: YES/NO/UNVERIFIED
 
 ---
 
@@ -344,8 +320,9 @@ one under **Unavailable Evidence** with the check name, the reason, and what wou
 
 Typical cases for existing projects:
 
-- Baseline `status` is `not_run` or `timeout` and the re-run in Step 1 also cannot complete
-- `baseline-routes.txt` or `baseline-tests.txt` is missing, so the git-based fallback was used
+- Baseline `status` is `not_run` or `timeout`, `tests` is empty, `revision` is `unknown`, or `dirty` is `true`, so there is
+  no per-test evidence from before this pipeline
+- `baseline-routes.txt` or `baseline-tests.txt` is missing, so there is no record of the pre-existing files
 - The build tool, a required service or credentials are unavailable, so tests or endpoint checks cannot execute
 
 If any check that covers existing behavior is unavailable, set **Baseline Preserved** to `UNVERIFIED` instead of `YES`

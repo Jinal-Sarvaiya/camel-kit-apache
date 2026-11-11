@@ -1442,7 +1442,7 @@ class ResourceConsistencyTest {
         // keys init writes only for greenfield or internal bookkeeping are not workflow constraints
         Set<String> notConstraints
                 = Set.of("project.type", "project.unsupportedReason",
-                        "project.detectedPlatformBomVersion", "project.sourcePlatform", "project.springBootVersion");
+                        "project.detectedPlatformBomVersion", "project.sourcePlatform");
         Set<String> documentedButNeverWritten = new LinkedHashSet<>(documented);
         documentedButNeverWritten.removeAll(written);
         assertTrue(documentedButNeverWritten.isEmpty(),
@@ -1516,6 +1516,107 @@ class ResourceConsistencyTest {
                 "camel-validate must report unavailable evidence");
         assertTrue(validate.contains("`UNVERIFIED`"),
                 "camel-validate must not report an unrunnable baseline check as preserved");
+    }
+
+    /**
+     * The baseline schema camel-validate and camel-execute document must be the one init writes: a renamed field would
+     * silently leave validation without evidence.
+     */
+    @Test
+    void validateAndExecuteDocumentTheBaselineSchemaInitWrites() throws IOException {
+        Path core = repositoryRoot().resolve("kit/camel-kit-core/src/main");
+        String writer = Files.readString(core.resolve("java/org/apache/camel/kit/service/BaselineTestResults.java"));
+        String initService = Files.readString(core.resolve("java/org/apache/camel/kit/service/InitService.java"));
+        Path skills = core.resolve("resources/skills");
+        String validate = Files.readString(skills.resolve("camel-validate/SKILL.md"));
+        String execute = Files.readString(skills.resolve("camel-execute/SKILL.md"));
+        String plan = Files.readString(skills.resolve("camel-plan/SKILL.md"));
+
+        for (String field : List.of("status", "reason", "timestamp", "revision", "dirty", "testCount", "tests",
+                "nonPassing")) {
+            assertTrue(writer.contains("\"" + field + "\"") || writer.contains("putObject(\"" + field + "\")")
+                    || writer.contains("putArray(\"" + field + "\")"), "init no longer writes baseline field " + field);
+            assertTrue(validate.contains("\"" + field + "\""), "camel-validate must document baseline field " + field);
+        }
+        for (String status : List.of("passed", "failed", "timeout", "not_run")) {
+            assertTrue(validate.contains(status), "camel-validate must handle baseline status " + status);
+        }
+        assertTrue(initService.contains("\"--untracked-files=no\""),
+                "the dirty flag must ignore init's own untracked output");
+
+        // validation compares test identities, never counts, and cannot establish the baseline after the edits
+        assertTrue(validate.contains("by test identity") && validate.contains("`class#method`"),
+                "camel-validate must compare per-test identities");
+        assertTrue(validate.contains("**REGRESSION** unless the design spec"),
+                "a baseline test that disappeared must be a regression unless approved");
+        assertFalse(validate.contains("done < .camel-kit/baseline-tests.txt"),
+                "camel-validate must not derive test classes from file names and count lines");
+        assertFalse(validate.contains("| Tests Run |"), "camel-validate must not compare totals");
+        assertTrue(validate.contains("DO NOT run the tests and call that the baseline"));
+
+        // execute captures the baseline before the first edit; plan makes sure that happens
+        assertTrue(execute.contains("Capture the test baseline BEFORE the first edit"),
+                "camel-execute must capture the baseline before editing");
+        assertTrue(execute.contains("baseline-test-results.json") && execute.contains("`revision`")
+                && execute.contains("`dirty`"), "camel-execute must write the documented schema");
+        assertTrue(plan.contains("The test baseline must exist before execution"),
+                "camel-plan must require the baseline to exist before execution");
+    }
+
+    @Test
+    void existingProjectRouteInventoryIsNotLimitedToCamelYamlNames() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String validate = Files.readString(root.resolve("camel-validate/SKILL.md"));
+        assertTrue(validate.contains("`ROUTE_FILES` is NOT limited to `*.camel.yaml`"),
+                "existing projects keep their own route file names");
+        assertTrue(validate.contains("every path in `.camel-kit/baseline-routes.txt`"));
+
+        Path fixture = repositoryRoot()
+                .resolve("kit/camel-kit-core/src/test/resources/fixtures/existing-project-spring-boot");
+        try (var files = Files.walk(fixture)) {
+            assertTrue(files.anyMatch(f -> f.getFileName().toString().equals("api-routes.yaml")),
+                    "the fixture is the proof that real route files do not end in .camel.yaml");
+        }
+    }
+
+    @Test
+    void existingProjectsNeverGoThroughGreenfieldVersionSelectionOrPomTemplates() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String versions = Files.readString(root.resolve("camel-brainstorm/guides/version-selection.md"));
+        String existingPath = versions.substring(versions.indexOf("## Existing Projects (separate path)"),
+                versions.indexOf("## Step 1: Select Runtime Platform"));
+
+        assertTrue(existingPath.contains("follow ONLY this section and then stop"));
+        assertTrue(existingPath.contains("never through\nthe Step 2 version tables or the Step 3 mapping rules"));
+        assertTrue(existingPath.contains("DO NOT replace a recorded value with a value from the tables"));
+        assertTrue(existingPath.contains("project.springBootVersion"));
+        assertFalse(existingPath.contains("{CAMEL_"),
+                "the existing-project path must not reference the version tables");
+        assertFalse(existingPath.contains("Do you want to upgrade"),
+                "an existing project is not offered a replacement");
+
+        for (String guide : List.of("pom-spring-boot.md", "pom-quarkus.md")) {
+            String pom = Files.readString(root.resolve("camel-implement/guides/" + guide));
+            assertTrue(pom.indexOf("Existing Projects: Never Replace the POM") >= 0
+                    && pom.indexOf("Existing Projects: Never Replace the POM") < pom.indexOf("## POM Template File"),
+                    guide + " must put the existing-project rule before the template instruction");
+        }
+        String dependencies = Files.readString(root.resolve("camel-implement/guides/maven-dependencies.md"));
+        assertTrue(dependencies.contains("skip Step 1") && dependencies.contains("project.type=existing"));
+    }
+
+    @Test
+    void conflictingOrMissingDiscoveryIsAHardStopInEveryStage() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        for (String file : List.of("camel-plan/SKILL.md", "camel-execute/SKILL.md",
+                "camel-brainstorm/guides/existing-project-discovery.md",
+                "camel-brainstorm/guides/version-selection.md")) {
+            String content = Files.readString(root.resolve(file));
+            assertTrue(content.contains("STOP") && content.contains("project.camelVersion")
+                    && content.contains("project.runtime")
+                    && (content.contains("conflicting") || content.contains("Conflicting")),
+                    file + " must stop when the runtime or Camel version was not locked by discovery");
+        }
     }
 
     @Test

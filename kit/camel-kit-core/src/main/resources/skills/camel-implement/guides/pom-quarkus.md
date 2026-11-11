@@ -5,6 +5,22 @@
 
 ---
 
+## Existing Projects: Never Replace the POM
+
+<HARD-RULE>
+If `.camel-kit/config.properties` has `project.type=existing`, the project already owns its `pom.xml`. Do NOT copy the
+template over it, do NOT replace its placeholders, and do NOT change its parent, BOMs, plugins, Camel version, platform
+BOM version or Spring Boot version. Skip "POM Template File" below entirely.
+
+Edit the existing `pom.xml` in place, and only to add the dependencies the approved design spec lists under "Affected
+Files". Add each one by hand with the `<groupId>`/`<artifactId>` form this project already uses, and add no `<version>`
+unless the project's own BOM does not manage that artifact. A version, when needed, must be the one the project already
+uses for the same Camel release train (`project.camelVersion` / `project.platformBomVersion`), never one from a shipped
+version table. If the dependency cannot be added without changing a locked version, STOP and report it.
+</HARD-RULE>
+
+---
+
 ## POM Template File
 
 <HARD-RULE>

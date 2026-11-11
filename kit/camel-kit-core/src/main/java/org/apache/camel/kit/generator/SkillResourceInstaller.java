@@ -144,20 +144,9 @@ class SkillResourceInstaller {
             throws Exception {
         Files.createDirectories(destination.getParent());
 
-        // Always update shipped resources: SKILL.md, guide files, and shared/ resources
-        // Preserve user files (custom skills the user created)
-        String fileName = destination.getFileName().toString();
-        boolean isSkillManifest = fileName.equals("SKILL.md");
-        boolean isGuideFile = destination.getParent().getFileName().toString().equals("guides");
-        boolean isSharedResource = destination.toString().contains("/shared/")
-                || destination.toString().contains("\\shared\\");
-        boolean shouldUpdate = isSkillManifest || isGuideFile || isSharedResource;
-
-        if (Files.exists(destination) && !shouldUpdate) {
-            // Skip existing user files to preserve customizations
-            return;
-        }
-
+        // Ownership comes from the shipped source: copySkills() visits only files Camel Kit ships, so every file
+        // reaching this method is refreshed. User-owned files (custom skills, notes next to a SKILL.md) are never in
+        // the shipped tree, are never visited and therefore survive reinitialization untouched.
         try (InputStream in = Files.newInputStream(source)) {
             Files.copy(in, destination, StandardCopyOption.REPLACE_EXISTING);
         }

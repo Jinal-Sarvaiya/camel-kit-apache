@@ -121,6 +121,7 @@ The properties validation gate (properties-generation.md §5.4) is part of this 
 **Spring Boot / Quarkus:**
 - Load `guides/maven-dependencies.md`
 - Pass: `FLOW_NAME`, `MODULE_DIR`, `CAMEL_VERSION`, `RUNTIME`
+- If `project.type=existing`, tell the guide so: it edits the existing `pom.xml` in place and never replaces it.
 
 ### Step 5.5: Migration Artifacts (CONDITIONAL)
 

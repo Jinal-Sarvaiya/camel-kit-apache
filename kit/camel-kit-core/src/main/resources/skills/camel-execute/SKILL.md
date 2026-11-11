@@ -215,6 +215,11 @@ Read `.camel-kit/config.properties`:
    and do not execute. Treat `project.discoveryGaps` as items to inspect in the source before editing, not as proof
    that nothing exists.
 
+   **A missing `project.runtime` or `project.camelVersion` means discovery found conflicting or no evidence, not that
+   the project has no constraint.** If either is absent, or `project.discoveryGaps` reports conflicting runtimes or
+   Camel versions or a failed discovery, STOP and report it: the user must resolve it before any file is edited. Never
+   fill the value in from the shipped version tables.
+
 2. **Load baseline inventory (if files exist):**
    ```bash
    # Routes that existed at project initialization
@@ -254,11 +259,22 @@ Read `.camel-kit/config.properties`:
    3. Abort execution"
    ```
 
-6. **Record execution baseline state:**
-   - Run: `git diff --name-only` (should be empty or only have .camel-kit/ changes)
-   - Record current dependency versions from pom.xml
-   - Note: Route/test baseline already recorded in baseline-routes.txt and baseline-tests.txt
-   - This execution baseline will be checked after task completion
+6. **Capture the test baseline BEFORE the first edit (existing projects only):**
+   - Read `.camel-kit/baseline-test-results.json`. If `status` is `passed` or `failed`, `tests` is not empty, `dirty`
+     is `false`, and `revision` equals the current `git rev-parse HEAD`, the baseline already exists. Do not touch it.
+   - Otherwise nothing has been edited yet, so this is the last moment a baseline can exist. Run the project's tests
+     with its own wrapper (`./mvnw test -B`), then write `.camel-kit/baseline-test-results.json` in the schema that
+     `camel-validate` Step 1 documents: `status`, `reason`, `timestamp`, `revision` (`git rev-parse HEAD`), `dirty`
+     (`true` if `git status --porcelain --untracked-files=no` is not empty), and every test under `tests` keyed
+     `class#method` with `passed`, `failed`, `error` or `skipped`, read from `target/surefire-reports/TEST-*.xml` and
+     `target/failsafe-reports/TEST-*.xml`.
+   - If the tests cannot be run (no wrapper, build broken, timeout), write the file with `status` `not_run` or
+     `timeout` and the reason, and tell the user that baseline preservation will be reported as UNVERIFIED. Do not
+     proceed as if a baseline existed.
+   - Never overwrite a usable baseline, and never create or refresh it after the first task has started.
+   - Run `git diff --name-only` (should be empty or only have `.camel-kit/` changes) and record the current
+     dependency versions from pom.xml. Route and test inventories are already in `baseline-routes.txt` and
+     `baseline-tests.txt`. This execution baseline is checked after task completion.
 
 ### During Task Execution: Scope Guards
 

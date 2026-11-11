@@ -13,11 +13,13 @@ integration goes through it, however small: short designs are fine, skipped desi
 == Existing Camel 4 applications
 
 When `.camel-kit/config.properties` has `project.type=existing`, the skill runs discovery first and designs against the
-runtime, Camel version, platform BOM and DSL that `camel-kit init` detected. It does not re-ask for what discovery
-already answered, and it never upgrades dependencies or converts the DSL. The design records the new capability,
+runtime, Camel version, platform BOM and DSL that `camel-kit init` read from your pom. It does not re-ask for what
+discovery already answered, never takes a version from Camel Kit's own version tables, and never upgrades dependencies
+or converts the DSL. The design records the new capability,
 integration points, affected files, compatibility constraints and the existing behavior to preserve.
 
-The skill stops instead of designing when `project.unsupportedVersion` or `project.unsupportedCombination` is set, and
+The skill stops instead of designing when `project.unsupportedVersion` or `project.unsupportedCombination` is set, or
+when `project.runtime` or `project.camelVersion` is missing because the pom showed conflicting evidence. It
 inspects the source for every item in `project.discoveryGaps` before asking you about it. See
 xref:existing-project.adoc[] for the detected keys and supported combinations.
 

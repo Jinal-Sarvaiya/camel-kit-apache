@@ -79,7 +79,7 @@ public class InitService {
                 skillsDir, targetDir,
                 request.commandPrefix(), request.distribution(), request.withCitrusMcp(), request.printer());
         AgentGenerator generator = AgentGeneratorFactory.create(request.agentName());
-        requireConfinedOutputs(targetDir, genCtx);
+        requireConfinedOutputs(targetDir, genCtx, isExistingProject);
         generator.preflight(genCtx);
 
         List<Path> createdPaths = new ArrayList<>();
@@ -133,13 +133,22 @@ public class InitService {
                 citrusVersion, citrusSchemaCount, MAVEN_WRAPPER_VERSION, graph, createdPaths, warnings);
     }
 
-    private void requireConfinedOutputs(Path targetDir, InitContext genCtx) throws IOException {
+    /** Files init writes under {@code .camel-kit/} for an existing project (recorded baseline). */
+    private static final List<String> BASELINE_OUTPUTS = List.of(
+            ".camel-kit/baseline-routes.txt", ".camel-kit/baseline-tests.txt",
+            ".camel-kit/baseline-contracts.txt", ".camel-kit/baseline-test-results.json");
+
+    private void requireConfinedOutputs(Path targetDir, InitContext genCtx, boolean existingProject)
+            throws IOException {
         Set<Path> outputs = new LinkedHashSet<>();
         for (String relative : List.of(".camel-kit/.cache", ".camel-kit/config.properties",
                 ".camel-kit/project-graph.json", ".mvn/wrapper/maven-wrapper.properties", "mvnw", "mvnw.cmd",
-                "AGENTS.md",
+                "AGENTS.md", "CLAUDE.md",
                 "docs/constitution.md", "docs/flows", "test/data", "schemas")) {
             outputs.add(Path.of(relative));
+        }
+        if (existingProject) {
+            BASELINE_OUTPUTS.forEach(relative -> outputs.add(Path.of(relative)));
         }
         try {
             for (Path output : outputs) {
@@ -343,10 +352,38 @@ public class InitService {
                 throw e;
             }
             reportWarning(request, warnings, "Could not build project graph: " + e.getMessage());
+            recordUnresolvedDiscovery(camelKitDir, e.getMessage());
             return null;
         } catch (Exception e) {
             reportWarning(request, warnings, "Could not build project graph: " + e.getMessage());
+            recordUnresolvedDiscovery(camelKitDir, e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * An existing project whose graph could not be built has no discovered constraints at all. Record that in the
+     * configuration so later stages stop and inspect the project instead of treating the absent versions as "nothing
+     * declared". Greenfield projects are unaffected.
+     */
+    private void recordUnresolvedDiscovery(Path camelKitDir, String reason) {
+        Path configFile = camelKitDir.resolve("config.properties");
+        try {
+            Properties config = new Properties();
+            try (var in = Files.newInputStream(configFile)) {
+                config.load(in);
+            }
+            if (!"existing".equals(config.getProperty("project.type"))) {
+                return;
+            }
+            config.setProperty("project.discoveryGaps",
+                    "Project discovery failed: " + reason + ". No runtime or version constraints were detected. "
+                                                        + "Fix the project files and run init again, or inspect them before planning.");
+            var out = new ByteArrayOutputStream();
+            config.store(out, "Camel-Kit Project Configuration");
+            AtomicFileWriter.write(configFile, out.toByteArray());
+        } catch (Exception e) {
+            // Best-effort: the warning has already been reported.
         }
     }
 
@@ -396,20 +433,22 @@ public class InitService {
         org.apache.camel.kit.graph.ProjectDiscovery.DiscoveryResult discovery
                 = org.apache.camel.kit.graph.ProjectDiscovery.discover(graph);
 
-        String runtime = discovery.runtime();
         boolean isExistingProject = "existing".equals(config.getProperty("project.type"));
+        String runtime = discovery.runtime();
 
         if (isExistingProject) {
-            // For existing projects: use detected versions, do not overwrite with distribution defaults
-            String normalizedRuntime = normalizeRuntime(runtime);
-            config.setProperty("project.runtime", normalizedRuntime);
+            // Existing projects: only values the project itself declares are recorded as constraints. Nothing is
+            // seeded from the distribution, so an unresolved value is absent (and reported), never a default.
+            if (runtime != null) {
+                config.setProperty("project.runtime", normalizeRuntime(runtime));
+            } else {
+                config.remove("project.runtime");
+            }
 
-            // Bind to detected Camel version instead of distribution default
             if (discovery.camelVersion() != null) {
                 config.setProperty("project.camelVersion", discovery.camelVersion());
-                // Also store in detectedCamelVersion for reference
                 config.setProperty("project.detectedCamelVersion", discovery.camelVersion());
-            } else {
+            } else if (!discovery.hasConflict()) {
                 // ERROR: Cannot proceed with undetectable version on existing project
                 throw new IllegalStateException(
                         "Cannot detect Camel version from existing project. "
@@ -417,10 +456,14 @@ public class InitService {
                                                 + "-p project.camelVersion=<version>. "
                                                 + "Refusing to guess a version for an existing project.");
             }
+            // With conflicting evidence neither value is locked; the gap below tells the user what to resolve.
 
             if (discovery.platformBomVersion() != null) {
                 config.setProperty("project.platformBomVersion", discovery.platformBomVersion());
                 config.setProperty("project.detectedPlatformBomVersion", discovery.platformBomVersion());
+            }
+            if (discovery.springBootVersion() != null) {
+                config.setProperty("project.springBootVersion", discovery.springBootVersion());
             }
 
             if (!discovery.dslTypes().isEmpty()) {
@@ -442,7 +485,8 @@ public class InitService {
                 } else {
                     // Default: do not run project code during init; validation establishes the baseline later
                     writeBaselineStatus(dir.resolve("baseline-test-results.json"), "not_run",
-                            "Baseline tests were not run during init (use --record-baseline to run them)");
+                            "Baseline tests were not run during init (use --record-baseline to run them)",
+                            projectRoot);
                     config.setProperty("project.baselineTestStatus", "not_run");
                 }
             }
@@ -518,7 +562,7 @@ public class InitService {
         var out = new ByteArrayOutputStream();
         config.store(out, "Camel-Kit Project Configuration");
         AtomicFileWriter.write(configFile, out.toByteArray());
-        return runtime;
+        return runtime == null ? "" : runtime;
     }
 
     private void writeVersionConfig(Properties config, DistributionConfig distribution, String runtime) {
@@ -830,7 +874,7 @@ public class InitService {
         Path baselineResultsFile = camelKitDir.resolve("baseline-test-results.json");
 
         if (!Files.exists(mvnw)) {
-            writeBaselineStatus(baselineResultsFile, "not_run", "Maven wrapper not found");
+            writeBaselineStatus(baselineResultsFile, "not_run", "Maven wrapper not found", projectRoot);
             config.setProperty("project.baselineTestStatus", "not_run");
             return;
         }
@@ -851,20 +895,27 @@ public class InitService {
             if (!finished) {
                 testProcess.destroyForcibly();
                 writeBaselineStatus(baselineResultsFile, "timeout",
-                        "Tests timed out after " + BASELINE_TEST_TIMEOUT_SECONDS + " seconds");
+                        "Tests timed out after " + BASELINE_TEST_TIMEOUT_SECONDS + " seconds", projectRoot);
                 config.setProperty("project.baselineTestStatus", "timeout");
                 return;
             }
 
-            if (testProcess.exitValue() == 0) {
-                writeBaselineStatus(baselineResultsFile, "passed", "All tests passed");
-                config.setProperty("project.baselineTestStatus", "passed");
-            } else {
-                writeBaselineStatus(baselineResultsFile, "failed", "Tests had failures (baseline state)");
-                config.setProperty("project.baselineTestStatus", "failed");
+            // Per-test outcomes and the revision they belong to: validation compares test identities, never totals.
+            var tests = BaselineTestResults.collect(projectRoot);
+            String status = testProcess.exitValue() == 0 ? "passed" : "failed";
+            String reason = testProcess.exitValue() == 0
+                    ? "All tests passed"
+                    : "Tests had failures (baseline state)";
+            if (tests.isEmpty()) {
+                reason += "; no Surefire/Failsafe reports were found, so per-test outcomes are unavailable";
             }
+            writeBaselineFile(projectRoot, baselineResultsFile,
+                    BaselineTestResults.toJson(status, reason, sourceRevision(projectRoot),
+                            sourceTreeDirty(projectRoot), tests));
+            config.setProperty("project.baselineTestStatus", status);
         } catch (Exception e) {
-            writeBaselineStatus(baselineResultsFile, "not_run", "Could not execute tests: " + e.getMessage());
+            writeBaselineStatus(baselineResultsFile, "not_run", "Could not execute tests: " + e.getMessage(),
+                    projectRoot);
             config.setProperty("project.baselineTestStatus", "not_run");
         } finally {
             if (output != null) {
@@ -877,18 +928,60 @@ public class InitService {
         }
     }
 
+    /** Git HEAD of the project, or {@code unknown} when it is not a Git work tree. Read-only. */
+    private String sourceRevision(Path projectRoot) {
+        return runGit(projectRoot, "rev-parse", "HEAD").map(String::trim).filter(v -> !v.isEmpty()).orElse("unknown");
+    }
+
     /**
-     * Write baseline test status to JSON file.
+     * True when a tracked file has uncommitted changes, or when that cannot be determined. Untracked files are ignored
+     * on purpose: init's own output (.camel-kit, agent skills, AGENTS.md) is untracked at this point and must not make
+     * every baseline look dirty.
      */
-    private void writeBaselineStatus(Path file, String status, String reason) {
+    private boolean sourceTreeDirty(Path projectRoot) {
+        return runGit(projectRoot, "status", "--porcelain", "--untracked-files=no")
+                .map(out -> !out.isBlank()).orElse(true);
+    }
+
+    private java.util.Optional<String> runGit(Path projectRoot, String... args) {
+        Path output = null;
         try {
-            org.apache.camel.kit.util.ConfinedPaths.requirePath(file.getParent().getParent(), file);
-            String json = String.format(Locale.ROOT,
-                    "{\n  \"status\": \"%s\",\n  \"reason\": \"%s\",\n  \"timestamp\": \"%s\"\n}",
-                    status,
-                    reason.replace("\"", "\\\""),
-                    java.time.Instant.now().toString());
-            AtomicFileWriter.write(file, json);
+            output = Files.createTempFile("camel-kit-git-", ".out");
+            List<String> command = new ArrayList<>(List.of("git", "-C", projectRoot.toString()));
+            command.addAll(List.of(args));
+            Process process = new ProcessBuilder(command)
+                    .redirectErrorStream(true)
+                    .redirectOutput(output.toFile())
+                    .start();
+            if (!process.waitFor(30, TimeUnit.SECONDS)) {
+                process.destroyForcibly();
+                return java.util.Optional.empty();
+            }
+            return process.exitValue() == 0
+                    ? java.util.Optional.of(Files.readString(output))
+                    : java.util.Optional.empty();
+        } catch (Exception e) {
+            return java.util.Optional.empty();
+        } finally {
+            if (output != null) {
+                try {
+                    Files.deleteIfExists(output);
+                } catch (IOException ignored) {
+                    // temp file cleanup only
+                }
+            }
+        }
+    }
+
+    /**
+     * Writes a baseline status that has no per-test outcomes ({@code not_run} or {@code timeout}). It carries the same
+     * fields as a full baseline, with an empty test list, so validation never has to special-case it.
+     */
+    private void writeBaselineStatus(Path file, String status, String reason, Path projectRoot) {
+        try {
+            writeBaselineFile(projectRoot, file,
+                    BaselineTestResults.toJson(status, reason, sourceRevision(projectRoot),
+                            sourceTreeDirty(projectRoot), java.util.Map.of()));
         } catch (Exception e) {
             // Best-effort - ignore write failures
         }
@@ -918,8 +1011,7 @@ public class InitService {
 
             if (!testFiles.isEmpty()) {
                 Path baselineFile = camelKitDir.resolve("baseline-tests.txt");
-                org.apache.camel.kit.util.ConfinedPaths.requirePath(projectRoot, baselineFile);
-                AtomicFileWriter.write(baselineFile, String.join("\n", testFiles.stream().sorted().toList()));
+                writeBaselineFile(projectRoot, baselineFile, String.join("\n", testFiles.stream().sorted().toList()));
             }
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
@@ -937,7 +1029,6 @@ public class InitService {
     private void writeBaselineRoutes(Path camelKitDir, List<String> routeFiles, Path projectRoot) {
         try {
             Path baselineFile = camelKitDir.resolve("baseline-routes.txt");
-            org.apache.camel.kit.util.ConfinedPaths.requirePath(projectRoot, baselineFile);
             List<String> relativePaths = routeFiles.stream()
                     .map(r -> {
                         Path routePath = Path.of(r);
@@ -952,7 +1043,7 @@ public class InitService {
                     })
                     .sorted()
                     .toList();
-            AtomicFileWriter.write(baselineFile, String.join("\n", relativePaths));
+            writeBaselineFile(projectRoot, baselineFile, String.join("\n", relativePaths));
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
         }
@@ -988,10 +1079,19 @@ public class InitService {
         }
     }
 
+    /**
+     * Writes one recorded-baseline file. Every baseline output goes through here so it is confined below the project
+     * root (no symbolic-link redirection) and replaced atomically (a hard link to an outside file is never written
+     * through).
+     */
+    private void writeBaselineFile(Path projectRoot, Path file, String content) throws IOException {
+        org.apache.camel.kit.util.ConfinedPaths.requirePath(projectRoot, file);
+        AtomicFileWriter.write(file, content);
+    }
+
     private void writeBaselineLines(Path file, List<String> lines, Path projectRoot) {
         try {
-            org.apache.camel.kit.util.ConfinedPaths.requirePath(projectRoot, file);
-            AtomicFileWriter.write(file, String.join("\n", lines));
+            writeBaselineFile(projectRoot, file, String.join("\n", lines));
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
         }

@@ -9,9 +9,10 @@ Learn how to use Camel Kit to add new capabilities to your existing Apache Camel
 Camel Kit can enhance **existing Camel 4 applications** in addition to creating new greenfield projects. When you run `init` on an existing project, Camel Kit:
 
 * Detects your current Camel version, runtime, and DSL
-* Preserves your `pom.xml`, existing routes, and configuration
-* Adds Camel Kit skills without overwriting customizations
-* Uses your existing version instead of upgrading
+* Preserves your `pom.xml`, existing routes, and configuration (init writes none of them)
+* Adds Camel Kit skills; the shipped skill, guide and shared files are refreshed on every reinit, and files you add
+  next to them are never touched
+* Records the versions your pom declares and uses them instead of upgrading or choosing others
 
 The workflow follows the same **design → plan → execute → validate** pipeline, but with additional safeguards to protect existing functionality.
 
@@ -24,8 +25,9 @@ Your existing project must meet these requirements:
 * One of these runtimes:
 ** Spring Boot
 ** Quarkus
-** Karaf
 ** Camel Main / JBang
+* **YAML routes**. Projects whose routes are only XML, Java or Groovy are reported as an unsupported combination, and
+  Karaf (`camel-blueprint`) is not supported. Camel Kit never converts the DSL or switches the runtime.
 
 NOTE: Multi-module Maven projects are supported with `.camel-kit/` at the root.
 
@@ -47,7 +49,8 @@ Camel Kit `init` is **safe to run over existing projects** with these protection
 | Use managed blocks - customizations preserved on reinit
 
 | Skill files
-| Existing customized files are not overwritten
+| Files Camel Kit ships are refreshed on reinit so they match the installed version. Edit a copy, or add your own file
+  next to them: files Camel Kit does not ship are never touched
 
 | Existing routes
 | Never modified unless explicitly listed in design spec
@@ -104,10 +107,21 @@ Camel Kit detects:
 ✓ Generated CLAUDE.md and skills
 ----
 
-`init` does not run your project's build or tests. The baseline test status is recorded as `not_run`, and
-`/camel-validate` establishes the baseline before it compares results. To record the baseline during `init` instead,
-pass `--record-baseline`. This runs `./mvnw test` once in your project and stores `passed`, `failed` or `timeout` in
-`project.baselineTestStatus`.
+`init` does not run your project's build or tests. The baseline test status is recorded as `not_run`. The test
+baseline has to exist *before* anything is edited, because results captured afterwards would include the new changes and
+hide regressions. There are two ways to get it:
+
+* Pass `--record-baseline` to `init`. It runs `./mvnw test` once in your project and writes
+  `.camel-kit/baseline-test-results.json`.
+* Otherwise `/camel-execute` captures it as its first step, before the first edit.
+
+If neither happened, `/camel-validate` reports baseline preservation as `UNVERIFIED`. It does not run the tests
+afterwards and call that the baseline.
+
+`.camel-kit/baseline-test-results.json` stores the outcome of every individual test (`class#method` mapped to `passed`,
+`failed`, `error` or `skipped`), the Git revision the tests ran against and whether tracked files had uncommitted
+changes. Validation compares tests by identity, so a test that now fails, was skipped, or disappeared is a regression
+even when the number of failures is unchanged.
 
 Camel Kit warns when the project uses an unsupported Camel version (3.x), an unsupported runtime or DSL, or when no
 routes were found in the project graph. In the last case the route baseline is incomplete, so read the existing route
@@ -121,7 +135,10 @@ Check `.camel-kit/config.properties`:
 ----
 project.type=existing
 project.runtime=spring-boot
+project.camelVersion=4.8.0
 project.detectedCamelVersion=4.8.0
+project.platformBomVersion=4.8.0
+project.springBootVersion=3.3.4
 project.primaryDsl=yaml
 project.routeCount=3
 project.hasTests=true
@@ -139,10 +156,21 @@ missing means discovery found nothing for it, not that the project has none.
 Avro schemas) and `.camel-kit/baseline-contracts.txt` lists them. Init only inventories these files so later stages can
 protect them; it does not analyse their content (tracked in #111).
 
+Only values your project declares are recorded. `project.camelVersion` comes from the `camel.version` property, an
+`org.apache.camel` dependency, or an imported Camel BOM. `project.platformBomVersion` is the imported
+`camel-spring-boot-bom` or `quarkus-bom` and `project.springBootVersion` is the imported `spring-boot-dependencies` or
+the `spring-boot-starter-parent`, with `${property}` references resolved from the pom. Nothing is filled in from Camel
+Kit's own version tables. If a value cannot be established it is left out and reported as a gap.
+
+If the pom shows two runtimes (for example `camel-spring-boot-starter` and `camel-quarkus-core`) or two different Camel
+versions, Camel Kit does not pick one: `project.runtime` or `project.camelVersion` is left out and
+`project.discoveryGaps` names the evidence. The workflow stops until you align the pom.
+
 Two further keys appear only when needed:
 
-* `project.discoveryGaps` - something discovery could not determine, for example no routes found in the graph or routes
-  in more than one DSL. The workflow inspects the source for these items and asks you about anything still unclear.
+* `project.discoveryGaps` - something discovery could not determine, for example conflicting runtimes or Camel versions,
+  a BOM version that could not be resolved, a pom that could not be read, no routes found in the graph or routes in more
+  than one DSL. The workflow inspects the source for these items and asks you about anything still unclear.
 * `project.unsupportedCombination` - the detected runtime or DSL is outside the supported scope (for example a Karaf
   runtime, or no YAML routes). The workflow stops instead of guessing; Camel Kit never converts the DSL.
 
@@ -190,9 +218,12 @@ The plan phase:
 * Limits changes to approved scope (won't modify protected files)
 * Preserves your Camel version (no upgrades)
 * Generates new routes in your primary DSL (currently YAML; XML/Java support tracked in #52)
+* Adds dependencies to your existing `pom.xml` in place. It never replaces the pom with a template, and never changes
+  its parent, BOMs or versions
 
 The execute phase:
 
+* Captures the per-test baseline before the first edit (unless `init --record-baseline` already did)
 * Validates scope compliance before and after each task
 * Verifies no unrelated files are touched
 * Checks that versions stay unchanged
@@ -201,22 +232,25 @@ The execute phase:
 
 The validate phase:
 
-* **Establishes a baseline** - runs existing tests first
+* **Uses the baseline captured before the edits** - it never creates one afterwards
 * **Separates concerns** - validates new routes separately from existing ones
-* **Detects regressions** - compares current test results to baseline
+* **Detects regressions per test** - compares each baseline test with its current outcome
 
 [source]
 ----
 ## Baseline Test Results
 
-| Metric | Baseline | Current | Status |
-|--------|----------|---------|--------|
-| Tests Run | 15 | 18 | ✓ Increased (new tests) |
-| Failures | 0 | 0 | ✓ No regressions |
-| Errors | 0 | 0 | ✓ No regressions |
+| Test | Baseline | Current | Verdict |
+|------|----------|---------|---------|
+| com.example.OrderTest#create | passed | passed | OK |
+| com.example.OrderTest#cancel | failed | failed | Pre-existing failure |
+| com.example.UserTest#lookup | passed | failed | REGRESSION |
 
-VERDICT: BASELINE PRESERVED - no regressions introduced
+VERDICT: REGRESSION - 1 baseline test no longer passes
 ----
+
+A test that disappeared or is now skipped counts as a regression unless the design spec approves it. When no usable
+baseline exists, the verdict is `UNVERIFIED` and the report lists what is missing under *Unavailable Evidence*.
 
 == Worked Example: Add REST Endpoint
 
@@ -365,7 +399,12 @@ READY FOR PRODUCTION: YES
 | Camel Main
 | 4.8.x
 | YAML
-| ✅ Supported
+| ⚠️ Expected to work (not tested)
+
+| Karaf (`camel-blueprint`), or no YAML routes
+| Any
+| Any
+| ❌ Not supported (reported as `project.unsupportedCombination`)
 
 | Camel 3.x
 | Any
@@ -393,7 +432,8 @@ READY FOR PRODUCTION: YES
 
 === "No Maven version detected"
 
-**Cause:** `pom.xml` uses `${camel.version}` property but doesn't define it.
+**Cause:** `pom.xml` uses `${camel.version}` property but doesn't define it, or no Camel version is declared at all.
+Camel Kit never guesses a version for an existing project.
 
 **Fix:** Define the property:
 [source,xml]
@@ -402,6 +442,14 @@ READY FOR PRODUCTION: YES
     <camel.version>4.8.0</camel.version>
 </properties>
 ----
+
+=== "Conflicting runtimes" or "Conflicting Camel versions"
+
+**Cause:** The pom shows more than one runtime (for example both Spring Boot and Quarkus Camel artifacts) or more than
+one Camel version (for example `camel.version` is 4.8.0 but a `camel-core` dependency says 4.10.0).
+
+**Fix:** Align the pom. Until then `project.runtime` or `project.camelVersion` is not recorded, and `/camel-plan` and
+`/camel-execute` stop. `project.discoveryGaps` lists the files and artifacts that disagree.
 
 === "Unsupported Camel version 3.x"
 
@@ -417,7 +465,7 @@ READY FOR PRODUCTION: YES
 
 **Cause:** Your project has both YAML and XML routes.
 
-**Fix:** Camel Kit will use your **primary DSL** (most common file type). If you want consistency:
+**Fix:** New routes use YAML and the other DSLs are never converted. If you want consistency:
 
 1. Choose one DSL
 2. Convert routes to that DSL

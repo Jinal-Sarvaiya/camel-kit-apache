@@ -1584,6 +1584,41 @@ class InitServiceTest {
                 "Custom skill files should be preserved exactly, not overwritten on reinit");
     }
 
+    /**
+     * Producer-to-consumer: the shipped camel-validate instructions read the inventories line by line, so a final entry
+     * without a line feed is silently skipped. Runs the real producer, then a literal {@code while read} loop.
+     */
+    @Test
+    void baselineInventoriesAreNewlineTerminatedSoShellConsumersSeeEveryEntry() throws Exception {
+        Path targetDir = tempDir.resolve("inventory-newline");
+        Files.createDirectories(targetDir.resolve("src/main/resources/camel"));
+        Files.createDirectories(targetDir.resolve("src/test/java/com/example"));
+        Files.writeString(targetDir.resolve("pom.xml"), minimalCamelPom("4.8.0"));
+        Files.writeString(targetDir.resolve("src/main/resources/camel/only-route.yaml"),
+                "- route:\n    id: r\n    from:\n      uri: timer:t\n      steps:\n        - log: hi\n");
+        Files.writeString(targetDir.resolve("src/test/java/com/example/OnlyTest.java"),
+                "package com.example;\nclass OnlyTest {\n}\n");
+
+        new InitService().initialize(
+                requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        for (String inventory : List.of("baseline-routes.txt", "baseline-tests.txt")) {
+            Path file = targetDir.resolve(".camel-kit/" + inventory);
+            String content = Files.readString(file);
+            assertTrue(content.endsWith("\n"), inventory + " must end with a line feed: [" + content + "]");
+
+            Process loop = new ProcessBuilder(
+                    "sh", "-c",
+                    "n=0; while IFS= read -r entry; do n=$((n+1)); done < " + file + "; echo $n")
+                    .redirectErrorStream(true).start();
+            String counted
+                    = new String(loop.getInputStream().readAllBytes(), java.nio.charset.StandardCharsets.UTF_8).trim();
+            loop.waitFor();
+            assertEquals("1", counted, inventory + ": the shell loop must see the single entry");
+        }
+        assertEquals("", InitService.inventoryText(List.of()), "an empty inventory is an empty file");
+    }
+
     @Test
     void reinitRefreshesSharedSkillResourcesAndKeepsUserOwnedFiles() throws Exception {
         Path targetDir = tempDir.resolve("shared-refresh");

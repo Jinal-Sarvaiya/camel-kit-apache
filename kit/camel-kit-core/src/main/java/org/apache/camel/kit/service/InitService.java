@@ -1011,7 +1011,7 @@ public class InitService {
 
             if (!testFiles.isEmpty()) {
                 Path baselineFile = camelKitDir.resolve("baseline-tests.txt");
-                writeBaselineFile(projectRoot, baselineFile, String.join("\n", testFiles.stream().sorted().toList()));
+                writeBaselineFile(projectRoot, baselineFile, inventoryText(testFiles.stream().sorted().toList()));
             }
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
@@ -1043,7 +1043,7 @@ public class InitService {
                     })
                     .sorted()
                     .toList();
-            writeBaselineFile(projectRoot, baselineFile, String.join("\n", relativePaths));
+            writeBaselineFile(projectRoot, baselineFile, inventoryText(relativePaths));
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
         }
@@ -1089,9 +1089,17 @@ public class InitService {
         AtomicFileWriter.write(file, content);
     }
 
+    /**
+     * One record per line, every line (including the last) terminated by a line feed, so shell consumers such as
+     * {@code while read} see the final entry. An empty inventory is an empty file.
+     */
+    static String inventoryText(List<String> lines) {
+        return lines.isEmpty() ? "" : String.join("\n", lines) + "\n";
+    }
+
     private void writeBaselineLines(Path file, List<String> lines, Path projectRoot) {
         try {
-            writeBaselineFile(projectRoot, file, String.join("\n", lines));
+            writeBaselineFile(projectRoot, file, inventoryText(lines));
         } catch (Exception e) {
             // Non-fatal - baseline recording is best-effort
         }

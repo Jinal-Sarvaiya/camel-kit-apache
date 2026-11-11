@@ -120,6 +120,13 @@ public final class ProjectDiscovery {
                         "imported BOM " + managed.properties().get("artifactId"));
             }
         }
+        // Per-POM declarations: in a reactor the nodes above collapse to one module's value, these do not.
+        for (GraphNode evidence : graph.findByType(NodeType.CONFIG_PROPERTY)) {
+            if ("camel-version-evidence".equals(evidence.properties().get("kind"))) {
+                addVersion(versions, evidence.properties().get("version"),
+                        evidence.properties().get("source") + " in " + evidence.properties().get("file"));
+            }
+        }
         return versions;
     }
 

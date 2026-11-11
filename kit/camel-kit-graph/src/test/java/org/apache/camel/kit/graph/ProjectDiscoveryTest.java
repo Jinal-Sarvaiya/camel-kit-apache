@@ -605,4 +605,64 @@ class ProjectDiscoveryTest {
         assertTrue(result.coverageGaps().stream().anyMatch(g -> g.contains("Conflicting Camel versions")
                 && g.contains("4.8.0") && g.contains("4.10.0")));
     }
+
+    private static void module(java.nio.file.Path root, String name, String camelVersion) throws java.io.IOException {
+        java.nio.file.Path dir = java.nio.file.Files.createDirectories(root.resolve(name));
+        java.nio.file.Files.writeString(dir.resolve("pom.xml"), String.format(java.util.Locale.ROOT, """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>%s</artifactId>
+                  <version>1.0.0</version>
+                  <properties><camel.version>%s</camel.version></properties>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.camel</groupId>
+                      <artifactId>camel-main</artifactId>
+                      <version>${camel.version}</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """, name, camelVersion));
+    }
+
+    @Test
+    void modulesDeclaringDifferentCamelVersionsAreAConflictNotTheLastModulesVersion(
+            @org.junit.jupiter.api.io.TempDir java.nio.file.Path root)
+            throws Exception {
+        java.nio.file.Files.writeString(root.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>parent</artifactId>
+                  <version>1.0.0</version>
+                  <packaging>pom</packaging>
+                  <modules><module>a</module><module>b</module></modules>
+                </project>
+                """);
+        module(root, "a", "4.8.0");
+        module(root, "b", "4.10.0");
+        ProjectGraph reactor = new ProjectGraph();
+
+        new org.apache.camel.kit.graph.parser.PomParser().parse(root, reactor);
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(reactor);
+
+        assertNull(result.camelVersion(), "one module's version must not be bound to the whole reactor");
+        assertTrue(result.hasConflict());
+        assertTrue(result.allCamelVersions().containsAll(java.util.Set.of("4.8.0", "4.10.0")));
+        assertTrue(result.coverageGaps().stream().anyMatch(g -> g.contains("Conflicting Camel versions")
+                && g.contains("a/pom.xml") && g.contains("b/pom.xml")), result.coverageGaps().toString());
+    }
+
+    @Test
+    void modulesThatAgreeOnTheCamelVersionStayLocked(@org.junit.jupiter.api.io.TempDir java.nio.file.Path root)
+            throws Exception {
+        module(root, "a", "4.8.0");
+        module(root, "b", "4.8.0");
+        ProjectGraph reactor = new ProjectGraph();
+
+        new org.apache.camel.kit.graph.parser.PomParser().parse(root, reactor);
+
+        assertEquals("4.8.0", ProjectDiscovery.discover(reactor).camelVersion());
+    }
 }

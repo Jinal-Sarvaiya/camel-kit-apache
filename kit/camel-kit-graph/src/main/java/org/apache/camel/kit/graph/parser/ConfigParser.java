@@ -68,10 +68,10 @@ public class ConfigParser implements GraphParser {
                 JsonNode document = (JsonNode) documents.nextValue();
                 Map<String, String> flattened = new LinkedHashMap<>();
 
-                // Check for document-level profile (spring.config.activate.on-profile)
-                String documentProfile = extractDocumentProfile(document);
-
                 flatten("", document, flattened);
+
+                // Document-level profile (spring.config.activate.on-profile), nested or written as a flat dotted key
+                String documentProfile = flattened.get("spring.config.activate.on-profile");
 
                 // Determine effective profile (document > filename)
                 String effectiveProfile = documentProfile != null ? documentProfile : filenameProfile;
@@ -98,25 +98,6 @@ public class ConfigParser implements GraphParser {
         } catch (IOException e) {
             throw new RuntimeException("Failed to parse YAML configuration: " + file, e);
         }
-    }
-
-    /**
-     * Extract profile from document content (spring.config.activate.on-profile).
-     */
-    private String extractDocumentProfile(JsonNode document) {
-        if (document.has("spring")) {
-            JsonNode spring = document.get("spring");
-            if (spring.has("config")) {
-                JsonNode config = spring.get("config");
-                if (config.has("activate")) {
-                    JsonNode activate = config.get("activate");
-                    if (activate.has("on-profile")) {
-                        return activate.get("on-profile").asText();
-                    }
-                }
-            }
-        }
-        return null;
     }
 
     private static void flatten(String prefix, JsonNode node, Map<String, String> out) {

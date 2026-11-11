@@ -98,22 +98,19 @@ fi
 ```
 
 **If baseline exists, use it:**
-- `status: "passed"` → Baseline tests all passed
+- `status: "passed"` → Baseline tests all passed before execute
 - `status: "failed"` → Baseline had pre-existing failures (NOT a regression)
-- `status: "not_run"` → Tests couldn't run during init (establish baseline now)
-- `status: "timeout"` → Tests timed out (re-run to establish baseline)
+- `status: "not_run"` → Tests were not run before execute (CANNOT verify preservation - see Unavailable Evidence)
+- `status: "timeout"` → Tests timed out during init (CANNOT verify preservation - see Unavailable Evidence)
 
-**If baseline doesn't exist or status is "not_run", run tests now:**
+**CRITICAL: Baseline must be captured BEFORE execute modifies code.**
+If `status` is "not_run" or "timeout", you CANNOT establish baseline now (code is already modified).
+Running tests now would capture post-change results as "baseline", hiding regressions.
 
-```bash
-# Run existing tests (those that existed before this pipeline)
-./mvnw test -B
-
-# Record results
-BASELINE_TEST_COUNT=$(grep -E "Tests run:" target/surefire-reports/*.txt | wc -l)
-BASELINE_FAILURES=$(grep -E "Failures:" target/surefire-reports/*.txt)
-BASELINE_ERRORS=$(grep -E "Errors:" target/surefire-reports/*.txt)
-```
+**If baseline is unavailable (not_run/timeout/missing):**
+- Report in **Unavailable Evidence**: "Cannot verify baseline preservation - tests were not run before execute"
+- Mark "Baseline Preserved" as **UNVERIFIED**
+- DO NOT run tests and call that the baseline
 
 **Record baseline state (if not already recorded):**
 ```json
@@ -253,19 +250,36 @@ done < .camel-kit/baseline-tests.txt
 
 ### Regression Analysis
 
-If current failures > baseline failures:
-  
-  New failures detected:
-  - TestName: testExistingRoute()
-    Baseline: PASS
-    Current: FAIL
-    Reason: [error message]
-  
-  VERDICT: REGRESSION - existing functionality broken by new additions
+**CRITICAL: Compare per-test results, not just totals.**
 
-If current failures == baseline failures:
-  
-  VERDICT: BASELINE PRESERVED - no regressions introduced
+Parse baseline-test-results.json (if available) to get per-test outcomes:
+```json
+{
+  "tests": {
+    "com.example.ExistingTest#testA": {"status": "passed"},
+    "com.example.ExistingTest#testB": {"status": "failed", "reason": "..."}
+  }
+}
+```
+
+Parse current test results (from Surefire XML reports or output).
+
+**For each test:**
+- If baseline=PASS and current=FAIL → **REGRESSION**
+- If baseline=FAIL and current=FAIL → Pre-existing failure (not a regression)
+- If baseline=PASS and current=PASS → OK
+- If baseline=FAIL and current=PASS → Fixed (note as improvement)
+- If test is NEW (not in baseline) → Validate separately
+
+**If baseline-test-results.json is unavailable:**
+- Totals comparison is NOT sufficient (can hide regressions where one test improves, another regresses)
+- Report in **Unavailable Evidence**: "Cannot verify per-test preservation - baseline-test-results.json missing"
+- Mark "Baseline Preserved" as **UNVERIFIED**
+
+**Verdict:**
+- **BASELINE PRESERVED**: No tests went from PASS→FAIL
+- **REGRESSION**: At least one test went from PASS→FAIL (list them)
+- **UNVERIFIED**: Cannot verify (see Unavailable Evidence)
 ```
 
 ### Step 5: Report Structure for Existing Projects

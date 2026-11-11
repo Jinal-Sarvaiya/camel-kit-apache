@@ -32,7 +32,7 @@ public class ManagedBlockMerger {
 
         if (!Files.exists(targetFile)) {
             // File doesn't exist, create it with the managed block
-            Files.writeString(targetFile, fullManagedBlock + "\n");
+            AtomicFileWriter.write(targetFile, fullManagedBlock + "\n");
             return;
         }
 
@@ -46,11 +46,11 @@ public class ManagedBlockMerger {
         if (matcher.find()) {
             // Replace existing managed block
             String updated = matcher.replaceFirst(Matcher.quoteReplacement(fullManagedBlock));
-            Files.writeString(targetFile, updated);
+            AtomicFileWriter.write(targetFile, updated);
         } else {
             // Append managed block to existing file
             String updated = existingContent.trim() + "\n\n" + fullManagedBlock + "\n";
-            Files.writeString(targetFile, updated);
+            AtomicFileWriter.write(targetFile, updated);
         }
     }
 }

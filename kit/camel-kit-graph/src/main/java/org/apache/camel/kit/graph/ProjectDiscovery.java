@@ -23,8 +23,14 @@ public final class ProjectDiscovery {
      * @return       discovery result with project metadata
      */
     public static DiscoveryResult discover(ProjectGraph graph) {
-        String runtime = RuntimeDetector.detect(graph);
-        String camelVersion = detectCamelVersion(graph);
+        // Detect all runtimes present (for conflict detection)
+        Set<String> detectedRuntimes = detectAllRuntimes(graph);
+        String runtime = detectedRuntimes.isEmpty() ? "main" : detectedRuntimes.iterator().next();
+
+        // Detect all Camel versions present (for conflict detection)
+        Set<String> allCamelVersions = detectAllCamelVersions(graph);
+        String camelVersion = allCamelVersions.isEmpty() ? null : allCamelVersions.iterator().next();
+
         String platformBomVersion = detectPlatformBomVersion(graph, runtime);
         Set<DslType> dslTypes = detectDslTypes(graph);
         List<String> routes = detectRoutes(graph);
@@ -34,7 +40,8 @@ public final class ProjectDiscovery {
         int beansCount = detectBeansCount(graph);
         int configFilesCount = detectConfigFilesCount(graph);
 
-        return new DiscoveryResult(
+        // Build result with conflict information
+        DiscoveryResult result = new DiscoveryResult(
                 runtime,
                 camelVersion,
                 platformBomVersion,
@@ -44,11 +51,64 @@ public final class ProjectDiscovery {
                 hasTests,
                 modules,
                 beansCount,
-                configFilesCount);
+                configFilesCount,
+                detectedRuntimes,
+                allCamelVersions);
+
+        return result;
+    }
+
+    /**
+     * Detect all runtimes present in the project (for conflict detection).
+     */
+    private static Set<String> detectAllRuntimes(ProjectGraph graph) {
+        Set<String> runtimes = new HashSet<>();
+        for (GraphNode artifact : graph.findByType(NodeType.MAVEN_ARTIFACT)) {
+            String artifactId = artifact.properties().getOrDefault("artifactId", "");
+            if (artifactId.startsWith("camel-spring-boot")) {
+                runtimes.add("spring-boot");
+            }
+            if (artifactId.startsWith("camel-quarkus")) {
+                runtimes.add("quarkus");
+            }
+            if ("camel-blueprint".equals(artifactId)) {
+                runtimes.add("karaf");
+            }
+        }
+        return runtimes;
+    }
+
+    /**
+     * Detect all distinct Camel versions in the project (for conflict detection).
+     */
+    private static Set<String> detectAllCamelVersions(ProjectGraph graph) {
+        Set<String> versions = new HashSet<>();
+
+        // Check for camel.version property
+        GraphNode versionProp = graph.getNode("maven-property:camel.version");
+        if (versionProp != null) {
+            String value = versionProp.properties().get("value");
+            if (value != null && !value.isEmpty() && !value.contains("${")) {
+                versions.add(value);
+            }
+        }
+
+        // Check all Camel artifacts
+        for (GraphNode node : graph.findByType(NodeType.MAVEN_ARTIFACT)) {
+            if ("org.apache.camel".equals(node.properties().get("groupId"))) {
+                String version = node.properties().get("version");
+                if (version != null && !"managed".equals(version) && !"unknown".equals(version)
+                        && !version.contains("${")) {
+                    versions.add(version);
+                }
+            }
+        }
+
+        return versions;
     }
 
     private static String detectCamelVersion(ProjectGraph graph) {
-        // Check for camel.version property
+        // Check for camel.version property (highest priority)
         GraphNode versionProp = graph.getNode("maven-property:camel.version");
         if (versionProp != null) {
             String value = versionProp.properties().get("value");
@@ -77,7 +137,7 @@ public final class ProjectDiscovery {
             }
         }
 
-        // Search all Camel artifacts
+        // Search all Camel artifacts (fallback)
         for (GraphNode node : graph.findByType(NodeType.MAVEN_ARTIFACT)) {
             if ("org.apache.camel".equals(node.properties().get("groupId"))) {
                 String version = node.properties().get("version");
@@ -191,8 +251,10 @@ public final class ProjectDiscovery {
     }
 
     /**
-     * @param routes     route IDs (one entry per route)
-     * @param routeFiles unique route source files, sorted
+     * @param routes           route IDs (one entry per route)
+     * @param routeFiles       unique route source files, sorted
+     * @param detectedRuntimes all runtimes found (for conflict detection)
+     * @param allCamelVersions all Camel versions found (for conflict detection)
      */
     public record DiscoveryResult(
             String runtime,
@@ -204,7 +266,9 @@ public final class ProjectDiscovery {
             boolean hasTests,
             List<String> modules,
             int beansCount,
-            int configFilesCount) {
+            int configFilesCount,
+            Set<String> detectedRuntimes,
+            Set<String> allCamelVersions) {
 
         public boolean isUnsupportedVersion() {
             if (camelVersion == null) {
@@ -240,6 +304,23 @@ public final class ProjectDiscovery {
          */
         public List<String> coverageGaps() {
             List<String> gaps = new ArrayList<>();
+
+            // Check for conflicting runtimes
+            if (detectedRuntimes != null && detectedRuntimes.size() > 1) {
+                gaps.add("Multiple conflicting runtimes detected: "
+                         + String.join(", ", detectedRuntimes)
+                         + ". A project cannot use multiple runtimes simultaneously. "
+                         + "Inspect pom.xml dependencies and resolve the conflict before proceeding.");
+            }
+
+            // Check for conflicting Camel versions
+            if (allCamelVersions != null && allCamelVersions.size() > 1) {
+                gaps.add("Multiple conflicting Camel versions detected: "
+                         + String.join(", ", allCamelVersions)
+                         + ". Inspect pom.xml dependencies and camel.version property. "
+                         + "All org.apache.camel artifacts must use the same version.");
+            }
+
             if (routes.isEmpty()) {
                 gaps.add("No routes were found in the project graph. Inspect the existing route sources before "
                          + "changing them.");

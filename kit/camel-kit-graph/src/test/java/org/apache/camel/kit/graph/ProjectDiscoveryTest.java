@@ -829,9 +829,11 @@ class ProjectDiscoveryTest {
     }
 
     @Test
-    void importOverridesParentInSameModule() {
-        // Single module inherits spring-boot-starter-parent:3.4.0 but explicitly imports
-        // spring-boot-dependencies:3.3.4 -> import wins
+    void cannotDetermineVersionWhenParentAndImportDisagree() {
+        // Single module inherits spring-boot-starter-parent:3.4.0 and also imports
+        // spring-boot-dependencies:3.3.4. Maven processes inheritance before imports
+        // and preserves existing management keys, so the effective version cannot be
+        // determined from POM source alone without executing Maven's model builder.
         ProjectGraph graph = new ProjectGraph();
         graph.addNode(springBootStarter("pom.xml"));
 
@@ -845,7 +847,42 @@ class ProjectDiscoveryTest {
                         "version", "3.4.0",
                         "file", "pom.xml")));
 
-        // But imports 3.3.4
+        // Also imports 3.3.4
+        graph.addNode(new GraphNode(
+                "maven-managed:pom.xml:org.springframework.boot:spring-boot-dependencies",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "managed",
+                        "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-dependencies",
+                        "version", "3.3.4",
+                        "type", "pom",
+                        "scope", "import",
+                        "file", "pom.xml")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertNull(result.springBootVersion(),
+                "Cannot determine effective version when parent and import disagree (source-only evidence insufficient)");
+        assertEquals("spring-boot", result.runtime());
+    }
+
+    @Test
+    void resolvesSameVersionWhenParentAndImportAgree() {
+        // When both parent and import declare the same version, that version can be established
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(springBootStarter("pom.xml"));
+
+        // Inherits parent 3.3.4
+        graph.addNode(new GraphNode(
+                "maven-parent:pom.xml:org.springframework.boot:spring-boot-starter-parent",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "parent",
+                        "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-starter-parent",
+                        "version", "3.3.4",
+                        "file", "pom.xml")));
+
+        // Also imports 3.3.4
         graph.addNode(new GraphNode(
                 "maven-managed:pom.xml:org.springframework.boot:spring-boot-dependencies",
                 NodeType.CONFIG_PROPERTY,
@@ -860,7 +897,7 @@ class ProjectDiscoveryTest {
         ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
 
         assertEquals("3.3.4", result.springBootVersion(),
-                "Import should take precedence over parent in the same module");
+                "When parent and import agree on the same version, that version is established");
         assertEquals("spring-boot", result.runtime());
     }
 }

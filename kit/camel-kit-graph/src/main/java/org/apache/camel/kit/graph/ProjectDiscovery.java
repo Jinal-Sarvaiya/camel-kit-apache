@@ -186,42 +186,59 @@ public final class ProjectDiscovery {
     /**
      * The Spring Boot framework version: an imported {@code spring-boot-dependencies}, otherwise the
      * {@code spring-boot-starter-parent} parent. This is a different artifact from the Camel BOM and is kept apart so
-     * the two are never mixed up. Returns null if modules disagree on the version.
+     * the two are never mixed up. Returns null if modules disagree on the version or if the effective version cannot be
+     * established from source-only evidence.
      * <p>
-     * Import-over-parent precedence is applied per module first, then effective versions are compared. A module that
-     * imports a version explicitly uses that version even if it also inherits a parent; modules without imports use
-     * their parent version. If effective versions disagree across modules, the project-wide constraint remains
-     * unresolved.
+     * Maven assembles inheritance before importing dependency management, and its importer preserves already-present
+     * management keys when processing imported BOMs. Therefore, when both a parent and an import are present with
+     * different versions, the effective framework version cannot be determined from POM source alone without executing
+     * Maven's model builder. In such cases, the version remains unresolved and discovery records a gap.
      */
     private static String detectSpringBootVersion(ProjectGraph graph) {
         Map<String, Set<String>> bomVersions = collectManagedVersions(graph, "spring-boot-dependencies");
         Map<String, Set<String>> parentVersions = collectParentVersions(graph, "spring-boot-starter-parent");
 
-        // Compute effective version per module: imports override parents
+        // Compute effective version per module, recognizing when source-only evidence is insufficient
         Map<String, String> effectiveVersions = new TreeMap<>();
         Set<String> allModules = new TreeSet<>();
         bomVersions.values().forEach(allModules::addAll);
         parentVersions.values().forEach(allModules::addAll);
 
         for (String module : allModules) {
-            // Check if this module has an explicit import
             String importVersion = null;
+            String parentVersion = null;
+
+            // Check if this module has an import
             for (Map.Entry<String, Set<String>> entry : bomVersions.entrySet()) {
                 if (entry.getValue().contains(module)) {
                     importVersion = entry.getKey();
                     break;
                 }
             }
-            if (importVersion != null) {
-                effectiveVersions.put(module, importVersion);
-            } else {
-                // No import, use parent if present
-                for (Map.Entry<String, Set<String>> entry : parentVersions.entrySet()) {
-                    if (entry.getValue().contains(module)) {
-                        effectiveVersions.put(module, entry.getKey());
-                        break;
-                    }
+
+            // Check if this module has a parent
+            for (Map.Entry<String, Set<String>> entry : parentVersions.entrySet()) {
+                if (entry.getValue().contains(module)) {
+                    parentVersion = entry.getKey();
+                    break;
                 }
+            }
+
+            // Determine effective version for this module
+            if (importVersion != null && parentVersion != null) {
+                // Both present: can only establish version if they agree
+                if (importVersion.equals(parentVersion)) {
+                    effectiveVersions.put(module, importVersion);
+                } else {
+                    // Different versions: cannot determine effective version from source alone
+                    return null;
+                }
+            } else if (importVersion != null) {
+                // Only import present
+                effectiveVersions.put(module, importVersion);
+            } else if (parentVersion != null) {
+                // Only parent present
+                effectiveVersions.put(module, parentVersion);
             }
         }
 

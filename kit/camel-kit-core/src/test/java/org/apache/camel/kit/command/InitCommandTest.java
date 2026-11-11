@@ -1,5 +1,6 @@
 package org.apache.camel.kit.command;
 
+import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.camel.kit.CamelKitMain;
@@ -155,6 +156,85 @@ class InitCommandTest {
                 .count());
         assertFalse(printer.output().contains("InvalidAgentConfigurationException"));
         assertFalse(printer.output().contains("\tat "));
+    }
+
+    @Test
+    void existingAgentsMdDoesNotBlockAdoptionAndIsPreserved(@TempDir Path tempDir) throws Exception {
+        Path project = tempDir.resolve("orders");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("AGENTS.md"), "# Team rules\n");
+        Files.writeString(project.resolve("mvnw"), "#!/bin/sh\n# project wrapper\n");
+        CapturingPrinter printer = new CapturingPrinter();
+
+        int exitCode = initCommand(project, printer).doCall();
+
+        assertEquals(0, exitCode, printer.output());
+        String agentsMd = Files.readString(project.resolve("AGENTS.md"));
+        assertTrue(agentsMd.startsWith("# Team rules\n"), agentsMd);
+        assertTrue(agentsMd.contains("camel-start"), agentsMd);
+        assertEquals("#!/bin/sh\n# project wrapper\n", Files.readString(project.resolve("mvnw")));
+        assertTrue(Files.isDirectory(project.resolve(".camel-kit")));
+        assertTrue(printer.output().contains("Existing files preserved"), printer.output());
+        assertTrue(printer.output().contains("mvnw"), printer.output());
+    }
+
+    @Test
+    void dryRunListsPlannedChangesAndWritesNothing(@TempDir Path tempDir) throws Exception {
+        Path project = tempDir.resolve("orders");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("AGENTS.md"), "# Team rules\n");
+        Files.writeString(project.resolve("mvnw"), "#!/bin/sh\n# project wrapper\n");
+        CapturingPrinter printer = new CapturingPrinter();
+        InitCommand command = initCommand(project, printer);
+        command.dryRun = true;
+
+        assertEquals(0, command.doCall(), printer.output());
+
+        assertFalse(Files.exists(project.resolve(".camel-kit")));
+        assertEquals("# Team rules\n", Files.readString(project.resolve("AGENTS.md")));
+        try (var files = Files.list(project)) {
+            assertEquals(2, files.count());
+        }
+        assertTrue(printer.output().lines().anyMatch(line -> line.contains("merge") && line.contains("AGENTS.md")),
+                printer.output());
+        assertTrue(printer.output().lines().anyMatch(line -> line.contains("preserve") && line.endsWith("mvnw")),
+                printer.output());
+        assertTrue(printer.output().lines().anyMatch(line -> line.contains("create") && line.contains("CLAUDE.md")),
+                printer.output());
+    }
+
+    @Test
+    void initializedProjectStillRequiresForceAndRejectsUnknownReplacement(@TempDir Path tempDir) throws Exception {
+        Path project = tempDir.resolve("orders");
+        assertEquals(0, initCommand(project, new CapturingPrinter()).doCall());
+
+        CapturingPrinter refused = new CapturingPrinter();
+        assertEquals(1, initCommand(project, refused).doCall());
+        assertTrue(refused.output().contains("Project already initialized"), refused.output());
+
+        CapturingPrinter rejected = new CapturingPrinter();
+        InitCommand command = initCommand(project, rejected);
+        command.force = true;
+        command.replace = java.util.List.of("pom.xml");
+        assertEquals(1, command.doCall());
+        assertTrue(rejected.output().contains("Cannot replace 'pom.xml'"), rejected.output());
+    }
+
+    private static InitCommand initCommand(Path project, CapturingPrinter printer) {
+        CamelKitMain main = new CamelKitMain() {
+            @Override
+            public void printBanner() {
+                // Keep command-level tests independent of terminal image support.
+            }
+        };
+        main.disableTui();
+        main.setOut(printer);
+        InitCommand command = new InitCommand(main);
+        command.projectName = project.toString();
+        command.ai = "claude";
+        command.citrusVersion = "default";
+        command.noFetch = true;
+        return command;
     }
 
     private static final class CapturingPrinter implements Printer {

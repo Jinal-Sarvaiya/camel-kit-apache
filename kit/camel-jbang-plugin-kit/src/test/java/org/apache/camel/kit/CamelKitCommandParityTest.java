@@ -157,6 +157,19 @@ class CamelKitCommandParityTest {
                     name + ": exit 0 without fresh reports must record not_run");
         }
 
+        for (String name : new String[]{"standalone-selected", "plugin-selected"}) {
+            Path dir = existingProject(name, "#!/bin/sh\n# ORIGINAL\n");
+            Files.writeString(dir.resolve("mvnw.cmd"), "@REM keep this wrapper\r\n");
+            int exit = name.startsWith("plugin")
+                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch",
+                            "--force", "--replace", "mvnw")
+                    : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch",
+                            "--force", "--replace", "mvnw");
+            assertEquals(0, exit, name);
+            assertFalse(Files.readString(dir.resolve("mvnw")).contains("ORIGINAL"), name);
+            assertEquals("@REM keep this wrapper\r\n", Files.readString(dir.resolve("mvnw.cmd")), name);
+        }
+
         // without --replace-wrapper the project's wrapper is kept; with it, it is replaced
         for (String name : new String[]{"standalone-keep", "plugin-keep"}) {
             Path dir = existingProject(name, "#!/bin/sh\n# ORIGINAL\n");

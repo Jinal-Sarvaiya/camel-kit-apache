@@ -120,6 +120,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Preserve existing project files on `init` (#168)** — `camel-kit init` no longer replaces files the
+  project owns. In `AGENTS.md`, `CLAUDE.md`, `QWEN.md` and `.github/copilot-instructions.md` Camel Kit
+  now writes its content inside a marked block: it appends the block to an existing file and later
+  replaces only that block. An existing `docs/constitution.md`, `.claude/settings.json`, `.qwenignore`,
+  `.bob/custom_modes.yaml` or Maven wrapper that Camel Kit did not write, or that was changed
+  afterwards, is left untouched and reported, with Camel Kit's version saved under
+  `.camel-kit/conflicts/`. New options: `--replace <path>` replaces one such file in full and
+  `--dry-run` previews the outcome without writing. Existing JSON MCP configurations are merged for
+  every agent instead of overwritten, and an invalid one stops `init` before any write.
+  Reinitialization keeps properties added to `.camel-kit/config.properties`. Only `.camel-kit/` marks a
+  project as initialized, so an existing `AGENTS.md` no longer blocks `init`. A workspace initialized by an
+  earlier version has no ledger and is treated the same way: its shared files are merged or preserved,
+  not regenerated, until named with `--replace`.
+
 - **Make Citrus MCP server opt-in (#109)** — `camel-kit init` no longer writes Citrus MCP server
   configuration by default. Pass `--with-citrus-mcp` to include it. Workspaces created before this
   change that have `citrus.mcp.version` but no `citrus.mcp.enabled` are treated as implicitly opted

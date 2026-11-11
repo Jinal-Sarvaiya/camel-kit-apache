@@ -54,6 +54,13 @@ public class OpenCodeGenerator extends DefaultGenerator {
     }
 
     @Override
+    public void validate(InitContext ctx) throws Exception {
+        // The same checks as preflight, without removing the Ship worker: a preview must not change the project.
+        requireRealShipWorkerPath(ctx);
+        new OpenCodeConfigMerger().validateExisting(ctx.projectDir().resolve(ctx.agent().mcpConfigPath()));
+    }
+
+    @Override
     public void generate(InitContext ctx) throws Exception {
         // Invalidate the worker before project-config merging can abort; it is regenerated below only if the
         // effective MCP inventory is bounded.

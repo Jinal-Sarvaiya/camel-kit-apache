@@ -8,6 +8,7 @@ import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.config.AgentGeneratorStrategy;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.generator.InvalidAgentConfigurationException;
+import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.output.Printer;
 import org.apache.camel.kit.service.InitGraphSummary;
 import org.apache.camel.kit.service.InitProgress;
@@ -55,12 +56,18 @@ public class InitCommand extends CamelKitCommand {
     @Option(names = {"--no-fetch"}, description = "Skip external catalog fetching")
     public boolean noFetch;
 
-    @Option(names = {"--force"}, description = "Overwrite existing project without prompting")
+    @Option(names = {"--force"},
+            description = "Reinitialize a project that already has .camel-kit/. Files you changed are preserved")
     public boolean force;
 
-    @Option(names = {"--dry-run"}, description = "Preview changes without writing files")
+    @Option(names = {"--dry-run"},
+            description = "Show what init would do to files the project may already own, without writing anything")
     public boolean dryRun;
 
+    @Option(names = {"--replace"}, paramLabel = "<path>",
+            description = "Replace this existing shared file (for example AGENTS.md or mvnw) instead of "
+                          + "preserving it (repeatable)")
+    public List<String> replace;
     @Option(names = {"--replace-wrapper"}, description = "Replace Maven wrapper even if it exists")
     public boolean replaceWrapper;
 
@@ -128,22 +135,21 @@ public class InitCommand extends CamelKitCommand {
             resolvedTargetDir = Path.of(projectName).toAbsolutePath().normalize();
         }
 
-        Path agentsMd = resolvedTargetDir.resolve("AGENTS.md");
+        // Only Camel-Kit's own directory marks a project as initialized: an existing application may well have its
+        // own AGENTS.md, which init preserves.
         Path camelKitDir = resolvedTargetDir.resolve(".camel-kit");
-        if (!force && (Files.exists(agentsMd) || Files.isDirectory(camelKitDir))) {
+        if (dryRun) {
+            return doDryRun();
+        }
+        if (!force && Files.isDirectory(camelKitDir)) {
             if (!silent)
                 main.printBanner();
             printer().println();
             printer().println(yellow("\u26A0") + bold(" Project already initialized"));
             printer().println(dim("  Directory: ") + cyan(resolvedTargetDir.toString()));
-            if (Files.exists(agentsMd)) {
-                printer().println(dim("  Found:     ") + "AGENTS.md");
-            }
-            if (Files.isDirectory(camelKitDir)) {
-                printer().println(dim("  Found:     ") + ".camel-kit/");
-            }
+            printer().println(dim("  Found:     ") + ".camel-kit/");
             printer().println();
-            printer().println(dim("  To overwrite: ") + bold("--force"));
+            printer().println(dim("  To reinitialize: ") + bold("--force") + dim(" (files you changed are preserved)"));
             printer().println(dim("  Example:      ") + "camel-kit init " + projectName + " --ai " + ai + " --force");
             printer().println();
             return 1;
@@ -174,12 +180,51 @@ public class InitCommand extends CamelKitCommand {
         return doInitWork();
     }
 
+    private Integer doDryRun() throws Exception {
+        final List<ManagedFiles.Change> changes;
+        try {
+            changes = initService.preview(initRequest());
+        } catch (InvalidAgentConfigurationException | IllegalArgumentException e) {
+            printer().println(red("Error: " + e.getMessage()));
+            return 1;
+        }
+        printer()
+                .println(bold("Dry run") + dim(" \u2014 nothing was written to ") + cyan(resolvedTargetDir.toString()));
+        for (ManagedFiles.Change change : changes) {
+            String outcome = switch (change.action()) {
+                case CREATE -> green("create  ");
+                case REFRESH -> green("replace ");
+                case MERGE -> green("merge   ");
+                case PRESERVE -> yellow("preserve");
+            };
+            printer().println("  " + outcome + "  " + change.path());
+        }
+        printer().println(dim("  merge: Camel Kit's block or servers are added and your content is kept."));
+        printer().println(dim("  preserve: the file is yours and stays as it is; replace it with --replace <path>."));
+        printer().println(dim("  Camel Kit's own assets (skills, subagents, .camel-kit/) are always written."));
+        return 0;
+    }
+
     private Integer doInitWork() throws Exception {
         if (!silent) {
             PrerequisiteChecker.check(printer());
         }
 
-        InitRequest request = new InitRequest(
+        final InitResult result;
+        try {
+            result = initService.initialize(initRequest());
+        } catch (InvalidAgentConfigurationException | IllegalArgumentException e) {
+            printer().println(red("Error: " + e.getMessage()));
+            return 1;
+        }
+        printSummary(result.projectName(), result.agent().name(), result.citrusSchemaCount());
+        printConflicts(result);
+        printNextSteps(result.projectName(), result.agent().name(), result.agentName());
+        return 0;
+    }
+
+    private InitRequest initRequest() {
+        return new InitRequest(
                 projectName,
                 ai,
                 resolvedTargetDir,
@@ -195,18 +240,26 @@ public class InitCommand extends CamelKitCommand {
                 initReporter(),
                 dryRun,
                 replaceWrapper,
-                recordBaseline);
+                recordBaseline,
+                replace);
+    }
 
-        final InitResult result;
-        try {
-            result = initService.initialize(request);
-        } catch (InvalidAgentConfigurationException e) {
-            printer().println(red("Error: " + e.getMessage()));
-            return 1;
+    private void printConflicts(InitResult result) {
+        if (result.conflicts().isEmpty()) {
+            return;
         }
-        printSummary(result.projectName(), result.agent().name(), result.citrusSchemaCount());
-        printNextSteps(result.projectName(), result.agent().name(), result.agentName());
-        return 0;
+        printer().println("  " + yellow("\u26A0") + bold("  Existing files preserved"));
+        printer().println(dim("  Not written by Camel Kit, or changed since, so left as they are:"));
+        for (ManagedFiles.Change conflict : result.conflicts()) {
+            String proposal = conflict.proposal() == null
+                    ? ""
+                    : dim("  \u2190 Camel Kit version: ")
+                      + result.targetDir().relativize(conflict.proposal()).toString().replace('\\', '/');
+            printer().println("     " + cyan(conflict.path()) + proposal);
+        }
+        printer().println(dim("  Merge the Camel Kit version by hand, or replace a file with ")
+                          + bold("--force --replace <path>"));
+        printer().println();
     }
 
     void printNextSteps(String projectName, String agentName, String agentId) {
@@ -277,6 +330,11 @@ public class InitCommand extends CamelKitCommand {
             @Override
             public void mavenWrapperCreated(String mavenVersion) {
                 printer().println(green("\u2713") + " Maven Wrapper created (portable Maven " + mavenVersion + ")");
+            }
+
+            @Override
+            public void mavenWrapperPreserved() {
+                printer().println(green("\u2713") + " Existing Maven Wrapper kept");
             }
 
             @Override

@@ -42,6 +42,11 @@ public class DefaultGenerator implements AgentGenerator {
     }
 
     @Override
+    public void preflight(InitContext ctx) throws Exception {
+        McpConfigGenerator.preflight(ctx);
+    }
+
+    @Override
     public void generate(InitContext ctx) throws Exception {
         WorkflowManifest workflow = loadWorkflowManifest();
         skillResourceInstaller.removeRetiredShipGuides(ctx);
@@ -84,7 +89,8 @@ public class DefaultGenerator implements AgentGenerator {
         mcpConfigGenerator.generate(ctx, workflow);
     }
 
-    protected void copyTemplateResource(String resourcePath, Path target) throws IOException {
-        templateResourceCopier.copy(resourcePath, target);
+    /** Installs a template, preserving the target when it is a shared file owned by the user. */
+    protected boolean copyTemplateResource(InitContext ctx, String resourcePath, Path target) throws IOException {
+        return ctx.files().write(target, templateResourceCopier.read(resourcePath));
     }
 }

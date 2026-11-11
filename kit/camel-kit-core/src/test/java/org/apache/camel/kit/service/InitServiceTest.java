@@ -1837,6 +1837,36 @@ class InitServiceTest {
                 "CLAUDE.md should be created");
     }
 
+    @Test
+    void reinitializationRefreshesDiscoveryWhilePreservingCustomProperties() throws Exception {
+        Path project = tempDir.resolve("rediscovery");
+        Files.createDirectories(project);
+        Files.writeString(project.resolve("pom.xml"), minimalCamelPom("4.8.0"));
+        new InitService()
+                .initialize(requestForExistingProject(project, "claude", InitProgress.noop(), InitReporter.noop()));
+        assertEquals("4.8.0", loadConfig(project).getProperty("project.camelVersion"));
+        Path configFile = project.resolve(".camel-kit/config.properties");
+        Files.writeString(configFile, "\nteam.custom=value\n", java.nio.file.StandardOpenOption.APPEND);
+
+        Files.writeString(project.resolve("pom.xml"), "<project><groupId>org.apache.camel</groupId><broken>");
+        new InitService()
+                .initialize(requestForExistingProject(project, "claude", InitProgress.noop(), InitReporter.noop()));
+        Properties unresolved = loadConfig(project);
+        assertNull(unresolved.getProperty("project.camelVersion"));
+        assertNull(unresolved.getProperty("project.detectedCamelVersion"));
+        assertNull(unresolved.getProperty("forage.version"));
+        assertNotNull(unresolved.getProperty("project.discoveryGaps"));
+        assertEquals("value", unresolved.getProperty("team.custom"));
+
+        Files.writeString(project.resolve("pom.xml"), minimalCamelPom("4.9.0"));
+        new InitService()
+                .initialize(requestForExistingProject(project, "claude", InitProgress.noop(), InitReporter.noop()));
+        Properties refreshed = loadConfig(project);
+        assertEquals("4.9.0", refreshed.getProperty("project.camelVersion"));
+        assertEquals("value", refreshed.getProperty("team.custom"));
+        assertFalse(refreshed.getProperty("project.discoveryGaps", "").contains("Project discovery failed"));
+    }
+
     private static String minimalCamelPom(String camelVersion) {
         return String.format(java.util.Locale.ROOT, """
                 <?xml version="1.0" encoding="UTF-8"?>

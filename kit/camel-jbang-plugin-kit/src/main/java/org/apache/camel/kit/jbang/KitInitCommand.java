@@ -38,8 +38,18 @@ public class KitInitCommand extends CamelCommand {
     @Option(names = {"--no-fetch"}, description = "Skip external catalog fetching")
     boolean noFetch;
 
-    @Option(names = {"--force"}, description = "Overwrite existing project without prompting")
+    @Option(names = {"--force"},
+            description = "Reinitialize a project that already has .camel-kit/. Files you changed are preserved")
     boolean force;
+
+    @Option(names = {"--dry-run"},
+            description = "Show what init would do to files the project may already own, without writing anything")
+    boolean dryRun;
+
+    @Option(names = {"--replace"}, paramLabel = "<path>",
+            description = "Replace this existing shared file (for example AGENTS.md or mvnw) instead of "
+                          + "preserving it (repeatable)")
+    List<String> replace;
 
     @Option(names = {"--silent"}, description = "Suppress all output (no banner, no progress, no summary)")
     boolean silent;
@@ -59,9 +69,6 @@ public class KitInitCommand extends CamelCommand {
     @Option(names = {"--source-platform"},
             description = "Source platform for migration graph analysis: mulesoft, camel, biztalk, auto (default: auto)")
     String sourcePlatform;
-
-    @Option(names = {"--dry-run"}, description = "Preview changes without writing files")
-    boolean dryRun;
 
     @Option(names = {"--replace-wrapper"},
             description = "Replace Maven wrapper even if it exists (default: preserve existing wrapper)")
@@ -100,6 +107,7 @@ public class KitInitCommand extends CamelCommand {
         initCommand.dryRun = this.dryRun;
         initCommand.replaceWrapper = this.replaceWrapper;
         initCommand.recordBaseline = this.recordBaseline;
+        initCommand.replace = this.replace;
 
         return initCommand.call();
     }

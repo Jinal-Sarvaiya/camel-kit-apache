@@ -21,12 +21,12 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 public class ClaudeGenerator extends DefaultGenerator {
 
     private final QuteTemplateEngine templateEngine = new QuteTemplateEngine();
-    private final ManagedBlockMerger merger = new ManagedBlockMerger();
 
     private static final String LEGACY_COMMAND_DIR = ".claude/commands";
 
     @Override
     public void preflight(InitContext ctx) throws Exception {
+        super.preflight(ctx);
         Path current = ctx.projectDir();
         for (Path component : ctx.projectDir().relativize(ctx.projectDir().resolve(LEGACY_COMMAND_DIR))) {
             current = current.resolve(component);
@@ -72,7 +72,7 @@ public class ClaudeGenerator extends DefaultGenerator {
         int subagents = 0;
         for (AgentDescriptor.TemplateInstall template : AgentRegistry.descriptor(ctx.agentName()).templates()) {
             if (template.target().startsWith(".claude/agents/")) {
-                copyTemplateResource(template.source(), ctx.projectDir().resolve(template.target()));
+                copyTemplateResource(ctx, template.source(), ctx.projectDir().resolve(template.target()));
                 subagents++;
             }
         }
@@ -86,22 +86,19 @@ public class ClaudeGenerator extends DefaultGenerator {
                 Map.of(
                         "COMMAND_PREFIX", ctx.commandPrefix()));
         String content = templateEngine.render("templates/claude/claude-md.md", data);
-
-        // Always use managed block (even on first init) to enable preservation on reinit
-        Path claudeMd = ctx.projectDir().resolve("CLAUDE.md");
-        merger.mergeBlock(claudeMd, "camel-kit-generated", content);
+        ctx.files().write(ctx.projectDir().resolve("CLAUDE.md"), content);
     }
 
     private void generateSettings(InitContext ctx) throws Exception {
         Path settingsFile = ctx.projectDir().resolve(".claude/settings.json");
-        Files.createDirectories(settingsFile.getParent());
         var mapper = new ObjectMapper();
         var settings = mapper.readTree(TemplateUtils.readTemplate("templates/claude/settings.json"));
         var allow = (ArrayNode) settings.path("permissions").path("allow");
         WorkflowManifestLoader.loadDefault().mcpServers().forEach(server -> server.allowedTools()
                 .forEach(tool -> allow.add("mcp__" + server.id() + "__" + tool)));
-        AtomicFileWriter.write(settingsFile, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(settings));
-        ctx.printer()
-                .println(AnsiColors.green("✓") + " Generated .claude/settings.json with auto-approved permissions");
+        if (ctx.files().write(settingsFile, mapper.writerWithDefaultPrettyPrinter().writeValueAsString(settings))) {
+            ctx.printer()
+                    .println(AnsiColors.green("✓") + " Generated .claude/settings.json with auto-approved permissions");
+        }
     }
 }

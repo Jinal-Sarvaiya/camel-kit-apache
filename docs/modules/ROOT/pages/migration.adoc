@@ -24,9 +24,9 @@ covers Fuse).
 [[init]]
 == Initialize the project for migration
 
-Run `init` inside the existing project with `--here`. The application sources and `pom.xml` are left alone, but
-`init` writes or replaces `mvnw`, `mvnw.cmd` and `.mvn/wrapper/maven-wrapper.properties` even without `--force`,
-so commit or back up a customized Maven wrapper first.
+Run `init` inside the existing project with `--here`. The application sources, `pom.xml`, an existing Maven wrapper
+and the content of an existing `AGENTS.md` are kept; see xref:getting-started.adoc#existing-project[Existing projects] for
+how preserved files are reported.
 
 [source,bash]
 ----

@@ -99,7 +99,7 @@ class InitWriteConfinementTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {".camel-kit/config.properties", "mvnw", "AGENTS.md"})
+    @ValueSource(strings = {".camel-kit/config.properties", "AGENTS.md"})
     void generatedFilesReplaceHardLinksWithoutChangingOutsideContent(String relative) throws Exception {
         Path project = Files.createDirectory(tempDir.resolve("project"));
         Path sentinel = Files.writeString(tempDir.resolve("outside"), "untouched");
@@ -113,6 +113,31 @@ class InitWriteConfinementTest {
         assertTrue(Files.isRegularFile(generated));
         assertNotEquals("untouched", Files.readString(generated));
         assertFalse(Files.isSameFile(generated, sentinel), "Generation must replace the selected directory entry");
+    }
+
+    @Test
+    void existingWrapperHardLinkIsPreservedUntilExplicitlyReplaced() throws Exception {
+        Path project = Files.createDirectory(tempDir.resolve("project"));
+        Path sentinel = Files.writeString(tempDir.resolve("outside"), "untouched");
+        Path wrapper = project.resolve("mvnw");
+        Files.createLink(wrapper, sentinel);
+
+        // A wrapper Camel-Kit did not write belongs to the project and is not written at all.
+        new InitService().initialize(request(project, "bob2"));
+
+        assertEquals("untouched", Files.readString(sentinel));
+        assertTrue(Files.isSameFile(wrapper, sentinel));
+
+        // An explicit replacement swaps the directory entry and never writes through the link.
+        new InitService().initialize(new InitRequest(
+                "orders", "bob2", project, "default", true, false, "auto", "camel-kit", "5.0.1",
+                CamelKitMain.distribution(), Printer.noop(), InitProgress.noop(), InitReporter.noop(),
+                List.of("mvnw")));
+
+        assertEquals("untouched", Files.readString(sentinel));
+        assertTrue(Files.isRegularFile(wrapper));
+        assertNotEquals("untouched", Files.readString(wrapper));
+        assertFalse(Files.isSameFile(wrapper, sentinel), "Replacement must replace the selected directory entry");
     }
 
     @ParameterizedTest

@@ -65,25 +65,10 @@ Preview changes before writing files:
 camel-kit init --here --ai claude --dry-run
 ----
 
-This shows:
-[source]
-----
-🔍 Dry-run mode: No files will be written
-
-✓ Detected existing Maven project (pom.xml found)
-
-📋 Changes that would be made:
-
-  Would create:
-    - .camel-kit/config.properties
-    - .claude/skills/ (skills)
-    - docs/constitution.md
-
-  ⚠️  Would merge (preserving customizations):
-    - AGENTS.md (managed block)
-
-  Maven wrapper: SKIPPED (already exists)
-----
+The preview lists shared files with a `create`, `replace`, `merge` or `preserve` action, using the same
+ownership and replacement rules as initialization. It does not write files or run baseline tests, even when
+`--record-baseline` is also supplied. See xref:getting-started.adoc#existing-project[Existing projects] for
+file ownership and `--replace <path>` behavior.
 
 == Getting Started
 

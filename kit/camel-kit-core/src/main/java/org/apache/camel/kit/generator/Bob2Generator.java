@@ -17,7 +17,7 @@ public class Bob2Generator extends DefaultGenerator {
     private void generateRegisteredResources(InitContext ctx) throws Exception {
         for (AgentDescriptor.TemplateInstall template : AgentRegistry.descriptor("bob2").templates()) {
             if (!PersonaResourceInstaller.isPersonaTemplate(template)) {
-                copyTemplateResource(template.source(), ctx.projectDir().resolve(template.target()));
+                copyTemplateResource(ctx, template.source(), ctx.projectDir().resolve(template.target()));
             }
         }
     }

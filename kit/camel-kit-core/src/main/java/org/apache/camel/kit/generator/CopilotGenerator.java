@@ -1,6 +1,5 @@
 package org.apache.camel.kit.generator;
 
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -41,14 +40,10 @@ public class CopilotGenerator extends DefaultGenerator {
                 continue;
             }
             Path target = ctx.projectDir().resolve(template.target());
-            Path parent = target.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
             if (RENDERED_TEMPLATES.contains(template.source())) {
-                AtomicFileWriter.write(target, templateEngine.render(template.source(), data));
+                ctx.files().write(target, templateEngine.render(template.source(), data));
             } else {
-                copyTemplateResource(template.source(), target);
+                copyTemplateResource(ctx, template.source(), target);
             }
             if (template.target().startsWith(".github/agents/") && template.target().endsWith(".agent.md")) {
                 customAgents++;

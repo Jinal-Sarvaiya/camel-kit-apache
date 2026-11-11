@@ -82,8 +82,7 @@ public class AntigravityGenerator extends DefaultGenerator {
         for (AgentDescriptor.TemplateInstall template : AgentRegistry.descriptor(ctx.agentName()).templates()) {
             if (!PersonaResourceInstaller.isPersonaTemplate(template)) {
                 Path target = ctx.projectDir().resolve(template.target());
-                Files.createDirectories(target.getParent());
-                AtomicFileWriter.write(target, templates.render(template.source(),
+                ctx.files().write(target, templates.render(template.source(),
                         Map.of("COMMAND_PREFIX", ctx.commandPrefix())));
             }
         }

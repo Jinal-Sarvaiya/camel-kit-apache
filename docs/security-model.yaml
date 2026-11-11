@@ -219,7 +219,7 @@ configuration_variants:
     security_relevant: false
   - knob: camel-kit init --force
     default: false
-    effect: Overwrites generated assets (data loss, not security).
+    effect: Regenerates Camel-Kit's own assets; preserves shared files it did not write or that were changed unless named with --replace (data loss, not security).
     security_relevant: false
   - knob: -p key=value, -c path
     default: none

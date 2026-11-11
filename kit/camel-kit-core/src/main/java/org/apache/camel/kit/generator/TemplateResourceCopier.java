@@ -10,15 +10,19 @@ import java.nio.file.Path;
 class TemplateResourceCopier {
 
     void copy(String resourcePath, Path target) throws IOException {
+        Path parent = target.getParent();
+        if (parent != null) {
+            Files.createDirectories(parent);
+        }
+        AtomicFileWriter.write(target, read(resourcePath));
+    }
+
+    String read(String resourcePath) throws IOException {
         try (InputStream is = getClass().getClassLoader().getResourceAsStream(resourcePath)) {
             if (is == null) {
                 throw new FileNotFoundException("Template resource not found: " + resourcePath);
             }
-            Path parent = target.getParent();
-            if (parent != null) {
-                Files.createDirectories(parent);
-            }
-            AtomicFileWriter.write(target, new String(is.readAllBytes(), StandardCharsets.UTF_8));
+            return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         }
     }
 }

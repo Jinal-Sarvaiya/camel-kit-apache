@@ -8,6 +8,7 @@ import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -25,6 +26,7 @@ import org.apache.camel.kit.generator.AgentGeneratorFactory;
 import org.apache.camel.kit.generator.AtomicFileWriter;
 import org.apache.camel.kit.generator.GeneratedAssetPreflight;
 import org.apache.camel.kit.generator.InitContext;
+import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.generator.QuteTemplateEngine;
 import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphBuilder;
@@ -45,6 +47,83 @@ public class InitService {
     /** Upper bound for the opt-in baseline test run. */
     private static final long BASELINE_TEST_TIMEOUT_SECONDS = 600;
 
+    /**
+     * Reports what initialization would do to each file an existing project may already own, without writing anything.
+     * Runs the same validation as {@link #initialize}, so a request that would be rejected is rejected here too.
+     */
+    public List<ManagedFiles.Change> preview(InitRequest request) throws Exception {
+        AgentConfig agent = AgentRegistry.get(request.agentName());
+        if (agent == null) {
+            throw new IllegalArgumentException(AgentRegistry.unsupportedAgentMessage(request.agentName()));
+        }
+        Path targetDir = request.targetDir();
+        Path skillsDir = targetDir.resolve(agent.skillsDirectory());
+        Path commandsDir = agent.generatesCommandStubs() ? targetDir.resolve(agent.commandDirectory()) : skillsDir;
+        ManagedFiles files = managedFiles(request);
+        InitContext genCtx = new InitContext(
+                agent, request.agentName(), commandsDir, skillsDir, targetDir,
+                request.commandPrefix(), request.distribution(), request.withCitrusMcp(), request.printer(), files);
+        requireConfinedOutputs(targetDir, genCtx, isExistingCamelProject(targetDir, request.sourcePlatform()));
+        AgentGeneratorFactory.create(request.agentName()).validate(genCtx);
+
+        Set<Path> shared = new LinkedHashSet<>();
+        shared.add(targetDir.resolve("AGENTS.md"));
+        for (var template : AgentRegistry.descriptor(request.agentName()).templates()) {
+            shared.add(targetDir.resolve(template.target()));
+        }
+        shared.add(targetDir.resolve("docs/constitution.md"));
+        List<ManagedFiles.Change> changes = new ArrayList<>();
+        for (Path file : shared) {
+            if (files.isShared(file)) {
+                changes.add(change(targetDir, file, files.plan(file)));
+            }
+        }
+        for (Map.Entry<Path, ManagedFiles.Action> wrapperFile : mavenWrapperPlan(targetDir, files).entrySet()) {
+            changes.add(change(targetDir, wrapperFile.getKey(), wrapperFile.getValue()));
+        }
+        Path mcpConfig = targetDir.resolve(agent.mcpConfigPath());
+        changes.add(change(targetDir, mcpConfig,
+                Files.exists(mcpConfig) ? ManagedFiles.Action.MERGE : ManagedFiles.Action.CREATE));
+        return changes;
+    }
+
+    private static ManagedFiles managedFiles(InitRequest request) throws IOException {
+        List<String> replacements = new ArrayList<>(request.replace());
+        if (request.replaceWrapper()) {
+            for (String path : List.of("mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties")) {
+                if (Files.exists(request.targetDir().resolve(path), java.nio.file.LinkOption.NOFOLLOW_LINKS)) {
+                    replacements.add(path);
+                }
+            }
+        }
+        return ManagedFiles.open(request.targetDir(), replacements);
+    }
+
+    private static ManagedFiles.Change change(Path targetDir, Path file, ManagedFiles.Action action) {
+        return new ManagedFiles.Change(targetDir.relativize(file).toString().replace('\\', '/'), action, null);
+    }
+
+    /**
+     * What happens to each Maven wrapper file, shared by preview and execution.
+     *
+     * <p>
+     * A project without a wrapper of its own gets the complete wrapper. Once any wrapper file belongs to the project,
+     * Camel-Kit adds no further file to it: it writes only files that are already its own or were named for
+     * replacement, and leaves the rest untouched.
+     */
+    private static Map<Path, ManagedFiles.Action> mavenWrapperPlan(Path projectDir, ManagedFiles files)
+            throws IOException {
+        Map<Path, ManagedFiles.Action> plan = new LinkedHashMap<>();
+        for (String wrapperFile : List.of(".mvn/wrapper/maven-wrapper.properties", "mvnw", "mvnw.cmd")) {
+            Path file = projectDir.resolve(wrapperFile);
+            plan.put(file, files.plan(file));
+        }
+        if (plan.containsValue(ManagedFiles.Action.PRESERVE)) {
+            plan.values().removeIf(action -> action == ManagedFiles.Action.CREATE);
+        }
+        return plan;
+    }
+
     public InitResult initialize(InitRequest request) throws Exception {
         AgentConfig agent = AgentRegistry.get(request.agentName());
         if (agent == null) {
@@ -60,25 +139,17 @@ public class InitService {
         Path docsDir = targetDir.resolve("docs");
         String citrusVersion = request.resolvedCitrusVersion();
 
-        // Detect if this is an existing Camel 4 project (not MuleSoft or other platforms)
         boolean isExistingProject = isExistingCamelProject(targetDir, request.sourcePlatform());
-
-        // Run preflight conflict detection
-        InitConflictDetector conflictDetector = new InitConflictDetector();
-        List<InitConflictDetector.ConflictingFile> conflicts = conflictDetector.detectConflicts(targetDir,
-                isExistingProject);
-
         if (request.dryRun()) {
-            return performDryRun(request, agent, conflicts, isExistingProject);
+            return performDryRun(request, agent);
         }
 
-        // Report existing files that will be preserved/merged (not dry-run mode)
-        reportExistingFiles(request, conflicts, isExistingProject);
-
+        // Opened before anything is written: a workspace is recognized as existing only by what was there on entry.
+        ManagedFiles files = managedFiles(request);
         InitContext genCtx = new InitContext(
                 agent, request.agentName(), commandsDir,
                 skillsDir, targetDir,
-                request.commandPrefix(), request.distribution(), request.withCitrusMcp(), request.printer());
+                request.commandPrefix(), request.distribution(), request.withCitrusMcp(), request.printer(), files);
         AgentGenerator generator = AgentGeneratorFactory.create(request.agentName());
         requireConfinedOutputs(targetDir, genCtx, isExistingProject);
         generator.preflight(genCtx);
@@ -92,28 +163,33 @@ public class InitService {
                 targetDir, camelKitDir, docsDir, createdPaths);
         progress.finishTask();
 
-        progress.startTask("\uD83D\uDCDD", "Writing configuration");
-        createConfigFile(camelKitDir, request.projectName(), request.agentName(), agent, request, createdPaths,
-                isExistingProject);
-        createConstitution(docsDir, request, createdPaths);
-        copyAdditionalTemplates(camelKitDir.resolve("templates"), createdPaths);
-        progress.finishTask();
-
-        progress.startTask("\uD83E\uDD16", "Generating " + agent.name() + " workspace");
-        generator.generate(genCtx);
-        progress.finishTask();
-
-        // Only create Maven wrapper if it doesn't exist or if replacement is explicitly requested
-        boolean shouldCreateWrapper = !isExistingProject
-                || request.replaceWrapper()
-                || (!Files.exists(targetDir.resolve("mvnw"))
-                        && !Files.exists(targetDir.resolve(".mvn")));
-
-        if (shouldCreateWrapper) {
-            progress.startTask("\uD83D\uDD0C", "Configuring Maven wrapper");
-            createMavenWrapper(targetDir, createdPaths);
-            request.reporter().mavenWrapperCreated(MAVEN_WRAPPER_VERSION);
+        try {
+            progress.startTask("\uD83D\uDCDD", "Writing configuration");
+            createConfigFile(camelKitDir, request.projectName(), request.agentName(), agent, request, createdPaths,
+                    isExistingProject);
+            createConstitution(docsDir, request, files, createdPaths);
+            copyAdditionalTemplates(camelKitDir.resolve("templates"), createdPaths);
             progress.finishTask();
+
+            progress.startTask("\uD83E\uDD16", "Generating " + agent.name() + " workspace");
+            generator.generate(genCtx);
+            progress.finishTask();
+
+            progress.startTask("\uD83D\uDD0C", "Configuring Maven wrapper");
+            if (createMavenWrapper(targetDir, files, createdPaths)) {
+                request.reporter().mavenWrapperCreated(MAVEN_WRAPPER_VERSION);
+            } else {
+                request.reporter().mavenWrapperPreserved();
+            }
+            progress.finishTask();
+        } finally {
+            files.save();
+        }
+        for (ManagedFiles.Change conflict : files.conflicts()) {
+            request.reporter().conflict(conflict);
+        }
+        for (String unused : files.unusedReplacements()) {
+            reportWarning(request, warnings, "--replace " + unused + " had no effect: the file does not exist.");
         }
 
         progress.startTask("\uD83D\uDD0D", "Building project graph");
@@ -131,7 +207,8 @@ public class InitService {
 
         return new InitResult(
                 request.projectName(), request.agentName(), agent, targetDir, camelKitDir, commandsDir, skillsDir,
-                citrusVersion, citrusSchemaCount, MAVEN_WRAPPER_VERSION, graph, createdPaths, warnings);
+                citrusVersion, citrusSchemaCount, MAVEN_WRAPPER_VERSION, graph, createdPaths, warnings,
+                files.conflicts());
     }
 
     /** Files init writes under {@code .camel-kit/} for an existing project (recorded baseline). */
@@ -143,7 +220,8 @@ public class InitService {
             throws IOException {
         Set<Path> outputs = new LinkedHashSet<>();
         for (String relative : List.of(".camel-kit/.cache", ".camel-kit/config.properties",
-                ".camel-kit/project-graph.json", ".mvn/wrapper/maven-wrapper.properties", "mvnw", "mvnw.cmd",
+                ManagedFiles.LEDGER, ".camel-kit/project-graph.json", ".mvn/wrapper/maven-wrapper.properties", "mvnw",
+                "mvnw.cmd",
                 "AGENTS.md", "CLAUDE.md",
                 "docs/constitution.md", "docs/flows", "test/data", "schemas")) {
             outputs.add(Path.of(relative));
@@ -156,6 +234,7 @@ public class InitService {
                 ConfinedPaths.requirePath(targetDir, targetDir.resolve(output));
             }
             ConfinedPaths.requireTree(targetDir, targetDir.resolve(".camel-kit/templates"));
+            ConfinedPaths.requireTree(targetDir, targetDir.resolve(ManagedFiles.PROPOSALS));
             GeneratedAssetPreflight.check(genCtx);
         } catch (IOException e) {
             throw new IOException("Initialization aborted: " + e.getMessage(), e);
@@ -188,7 +267,24 @@ public class InitService {
             List<Path> createdPaths,
             boolean isExistingProject)
             throws Exception {
+        Path configFile = dir.resolve("config.properties");
         Properties config = new Properties();
+        if (Files.isRegularFile(configFile)) {
+            // Reinitialization keeps properties it does not manage, such as ones the user added.
+            try (var in = Files.newInputStream(configFile)) {
+                config.load(in);
+            }
+        }
+        // Discovery must not retain constraints from an earlier scan when declarations disappear or conflict.
+        for (String key : List.of("project.runtime", "project.camelVersion", "project.detectedCamelVersion",
+                "project.platformBomVersion", "project.detectedPlatformBomVersion", "project.springBootVersion",
+                "project.primaryDsl", "project.dslTypes", "project.hasTests", "project.baselineTestStatus",
+                "project.routeCount", "project.contractFilesCount", "project.discoveryGaps",
+                "project.unsupportedCombination", "project.modules", "project.moduleCount", "project.beansCount",
+                "project.configFilesCount", "project.unsupportedVersion", "project.unsupportedReason",
+                "forage.version")) {
+            config.remove(key);
+        }
         config.setProperty("project.name", name);
         config.setProperty("project.type", isExistingProject ? "existing" : "greenfield");
         config.setProperty("project.command-prefix", request.commandPrefix());
@@ -200,6 +296,7 @@ public class InitService {
             config.setProperty("citrus.mcp.enabled", "true");
         } else {
             config.setProperty("citrus.mcp.enabled", "false");
+            config.remove("citrus.mcp.version");
         }
         // For greenfield projects only: seed distribution defaults
         // Existing projects get versions from discovery in updateConfigWithRuntime
@@ -208,9 +305,10 @@ public class InitService {
         }
         if (request.sourcePlatform() != null && !"auto".equals(request.sourcePlatform())) {
             config.setProperty("project.sourcePlatform", request.sourcePlatform());
+        } else {
+            config.remove("project.sourcePlatform");
         }
 
-        Path configFile = dir.resolve("config.properties");
         var out = new ByteArrayOutputStream();
         config.store(out, "Camel-Kit Project Configuration");
         AtomicFileWriter.write(configFile, out.toByteArray());
@@ -242,7 +340,8 @@ public class InitService {
         }
     }
 
-    private void createConstitution(Path dir, InitRequest request, List<Path> createdPaths) throws Exception {
+    private void createConstitution(Path dir, InitRequest request, ManagedFiles files, List<Path> createdPaths)
+            throws Exception {
         QuteTemplateEngine qute = new QuteTemplateEngine();
         String template = TemplateUtils.readTemplate("templates/constitution.md");
 
@@ -250,8 +349,9 @@ public class InitService {
                 "DATE", LocalDate.now(ZoneId.systemDefault()).toString(),
                 "CAMEL_VERSION", request.distribution().camelMainVersion()));
         Path constitution = dir.resolve("constitution.md");
-        AtomicFileWriter.write(constitution, content);
-        createdPaths.add(constitution);
+        if (files.write(constitution, content)) {
+            createdPaths.add(constitution);
+        }
     }
 
     private void copyAdditionalTemplates(Path templatesDir, List<Path> createdPaths) throws Exception {
@@ -277,10 +377,14 @@ public class InitService {
         }
     }
 
-    private void createMavenWrapper(Path projectDir, List<Path> createdPaths) throws Exception {
-        Path wrapperDir = projectDir.resolve(".mvn/wrapper");
-        createDirectory(wrapperDir, createdPaths);
-
+    /**
+     * Installs the Maven wrapper files selected by {@link #mavenWrapperPlan}.
+     *
+     * @return {@code false} when a wrapper file of the project's own was preserved
+     */
+    private boolean createMavenWrapper(Path projectDir, ManagedFiles files, List<Path> createdPaths)
+            throws Exception {
+        Map<Path, ManagedFiles.Action> plan = mavenWrapperPlan(projectDir, files);
         String wrapperProps
                 = String.format(Locale.ROOT,
                         """
@@ -288,20 +392,26 @@ public class InitService {
                                 wrapperUrl=https://repo.maven.apache.org/maven2/org/apache/maven/wrapper/maven-wrapper/3.3.2/maven-wrapper-3.3.2.jar
                                 """,
                         MAVEN_WRAPPER_VERSION, MAVEN_WRAPPER_VERSION);
-        Path wrapperProperties = wrapperDir.resolve("maven-wrapper.properties");
-        AtomicFileWriter.write(wrapperProperties, wrapperProps);
-        createdPaths.add(wrapperProperties);
+        Map<String, String> contents = new LinkedHashMap<>();
+        contents.put(".mvn/wrapper/maven-wrapper.properties", wrapperProps);
+        contents.put("mvnw", TemplateUtils.readTemplate("maven/mvnw"));
+        contents.put("mvnw.cmd", TemplateUtils.readTemplate("maven/mvnw.cmd"));
 
-        String mvnwScript = TemplateUtils.readTemplate("maven/mvnw");
-        Path mvnwPath = projectDir.resolve("mvnw");
-        AtomicFileWriter.write(mvnwPath, mvnwScript);
-        mvnwPath.toFile().setExecutable(true);
-        createdPaths.add(mvnwPath);
-
-        String mvnwCmdScript = TemplateUtils.readTemplate("maven/mvnw.cmd");
-        Path mvnwCmd = projectDir.resolve("mvnw.cmd");
-        AtomicFileWriter.write(mvnwCmd, mvnwCmdScript);
-        createdPaths.add(mvnwCmd);
+        boolean preserved = false;
+        for (Map.Entry<String, String> content : contents.entrySet()) {
+            Path file = projectDir.resolve(content.getKey());
+            ManagedFiles.Action action = plan.get(file);
+            if (action == ManagedFiles.Action.PRESERVE) {
+                files.preserve(file);
+                preserved = true;
+            } else if (action != null && files.write(file, content.getValue())) {
+                if ("mvnw".equals(content.getKey())) {
+                    file.toFile().setExecutable(true);
+                }
+                createdPaths.add(file);
+            }
+        }
+        return !preserved;
     }
 
     private InitGraphSummary buildProjectGraph(
@@ -574,6 +684,7 @@ public class InitService {
                 String camelVersion = distribution.camelQuarkusVersion();
                 config.setProperty("project.camelVersion", camelVersion);
                 config.setProperty("project.platformBomVersion", distribution.quarkusPlatformForVersion(camelVersion));
+                config.remove("project.springBootVersion");
             }
             case "spring-boot" -> {
                 String camelVersion = distribution.camelSpringbootVersion();
@@ -584,6 +695,7 @@ public class InitService {
                         distribution.springBootMappings().getOrDefault(camelVersion, distribution.springBootVersion()));
             }
             default -> {
+                config.remove("project.springBootVersion");
                 config.setProperty("project.camelVersion", distribution.camelMainVersion());
                 config.setProperty("project.platformBomVersion", distribution.camelMainVersion());
             }
@@ -763,101 +875,20 @@ public class InitService {
         return null;
     }
 
-    private void reportExistingFiles(
-            InitRequest request,
-            List<InitConflictDetector.ConflictingFile> existingFiles,
-            boolean isExistingProject) {
-        if (existingFiles.isEmpty()) {
-            return;
+    private InitResult performDryRun(InitRequest request, AgentConfig agent) throws Exception {
+        List<ManagedFiles.Change> changes = preview(request);
+        request.printer().println("Dry run — nothing was written");
+        for (ManagedFiles.Change change : changes) {
+            request.printer().println("  " + change.action() + "  " + change.path());
         }
-
-        // Categorize files by how they'll be handled
-        List<InitConflictDetector.ConflictingFile> willMerge = new ArrayList<>();
-        List<InitConflictDetector.ConflictingFile> willSkip = new ArrayList<>();
-
-        for (var file : existingFiles) {
-            if (file.type() == InitConflictDetector.ConflictType.AGENT_INSTRUCTIONS) {
-                willMerge.add(file);
-            } else if (file.type() == InitConflictDetector.ConflictType.MAVEN_WRAPPER && isExistingProject) {
-                willSkip.add(file);
-            }
-        }
-
-        if (!willMerge.isEmpty()) {
-            request.printer().println("ℹ️  Existing files will be preserved with managed blocks:");
-            for (var file : willMerge) {
-                request.printer().println("   - " + file.path().getFileName());
-            }
-        }
-
-        if (!willSkip.isEmpty()) {
-            request.printer()
-                    .println("ℹ️  Existing Maven wrapper will be preserved (use --replace-wrapper to replace)");
-        }
-    }
-
-    private InitResult performDryRun(
-            InitRequest request,
-            AgentConfig agent,
-            List<InitConflictDetector.ConflictingFile> conflicts,
-            boolean isExistingProject) {
-
-        request.printer().println();
-        request.printer().println("🔍 Dry-run mode: No files will be written");
-        request.printer().println();
-
-        if (isExistingProject) {
-            request.printer().println("✓ Detected existing Maven project (pom.xml found)");
-        } else {
-            request.printer().println("✓ Initializing new project");
-        }
-
-        request.printer().println();
-        request.printer().println("📋 Changes that would be made:");
-        request.printer().println();
-
-        // Report what would be created
-        request.printer().println("  Would create:");
-        request.printer().println("    - .camel-kit/config.properties");
-        request.printer().println("    - .camel-kit/templates/");
-        request.printer().println("    - docs/constitution.md");
-        request.printer().println("    - " + agent.skillsDirectory() + "/ (skills)");
-
-        if (!conflicts.isEmpty()) {
-            request.printer().println();
-            request.printer().println("  ⚠️  Would overwrite:");
-            for (var conflict : conflicts) {
-                request.printer().println("    - " + conflict.path().getFileName() + " (" + conflict.type() + ")");
-            }
-        }
-
-        boolean wouldCreateWrapper = !isExistingProject || request.replaceWrapper();
-        if (wouldCreateWrapper) {
-            request.printer().println();
-            request.printer().println("  Would create Maven wrapper:");
-            request.printer().println("    - mvnw, mvnw.cmd");
-            request.printer().println("    - .mvn/wrapper/maven-wrapper.properties");
-        }
-
-        request.printer().println();
-        request.printer().println("Run without --dry-run to apply these changes.");
-        request.printer().println();
-
-        // Return a minimal result for dry-run
+        Path targetDir = request.targetDir();
+        Path skillsDir = targetDir.resolve(agent.skillsDirectory());
+        Path commandsDir = agent.generatesCommandStubs() ? targetDir.resolve(agent.commandDirectory()) : skillsDir;
         return new InitResult(
-                request.projectName(),
-                request.agentName(),
-                agent,
-                request.targetDir(),
-                request.targetDir().resolve(".camel-kit"),
-                request.targetDir().resolve(agent.skillsDirectory()),
-                request.targetDir().resolve(agent.skillsDirectory()),
-                request.resolvedCitrusVersion(),
-                0,
-                MAVEN_WRAPPER_VERSION,
-                null,
-                List.of(),
-                List.of());
+                request.projectName(), request.agentName(), agent, targetDir,
+                targetDir.resolve(".camel-kit"), commandsDir, skillsDir, request.resolvedCitrusVersion(), 0,
+                MAVEN_WRAPPER_VERSION, null, List.of(), List.of(),
+                changes.stream().filter(change -> change.action() == ManagedFiles.Action.PRESERVE).toList());
     }
 
     /**

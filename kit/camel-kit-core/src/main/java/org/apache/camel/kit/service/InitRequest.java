@@ -1,6 +1,7 @@
 package org.apache.camel.kit.service;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Objects;
 
 import org.apache.camel.kit.config.DistributionConfig;
@@ -29,7 +30,8 @@ public record InitRequest(
         InitReporter reporter,
         boolean dryRun,
         boolean replaceWrapper,
-        boolean recordBaseline) {
+        boolean recordBaseline,
+        List<String> replace) {
 
     /**
      * Creates a request with default flags (no dry-run, no wrapper replacement, no baseline recording). Used by tests
@@ -77,6 +79,48 @@ public record InitRequest(
              replaceWrapper, false);
     }
 
+    public InitRequest(
+                       String projectName,
+                       String agentName,
+                       Path targetDir,
+                       String citrusVersion,
+                       boolean noFetch,
+                       boolean withCitrusMcp,
+                       String sourcePlatform,
+                       String commandPrefix,
+                       String defaultCitrusVersion,
+                       DistributionConfig distribution,
+                       Printer printer,
+                       InitProgress progress,
+                       InitReporter reporter,
+                       boolean dryRun,
+                       boolean replaceWrapper,
+                       boolean recordBaseline) {
+        this(projectName, agentName, targetDir, citrusVersion, noFetch, withCitrusMcp, sourcePlatform,
+             commandPrefix, defaultCitrusVersion, distribution, printer, progress, reporter, dryRun,
+             replaceWrapper, recordBaseline, List.of());
+    }
+
+    public InitRequest(
+                       String projectName,
+                       String agentName,
+                       Path targetDir,
+                       String citrusVersion,
+                       boolean noFetch,
+                       boolean withCitrusMcp,
+                       String sourcePlatform,
+                       String commandPrefix,
+                       String defaultCitrusVersion,
+                       DistributionConfig distribution,
+                       Printer printer,
+                       InitProgress progress,
+                       InitReporter reporter,
+                       List<String> replace) {
+        this(projectName, agentName, targetDir, citrusVersion, noFetch, withCitrusMcp, sourcePlatform,
+             commandPrefix, defaultCitrusVersion, distribution, printer, progress, reporter, false, false, false,
+             replace);
+    }
+
     public InitRequest {
         Objects.requireNonNull(projectName, "projectName");
         Objects.requireNonNull(agentName, "agentName");
@@ -89,6 +133,7 @@ public record InitRequest(
         Objects.requireNonNull(printer, "printer");
         progress = progress == null ? InitProgress.noop() : progress;
         reporter = reporter == null ? InitReporter.noop() : reporter;
+        replace = replace == null ? List.of() : List.copyOf(replace);
     }
 
     String resolvedCitrusVersion() {

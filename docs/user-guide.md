@@ -202,7 +202,7 @@ camel-kit init --here --ai bob2 --force
 camel kit init --here --ai bob2 --force
 ```
 
-Commit or back up customized generated files first: `--force` overwrites them.
+Commit or back up customized skills first: `--force` regenerates them. Your content in shared files such as `AGENTS.md` is kept.
 Restart Bob after regeneration. Earlier `0.4.0-SNAPSHOT` builds can still contain
 the defect. Until you upgrade, set both invocation fields to `true` only in the
 nine public skills listed above, then restart Bob; leave internal helpers unchanged.
@@ -261,7 +261,7 @@ order-processing/
   mvnw / mvnw.cmd            # Maven wrapper
 ```
 
-The init command checks prerequisites (Java, JBang, Camel JBang, test plugin), copies skill files, configures MCP, and sets up the Maven wrapper so you can start designing immediately. If the target directory already contains a camel-kit project (`AGENTS.md` or `.camel-kit/`), init warns and exits — use `--force` to overwrite.
+The init command checks prerequisites (Java, JBang, Camel JBang, test plugin), copies skill files, configures MCP, and sets up the Maven wrapper so you can start designing immediately. If the target directory already contains a camel-kit project (`.camel-kit/`), init warns and exits — use `--force` to reinitialize. Your content in `AGENTS.md` and the agent instruction files is kept (Camel-Kit only writes its marked block), and an existing `docs/constitution.md`, agent settings file or Maven wrapper that is yours is preserved unless named with `--replace <path>`. `--dry-run` previews the outcome.
 
 With `--ai codex`, both `camel-kit init` and the Camel JBang plugin form `camel kit init` generate repository-scoped Codex resources. Trust the repository so Codex can load `.codex/config.toml`; Codex also skips any user-added project hooks until trust. Then start with `$camel-start`; `/skills` lists project skills and `/mcp` shows the configured servers (two by default; three with `--with-citrus-mcp`). Camel-Kit preserves unrelated valid project config, does not create `.codex/commands/`, and does not change global Codex settings, authentication, or hooks.
 

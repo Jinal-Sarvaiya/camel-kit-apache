@@ -45,10 +45,10 @@ public class CodexGenerator extends DefaultGenerator {
             }
             Path target = ctx.projectDir().resolve(template.target());
             if (AGENTS_TEMPLATE.equals(template.source())) {
-                AtomicFileWriter.write(target, templateEngine.render(
+                ctx.files().write(target, templateEngine.render(
                         template.source(), Map.of("COMMAND_PREFIX", ctx.commandPrefix())));
             } else {
-                copyTemplateResource(template.source(), target);
+                copyTemplateResource(ctx, template.source(), target);
             }
             if (template.target().startsWith(".codex/agents/") && template.target().endsWith(".toml")) {
                 customAgents++;

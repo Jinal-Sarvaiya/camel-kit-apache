@@ -903,6 +903,56 @@ fallback (a temporary `knowledge-index*` directory, used only when resolution fa
 with its conditions (rejected: omitting the fallback as legacy, since it is shipped code). Each verification item has
 a tracking issue (#153–#158), and the Knowledge transport statements follow apache/camel-kit#143.
 
+### Shared File Ownership During Init
+
+`camel-kit init` writes a few files at paths an existing project may already own. `ManagedFiles` is the single place
+that decides what happens to them:
+
+- **Instruction files** (`AGENTS.md`, `CLAUDE.md`, `QWEN.md`, `.github/copilot-instructions.md`) hold Camel-Kit's
+  content between `CAMEL-KIT-MANAGED-BLOCK` markers. Init appends the block to a file that has none and later replaces
+  only the block, keeping the file's line endings. A block with a missing marker is not guessed at: the file is
+  preserved.
+- **Tracked files** (`docs/constitution.md`, `.claude/settings.json`, `.qwenignore`, `.bob/custom_modes.yaml` and the
+  Maven wrapper) cannot carry a marker. Init records the SHA-256 of what it wrote in
+  `.camel-kit/managed-files.properties` and rewrites a file only when it is missing or still matches. Hashes ignore
+  line-ending differences so a checkout that converts them does not look like an edit. A project without a Maven
+  wrapper gets the complete one; once any wrapper file is the project's own, no further wrapper file is added and
+  only files named for replacement are written. Preview and execution share that plan.
+- A preserved file is reported and the generated version is saved under `.camel-kit/conflicts/`. `--replace <path>`
+  rewrites one shared file in full; `--dry-run` reports the outcome per file without writing.
+- Existing JSON MCP configurations are merged, not replaced.
+
+Assets Camel-Kit ships under its own names (`camel-*` skills, subagents, personas, hooks, `.camel-kit/templates/`) are
+not tracked and are always regenerated. This keeps reinitialization able to restore the restricted Ship worker
+definitions regardless of local edits. Files the user adds next to them are never visited.
+
+Rejected alternatives:
+
+- **Keep overwriting, and document a backup step.** This silently destroys an existing application's agent
+  instructions and build wrapper, which is the failure this decision removes.
+- **Abort when any shared file exists.** Safe, but it blocks adoption in most existing projects, which commonly have
+  an `AGENTS.md` or a wrapper.
+- **Skip a shared file whenever it exists.** It protects the first adoption but cannot tell a file Camel-Kit wrote
+  from one the user wrote, so generated files would never be refreshed on reinitialization.
+- **Hash-track the instruction files too.** A preserved `AGENTS.md` would lack the skill routing until merged by hand.
+- **Use marked blocks for every shared file.** JSON, YAML and shell files cannot carry a reliable marker.
+- **Track every generated file, including skills.** Skills are rewritten several times in one run (install, agent
+  adaptation, traits, dispatch block, version resolution), and preserving a locally edited Ship worker would weaken
+  its restrictions.
+
+Missing provenance is unknown ownership, never Camel-Kit ownership. A workspace initialized before the ledger existed
+is treated like any other existing project: unmarked instruction files get the block appended, and other shared files
+are preserved until named with `--replace`. Markers that do not form exactly one ordered pair (missing, duplicated,
+nested or reversed) are never merged, because any guess could delete the user's text between them. A replacement is
+recorded as used only once it is written, so one that was skipped is reported.
+
+Rejected: adopting every shared file of a workspace that has a configuration but no ledger. It kept upgrades
+refreshing old generated files, but it silently discarded instructions, settings and wrappers the user had written
+there, which is the loss this decision exists to prevent.
+
+`--dry-run` runs each generator's `validate`, the side-effect-free part of `preflight`; OpenCode's preflight removes
+the Ship worker when the project configuration is rejected, and a preview must not.
+
 ---
 
 ## 10. How to Add a Skill

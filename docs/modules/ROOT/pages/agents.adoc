@@ -183,8 +183,8 @@ camel-kit doctor
 Before reinitializing, `.agents/mcp_config.json` must be valid JSON without duplicate keys (`doctor` reports
 duplicates as failures), and `AGENTS.md`, `GEMINI.md` and everything under `.agents/` must be real files or
 directories, so replace symbolic links first; these checks run before any project file is changed.
-`--force` replaces the generated `AGENTS.md`, skills and configuration, so preserve custom additions to those files
-first; custom project rules can live in `GEMINI.md`, which Antigravity also reads. Antigravity reinitialization removes
+`--force` replaces the generated skills and the Camel Kit block in `AGENTS.md`
+(xref:getting-started.adoc#existing-project[Existing projects]), so preserve custom additions to the skills first; custom project rules can live in `GEMINI.md`, which Antigravity also reads. Antigravity reinitialization removes
 the four old Camel Kit `@.gemini/...` imports from `GEMINI.md` and keeps custom text, imports and other `.gemini/`
 files. Move custom MCP servers from `.gemini/settings.json` to `.agents/mcp_config.json` using Google's MCP schema,
 and custom skills from `.gemini/skills/<name>/` to `.agents/skills/<name>/`. Bob 2 reinitialization replaces the

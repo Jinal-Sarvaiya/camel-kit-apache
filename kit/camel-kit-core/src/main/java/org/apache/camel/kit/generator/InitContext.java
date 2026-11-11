@@ -15,7 +15,31 @@ public record InitContext(
         String commandPrefix,
         DistributionConfig distribution,
         boolean withCitrusMcp,
-        Printer printer) {
+        Printer printer,
+        ManagedFiles files) {
+
+    public InitContext(
+                       AgentConfig agent,
+                       String agentName,
+                       Path commandsDir,
+                       Path skillsDir,
+                       Path projectDir,
+                       String commandPrefix,
+                       DistributionConfig distribution,
+                       boolean withCitrusMcp,
+                       Printer printer) {
+        this(
+             agent,
+             agentName,
+             commandsDir,
+             skillsDir,
+             projectDir,
+             commandPrefix,
+             distribution,
+             withCitrusMcp,
+             printer,
+             ManagedFiles.unrestricted(projectDir));
+    }
 
     public InitContext(
                        AgentConfig agent,

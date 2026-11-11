@@ -37,36 +37,36 @@ class McpConfigGenerator {
                 new CodexConfigMerger().merge(configFile, processed, ctx.withCitrusMcp());
             } else if ("opencode".equals(ctx.agentName())) {
                 new OpenCodeConfigMerger().merge(configFile, processed, ctx.withCitrusMcp());
-            } else if ("antigravity".equals(ctx.agentName())) {
-                ObjectNode config = readAntigravityConfig(configFile);
-                ObjectNode generated = (ObjectNode) JSON_MAPPER.readTree(processed).path("mcpServers");
+            } else {
+                // Merge into an existing config so servers and settings the project already has are preserved.
+                String key = ctx.agent().mcpServerContainerKey();
+                ObjectNode config = readJsonConfig(configFile, ctx.agent().name(), key);
+                ObjectNode generated = (ObjectNode) JSON_MAPPER.readTree(processed).path(key);
                 if (!Files.exists(configFile)) {
                     AtomicFileWriter.write(configFile, processed);
                 } else {
                     boolean needsUpdate = !generated.properties().stream()
                             .allMatch(server -> server.getValue()
-                                    .equals(config.path("mcpServers").get(server.getKey())));
+                                    .equals(config.path(key).get(server.getKey())));
                     boolean needsCitrusRemoval = !ctx.withCitrusMcp()
-                            && config.path("mcpServers").has("citrus");
+                            && config.path(key).has("citrus");
                     if (needsUpdate || needsCitrusRemoval) {
                         String original = Files.readString(configFile);
                         String bom = original.startsWith("\uFEFF") ? "\uFEFF" : "";
                         JsoncObjectEditor editor = new JsoncObjectEditor(original.substring(bom.length()));
-                        if (!config.has("mcpServers")) {
-                            editor.upsertRootMember("mcpServers", generated);
+                        if (!config.has(key)) {
+                            editor.upsertRootMember(key, generated);
                         } else {
-                            editor.removeObjectMembers("mcpServers", generated.fieldNames());
+                            editor.removeObjectMembers(key, generated.fieldNames());
                             if (needsCitrusRemoval) {
-                                editor.removeObjectMembers("mcpServers",
+                                editor.removeObjectMembers(key,
                                         java.util.Collections.singletonList("citrus").iterator());
                             }
-                            editor.appendObjectMembers("mcpServers", generated);
+                            editor.appendObjectMembers(key, generated);
                         }
                         AtomicFileWriter.write(configFile, bom + editor.content());
                     }
                 }
-            } else {
-                AtomicFileWriter.write(configFile, processed);
             }
 
             ctx.printer().println(AnsiColors.green("✓") + " MCP config created for " + ctx.agent().name());
@@ -78,24 +78,39 @@ class McpConfigGenerator {
     }
 
     static ObjectNode readAntigravityConfig(Path configFile) throws InvalidAgentConfigurationException {
+        return readJsonConfig(configFile, "Antigravity", "mcpServers");
+    }
+
+    /**
+     * Validates the JSON MCP config a generator will merge into, so an unusable file fails before anything is written.
+     */
+    static void preflight(InitContext ctx) throws InvalidAgentConfigurationException {
+        if (!"toml".equals(ctx.agent().mcpConfigFormat()) && !"opencode".equals(ctx.agentName())) {
+            readJsonConfig(ctx.projectDir().resolve(ctx.agent().mcpConfigPath()), ctx.agent().name(),
+                    ctx.agent().mcpServerContainerKey());
+        }
+    }
+
+    static ObjectNode readJsonConfig(Path configFile, String agent, String key)
+            throws InvalidAgentConfigurationException {
         if (!Files.exists(configFile, LinkOption.NOFOLLOW_LINKS)) {
             return JSON_MAPPER.createObjectNode();
         }
         if (!Files.isRegularFile(configFile, LinkOption.NOFOLLOW_LINKS)) {
             throw new InvalidAgentConfigurationException(
-                    "Antigravity MCP config must be a regular file: " + configFile);
+                    agent + " MCP config must be a regular file: " + configFile);
         }
         try {
             JsonNode config = ANTIGRAVITY_MAPPER.readTree(configFile.toFile());
             if (config == null || !config.isObject()
-                    || (config.has("mcpServers") && !config.path("mcpServers").isObject())) {
+                    || (config.has(key) && !config.path(key).isObject())) {
                 throw new InvalidAgentConfigurationException(
-                        "Antigravity MCP config must contain a JSON object with an mcpServers object: " + configFile);
+                        agent + " MCP config must contain a JSON object with an " + key + " object: " + configFile);
             }
             return (ObjectNode) config;
         } catch (IOException e) {
             throw new InvalidAgentConfigurationException(
-                    "Invalid Antigravity MCP config " + configFile + ": " + e.getMessage()
+                    "Invalid " + agent + " MCP config " + configFile + ": " + e.getMessage()
                                                          + ". Fix JSON syntax and remove duplicate keys before retrying.",
                     e);
         }

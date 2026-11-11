@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 import org.apache.camel.kit.config.AgentConfig;
+import org.apache.camel.kit.generator.ManagedFiles;
 
 /**
  * Result of initializing a Camel-Kit workspace.
@@ -22,7 +23,8 @@ public record InitResult(
         String mavenWrapperVersion,
         InitGraphSummary graph,
         List<Path> createdPaths,
-        List<InitWarning> warnings) {
+        List<InitWarning> warnings,
+        List<ManagedFiles.Change> conflicts) {
 
     public InitResult {
         Objects.requireNonNull(projectName, "projectName");
@@ -36,5 +38,6 @@ public record InitResult(
         Objects.requireNonNull(mavenWrapperVersion, "mavenWrapperVersion");
         createdPaths = List.copyOf(Objects.requireNonNull(createdPaths, "createdPaths"));
         warnings = List.copyOf(Objects.requireNonNull(warnings, "warnings"));
+        conflicts = List.copyOf(Objects.requireNonNull(conflicts, "conflicts"));
     }
 }

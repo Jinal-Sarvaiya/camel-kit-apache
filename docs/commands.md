@@ -67,8 +67,12 @@ camel kit init --here [options]
 | `-p`, `--property` | -- | Override a config property (repeatable). Example: `-p "camel.main.version=4.18.4"` |
 | `-c`, `--config` | `~/.camel-kit/config.properties` | Path to a custom config properties file |
 | `--with-citrus-mcp` | `false` | _(development snapshot only)_ Include the Citrus MCP server in agent configuration. When omitted, no Citrus server is generated; use this flag if your project needs Citrus test integration. Released versions (0.4.1 and earlier) include Citrus by default. |
+| `--replace-wrapper` | `false` | Replace the complete Maven wrapper; use `--replace <path>` to replace only one shared file |
+| `--record-baseline` | `false` | Run the existing project's build and tests once to record baseline results; never runs during `--dry-run` |
 | `--source-platform` | `auto` | Source platform for migration: `mulesoft`, `camel`, `biztalk`, `auto` |
-| `--force` | `false` | Overwrite existing project without prompting (skips overwrite detection) |
+| `--force` | `false` | Reinitialize a project that already has `.camel-kit/`. Your content in shared files is kept |
+| `--replace <path>` | none | Replace one existing shared file in full (for example `AGENTS.md` or `mvnw`) instead of merging or preserving it; repeatable |
+| `--dry-run` | `false` | Show what init would do to each shared file (create, replace, merge or preserve) without writing anything |
 | `--silent` | `false` | Suppress all output (no banner, no TUI, no progress, no summary) -- useful for CI/scripted environments |
 | `-V`, `--version` | -- | Print camel-kit version and exit |
 
@@ -147,19 +151,24 @@ The check is non-blocking -- it warns but never fails the init. Design and plann
 
 **Overwrite detection:**
 
-If the target directory already contains `AGENTS.md` or `.camel-kit/`, init warns and exits:
+If the target directory already contains `.camel-kit/`, init warns and exits:
 
 ```text
 ⚠ Project already initialized
   Directory: /path/to/my-integration
-  Found:     AGENTS.md
   Found:     .camel-kit/
 
-  To overwrite: --force
+  To reinitialize: --force (files you changed are preserved)
   Example:      camel-kit init my-integration --ai claude --force
 ```
 
-Use `--force` to overwrite an existing project.
+Use `--force` to reinitialize. In `AGENTS.md`, `CLAUDE.md`, `QWEN.md` and `.github/copilot-instructions.md`,
+Camel-Kit owns only the block between its `CAMEL-KIT-MANAGED-BLOCK` markers: init appends the block to an existing
+file and later replaces only that block. An existing `docs/constitution.md`, `.claude/settings.json`, `.qwenignore`,
+`.bob/custom_modes.yaml` or Maven wrapper that Camel-Kit did not write, or that you changed afterwards, is left
+untouched and listed at the end of the run; the version Camel-Kit would have written is saved under
+`.camel-kit/conflicts/`. Pass `--replace <path>` to replace a file in full, or `--dry-run` to preview. Shipped
+skills and other `camel-*` assets are always regenerated.
 
 **TUI experience:**
 

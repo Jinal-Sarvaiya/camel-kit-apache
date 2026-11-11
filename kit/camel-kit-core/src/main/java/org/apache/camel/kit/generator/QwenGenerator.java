@@ -41,7 +41,7 @@ public class QwenGenerator extends DefaultGenerator {
 
     private void generateQwenMd(InitContext ctx, Map<String, Object> data) throws Exception {
         String content = templateEngine.render("templates/qwen/qwen-md.md", data);
-        AtomicFileWriter.write(ctx.projectDir().resolve("QWEN.md"), content);
+        ctx.files().write(ctx.projectDir().resolve("QWEN.md"), content);
     }
 
     private void generateSubAgents(InitContext ctx) throws Exception {
@@ -49,7 +49,7 @@ public class QwenGenerator extends DefaultGenerator {
         Files.createDirectories(agentsDir);
 
         for (String agentName : SUB_AGENTS) {
-            copyTemplateResource(
+            copyTemplateResource(ctx,
                     "templates/qwen/agents/" + agentName + ".md",
                     agentsDir.resolve(agentName + ".md"));
         }
@@ -66,7 +66,7 @@ public class QwenGenerator extends DefaultGenerator {
     }
 
     private void generateQwenIgnore(InitContext ctx) throws Exception {
-        copyTemplateResource("templates/qwen/qwenignore",
+        copyTemplateResource(ctx, "templates/qwen/qwenignore",
                 ctx.projectDir().resolve(".qwenignore"));
     }
 

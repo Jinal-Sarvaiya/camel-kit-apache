@@ -61,6 +61,13 @@ class JavaGraphParserTest {
     }
 
     @Test
+    void javaDslRoutesRecordTheirSourceFile() {
+        String file = graph.getNode("route:processOrders").properties().get("file");
+        assertNotNull(file, "discovery needs the source file to tell Java DSL routes from YAML routes");
+        assertTrue(file.endsWith(".java"));
+    }
+
+    @Test
     void parsesRouteEndpoints() {
         assertTrue(graph.hasNode("endpoint:kafka:orders"));
         assertTrue(graph.hasNode("endpoint:direct:enrichOrder"));

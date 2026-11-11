@@ -24,6 +24,122 @@ declared requirements and scope interpreted by shipped planning/execution workfl
 
 ## Spec Structure
 
+### For Existing Projects
+
+When adding capabilities to an existing Camel 4 application (`project.type=existing`), use this extended structure:
+
+````markdown
+# [Project Name] — Design Spec (Existing Project Enhancement)
+
+**Date:** [YYYY-MM-DD]
+**Project Type:** Existing Camel {detectedCamelVersion} Application
+**Camel Version:** [detected version from config]
+**Runtime:** [detected runtime]
+**Platform BOM Version:** [detected platform BOM]
+**Primary DSL:** [detected primaryDsl: YAML/XML/Java]
+**Existing Routes:** [routeCount from config]
+
+## Existing Project Context
+
+**Current Architecture:**
+- Routes: [list existing route IDs from graph]
+- Components in use: [list components from Maven artifacts]
+- Error handling: [describe existing errorHandler configuration if found]
+- Tests: [hasTests status and test framework if detected]
+
+**Discovery Source:** Project graph analysis (`.camel-kit/project-graph.json`)
+
+---
+
+## Requested Additions
+
+**What's being added:**
+- [List new routes/endpoints/integrations]
+
+**Why:**
+- [Business justification for the addition]
+
+---
+
+## Integration Points
+
+**How new capabilities connect to existing routes:**
+
+| New Route | Connects To | Integration Mechanism | Rationale |
+|-----------|-------------|----------------------|-----------|
+| [new-route-id] | [existing-route-id or "none"] | direct:, seda:, event, shared bean, etc. | Why this integration approach |
+
+**Example:**
+| New Route | Connects To | Integration Mechanism | Rationale |
+|-----------|-------------|----------------------|-----------|
+| rest-api-v2 | database-processor | Reuses existing `userDatabaseBean` | Maintain consistency with existing /api/users endpoint |
+| new-file-watcher | order-processing-route | `direct:processOrder` | Trigger existing order processing logic |
+
+---
+
+## Affected Files
+
+**Files that will be modified:**
+
+| File | Change Type | Description |
+|------|-------------|-------------|
+| [path/to/routes.yaml] | Add routes | New REST endpoint definitions |
+| [path/to/application.properties] | Add properties | Configuration for new component |
+| [path/to/pom.xml] | Add dependency | Only if new component not already present |
+
+**Files that will NOT be modified (protected):**
+
+- [List existing files that must remain unchanged]
+- [Explain why they're protected, e.g., "Critical production route"]
+
+---
+
+## Unchanged Behavior Constraints
+
+**Existing routes/features that MUST remain unchanged:**
+
+- [existing-route-id]: [Why it must stay unchanged, e.g., "Production-critical, serves 10k req/day"]
+- [existing-configuration]: [Why it's protected, e.g., "Shared across multiple routes"]
+
+**Validation:**
+- All existing tests must continue to pass
+- No changes to existing endpoint contracts (URLs, message formats)
+- No changes to existing error handling behavior
+- No changes to existing configuration keys
+
+---
+
+## Compatibility Constraints
+
+**Version Compatibility:**
+- Camel version: MUST stay at {detectedCamelVersion} (do not upgrade)
+- Runtime version: MUST stay at detected version (do not upgrade)
+- Dependencies: New components must be compatible with existing Camel version
+
+**DSL Consistency:**
+- Primary DSL: {primaryDsl}
+- New routes MUST use the same DSL as existing routes (no DSL conversion)
+
+**Pattern Consistency:**
+- Error handling: Follow existing errorHandler pattern
+- Configuration: Use existing application.properties approach
+- Logging: Follow existing logging pattern
+- Metrics: Follow existing metrics/observability pattern (if present)
+
+---
+
+## Not Doing (and Why)
+
+[Same as greenfield — scope exclusions specific to this addition]
+
+- [What's explicitly NOT being added]
+- [Why it's excluded]
+
+---
+
+[Continue with sections 1-6 from greenfield template below (Not Doing, Executive Summary, Systems Landscape, Flow Designs, Cross-Cutting Concerns, Constitution Compliance, Project Structure)]
+````
+
 ### For Greenfield Projects
 
 ````markdown

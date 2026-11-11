@@ -7,7 +7,52 @@
 
 ---
 
-## Step 1: Select Runtime Platform
+## Special Case: Existing Projects
+
+**Check `.camel-kit/config.properties` FIRST:**
+
+```
+if project.type == "existing":
+    runtime = project.runtime  # already detected
+    camelVersion = project.detectedCamelVersion  # already detected
+    platformBomVersion = project.detectedPlatformBomVersion  # already detected
+    
+    VALIDATE:
+    - Is camelVersion supported? (check against supported versions below)
+    - Is it Camel 4.x? (Camel 3.x is unsupported)
+    
+    if camelVersion starts with "3.":
+        STOP: "This project uses Camel {camelVersion}, which is not supported.
+               Camel Kit requires Camel 4.x. Run /camel-migrate to upgrade first."
+    
+    if camelVersion is not in supported list:
+        WARN: "Detected Camel {camelVersion} on {runtime}.
+               This version is not in the recommended list, but Camel Kit will use it.
+               Recommended: {latest version for runtime}
+               
+               Do you want to upgrade to the recommended version? (y/N)"
+        
+        if user says no:
+            USE DETECTED VERSION (do not override)
+    
+    BIND to detected values:
+    - project.runtime = {detected runtime}
+    - project.camelVersion = {detected version}
+    - project.platformBomVersion = {detected platform BOM}
+    
+    SKIP the user selection questions below — proceed to Step 3.
+```
+
+**For existing projects:**
+- DO NOT ask the user to choose a runtime (it's already detected)
+- DO NOT ask the user to choose a version (it's already in use)
+- DO validate that the detected version is supported
+- DO flag unsupported versions with an actionable error
+- DO offer to upgrade, but respect "no" as keeping the detected version
+
+---
+
+## Step 1: Select Runtime Platform (Greenfield Projects Only)
 
 First inspect the analyzed requirements and recorded answers. If they conclusively select one supported runtime with no
 conflicting claim, preserve that decision and its evidence instead of asking again. If the runtime is absent, ambiguous,
@@ -25,7 +70,9 @@ Record: `project.runtime` (`main`, `spring-boot`, or `quarkus`)
 
 ---
 
-## Step 2: Select Camel Version
+## Step 2: Select Camel Version (Greenfield Projects Only)
+
+**Note:** For existing projects, this step is SKIPPED — versions are bound to detected values (see "Special Case: Existing Projects" above).
 
 First inspect the analyzed requirements and recorded answers. If they conclusively select a version supported by the
 chosen runtime, preserve that decision and its evidence instead of asking again. Otherwise present the supported

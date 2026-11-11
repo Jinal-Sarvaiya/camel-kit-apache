@@ -192,6 +192,137 @@ The probe prevents wasting implementation cycles on environments that cannot sup
 
 ---
 
+## Step 0.6: Existing Project Scope Enforcement
+
+**Before executing any tasks, check if this is an existing project:**
+
+Read `.camel-kit/config.properties`:
+- If `project.type=existing` → **enforce existing project constraints**
+- If `project.type=greenfield` or missing → **skip to Step 1**
+
+### For Existing Projects: Pre-Execution Validation
+
+1. **Load discovered project constraints from `.camel-kit/config.properties`:**
+   ```properties
+   project.type=existing
+   project.camelVersion=X.Y.Z        # LOCKED - cannot upgrade
+   project.runtime=spring-boot       # LOCKED - cannot change
+   project.primaryDsl=yaml           # LOCKED - new routes must use this DSL
+   project.platformBomVersion=A.B.C  # LOCKED - cannot upgrade
+   ```
+
+   **If `project.unsupportedVersion` or `project.unsupportedCombination` is set, STOP.** Report the value to the user
+   and do not execute. Treat `project.discoveryGaps` as items to inspect in the source before editing, not as proof
+   that nothing exists.
+
+2. **Load baseline inventory (if files exist):**
+   ```bash
+   # Routes that existed at project initialization
+   cat .camel-kit/baseline-routes.txt
+   
+   # Tests that existed at project initialization
+   cat .camel-kit/baseline-tests.txt
+   ```
+   These files define what MUST continue to work (regression prevention).
+   `.camel-kit/baseline-contracts.txt` (if present) lists interface contract files. Do not edit them unless the design
+   spec lists them under "Affected Files".
+
+3. **Load design spec scope boundaries:**
+   - Read `docs/camel-kit/<activePipeline>/design-spec.md`
+   - Extract "Affected Files" list
+   - Extract "Files that will NOT be modified (protected)" list
+   - Extract "Compatibility Constraints" section
+
+4. **Validate plan compliance:**
+   - For each task in the plan:
+     - Check that files to modify are in "Affected Files"
+     - Verify no files in "protected" list are touched
+     - Verify no files from baseline-routes.txt are touched (unless in "Affected Files")
+     - Confirm no dependency version upgrades (unless in design spec)
+     - Confirm new routes use `project.primaryDsl` format
+   
+5. **If violations found:**
+   ```
+   STOP: "Plan contains out-of-scope changes:
+   - Task 3 modifies src/main/resources/routes/existing-route.yaml (PROTECTED - in baseline-routes.txt)
+   - Task 5 upgrades Camel version from 4.8.0 to 4.9.0 (LOCKED by project.camelVersion)
+   
+   The plan does not match the approved design spec scope.
+   Options:
+   1. Re-run /camel-plan to generate a compliant plan
+   2. Amend the design spec to include these changes
+   3. Abort execution"
+   ```
+
+6. **Record execution baseline state:**
+   - Run: `git diff --name-only` (should be empty or only have .camel-kit/ changes)
+   - Record current dependency versions from pom.xml
+   - Note: Route/test baseline already recorded in baseline-routes.txt and baseline-tests.txt
+   - This execution baseline will be checked after task completion
+
+### During Task Execution: Scope Guards
+
+For each task being executed on an existing project:
+
+**Before implementation:**
+```
+Implementer briefing MUST include:
+- "This is an EXISTING PROJECT (project.type=existing)"
+- "Primary DSL: {primaryDsl} (DO NOT convert or mix DSLs)"
+- "Detected Camel version: {detectedCamelVersion} (DO NOT upgrade)"
+- "Approved files to modify: [list from task]"
+- "PROTECTED files (do not touch): [list from design spec]"
+- "Generate new routes in {primaryDsl} format only"
+```
+
+**After implementation, before review:**
+```
+Scope compliance check:
+1. List files modified: `git status --short`
+2. Verify each modified file is in task's approved file list
+3. Verify no protected files were touched
+4. If pom.xml modified, verify:
+   - No Camel version change
+   - No platform BOM version change
+   - Only approved dependencies added
+5. If routes added/modified, verify:
+   - All new routes use {primaryDsl}
+   - No DSL conversion occurred
+   - No changes to existing route IDs (unless approved)
+
+If violations detected:
+  REVERT changes and re-dispatch implementer with stricter constraints
+```
+
+### After All Tasks: Final Scope Verification
+
+After task loop completes, before final cross-cutting review:
+
+```markdown
+1. **File scope check:**
+   git diff --name-only origin/main
+   
+   Compare against design spec's "Affected Files" list
+   Report: "Modified N files, all within approved scope" OR
+          "VIOLATION: Modified unapproved files: [list]"
+
+2. **Version lock check:**
+   git diff pom.xml | grep -E "(<camel\\.|<quarkus\\.|<spring-boot\\.)"
+   
+   Report: "Versions unchanged (correct)" OR
+          "VIOLATION: Version upgraded without approval"
+
+3. **DSL consistency check:**
+   find src/main/resources/camel -name "*.{non-primary-dsl-extension}"
+   
+   Report: "All routes in {primaryDsl} (correct)" OR
+          "VIOLATION: Mixed DSLs detected"
+```
+
+**If any violation found:** STOP and report to user before proceeding to camel-validate.
+
+---
+
 ## Iron Laws (enforced in this phase)
 
 Read `shared/iron-laws.md` for the full Iron Laws. This phase enforces ALL six:

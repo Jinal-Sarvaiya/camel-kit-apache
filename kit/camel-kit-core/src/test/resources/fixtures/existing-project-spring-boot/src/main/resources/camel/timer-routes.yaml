@@ -1,0 +1,7 @@
+- route:
+    id: scheduled-task
+    from:
+      uri: timer:scheduled?period=60000
+      steps:
+        - log: "Scheduled task executed"
+        - to: http:example.com/api/data

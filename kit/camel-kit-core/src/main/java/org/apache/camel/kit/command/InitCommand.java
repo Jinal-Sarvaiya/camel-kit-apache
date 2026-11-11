@@ -58,6 +58,17 @@ public class InitCommand extends CamelKitCommand {
     @Option(names = {"--force"}, description = "Overwrite existing project without prompting")
     public boolean force;
 
+    @Option(names = {"--dry-run"}, description = "Preview changes without writing files")
+    public boolean dryRun;
+
+    @Option(names = {"--replace-wrapper"}, description = "Replace Maven wrapper even if it exists")
+    public boolean replaceWrapper;
+
+    @Option(names = {"--record-baseline"},
+            description = "For an existing project, run its tests once to record a baseline result "
+                          + "(executes the project's build and tests; may take several minutes)")
+    public boolean recordBaseline;
+
     @Option(names = {"--silent"}, description = "Suppress all output (no banner, no progress, no summary)")
     public boolean silent;
 
@@ -181,7 +192,10 @@ public class InitCommand extends CamelKitCommand {
                 CamelKitMain.distribution(),
                 printer(),
                 initProgress(),
-                initReporter());
+                initReporter(),
+                dryRun,
+                replaceWrapper,
+                recordBaseline);
 
         final InitResult result;
         try {

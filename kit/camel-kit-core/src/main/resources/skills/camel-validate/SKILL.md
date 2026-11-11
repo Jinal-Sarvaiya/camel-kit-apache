@@ -78,6 +78,278 @@ each module using the same optional relative module prefix as `camel-implement/g
 Record resolved file paths, not bare flow names. Pass the exact `ROUTE_FILES` and matching `PROPS_FILE` to
 `schema-validation.md`, `endpoint-validation.md`, and all later checks, and iterate every route in every module.
 
+## Existing Project Baseline Validation
+
+**Check `.camel-kit/config.properties` for `project.type=existing`.**
+
+If this is an existing project, establish and verify against a baseline BEFORE validating new capabilities:
+
+### Step 1: Load or Establish Baseline
+
+**First, check if baseline was already recorded during init:**
+
+```bash
+# Check for baseline test results file
+if [ -f .camel-kit/baseline-test-results.json ]; then
+  # Load existing baseline
+  BASELINE_STATUS=$(jq -r '.status' .camel-kit/baseline-test-results.json)
+  # Status will be: "passed", "failed", "not_run", or "timeout"
+fi
+```
+
+**If baseline exists, use it:**
+- `status: "passed"` → Baseline tests all passed
+- `status: "failed"` → Baseline had pre-existing failures (NOT a regression)
+- `status: "not_run"` → Tests couldn't run during init (establish baseline now)
+- `status: "timeout"` → Tests timed out (re-run to establish baseline)
+
+**If baseline doesn't exist or status is "not_run", run tests now:**
+
+```bash
+# Run existing tests (those that existed before this pipeline)
+./mvnw test -B
+
+# Record results
+BASELINE_TEST_COUNT=$(grep -E "Tests run:" target/surefire-reports/*.txt | wc -l)
+BASELINE_FAILURES=$(grep -E "Failures:" target/surefire-reports/*.txt)
+BASELINE_ERRORS=$(grep -E "Errors:" target/surefire-reports/*.txt)
+```
+
+**Record baseline state (if not already recorded):**
+```json
+{
+  "baseline": {
+    "status": "passed" | "failed",
+    "testsRun": N,
+    "failures": N,
+    "errors": N,
+    "timestamp": "YYYY-MM-DDTHH:mm:ss"
+  }
+}
+```
+
+### Step 2: Identify Existing vs. New Files
+
+**Use baseline inventory files created during init:**
+
+1. **Read baseline route files:**
+   ```bash
+   # Routes that existed when project was initialized
+   cat .camel-kit/baseline-routes.txt
+   ```
+   These are the existing routes that MUST continue to work (regression check).
+
+2. **Read baseline test files:**
+   ```bash
+   # Tests that existed when project was initialized  
+   cat .camel-kit/baseline-tests.txt
+   ```
+   These tests establish the pre-existing test baseline.
+
+3. **Identify new route files:**
+   ```bash
+   # Current route files
+   find src/main/resources/camel -name "*.yaml" -o -name "*.xml"
+   
+   # Compare to baseline-routes.txt to find NEW files
+   # New files = current files NOT in baseline-routes.txt
+   ```
+
+4. **Affected files** (from design spec - modified existing files):
+   ```
+   Read design-spec.md "Affected Files" section
+   Files marked "modify" are existing files that were changed
+   ```
+
+**Fallback (if baseline files don't exist):**
+```bash
+# Files that existed before this pipeline started
+git diff --name-only $(git merge-base HEAD origin/main)..origin/main -- 'src/main/resources/camel/*.yaml'
+```
+
+### Step 3: Separate Validation Runs
+
+**For EXISTING files (baseline preservation check):**
+
+Run validation ONLY on existing routes that were NOT modified in this pipeline:
+
+```markdown
+### Existing Routes Validation (Baseline Preservation)
+
+Purpose: Verify existing routes still work after new additions
+
+Scope:
+- Routes: [list existing routes not in "Affected Files"]
+- Expected: Same validation results as baseline
+- Any NEW failures = REGRESSION
+
+Results:
+- Schema validation: [compare to baseline]
+- Endpoint verification: [compare to baseline]
+- Quality checks: [compare to baseline]
+
+Regression detected: YES/NO
+If YES, list:
+  - Route: existing-route-1.yaml
+  - Check: endpoint-validation
+  - Baseline: PASS
+  - Current: FAIL (regression details)
+```
+
+**For NEW/AFFECTED files (full validation):**
+
+Run complete validation on:
+- New routes added in this pipeline
+- Existing routes modified in "Affected Files" list
+
+```markdown
+### New Capabilities Validation
+
+Purpose: Verify new/modified routes meet quality standards
+
+Scope:
+- New routes: [list files created in this pipeline]
+- Modified routes: [list from "Affected Files"]
+
+Results:
+[Run full validation suite - schema, endpoints, quality, security, anti-patterns]
+```
+
+### Step 3b: Contract Files
+
+If `.camel-kit/baseline-contracts.txt` exists, compare each listed file to its state at init (`git diff` against the
+baseline commit or the working-tree history). A contract file that was removed, or changed without being listed under
+"Affected Files", is a REGRESSION. If the files cannot be compared, report that under **Unavailable Evidence**.
+
+### Step 4: Baseline Test Re-Run
+
+After all route validation, re-run the EXISTING tests only (tests from baseline-tests.txt):
+
+```bash
+# Run only baseline tests (those that existed before this pipeline)
+# Read test list from baseline inventory
+while IFS= read -r test_file; do
+  # Convert path to test class name (e.g., com/example/FooTest.java -> com.example.FooTest)
+  test_class=$(echo "$test_file" | sed 's/\.java$//' | tr '/' '.')
+  ./mvnw test -Dtest="$test_class" -B
+done < .camel-kit/baseline-tests.txt
+```
+
+**Fallback (if baseline-tests.txt doesn't exist):**
+```bash
+# Run all tests
+./mvnw test -Dtest='*Test' -B
+```
+
+**Compare results:**
+```markdown
+## Baseline Test Results
+
+| Metric | Baseline | Current | Status |
+|--------|----------|---------|--------|
+| Tests Run | N | N | ✓ Same / ⚠ Changed |
+| Failures | N | N | ✓ Same / ❌ Regression |
+| Errors | N | N | ✓ Same / ❌ Regression |
+
+### Regression Analysis
+
+If current failures > baseline failures:
+  
+  New failures detected:
+  - TestName: testExistingRoute()
+    Baseline: PASS
+    Current: FAIL
+    Reason: [error message]
+  
+  VERDICT: REGRESSION - existing functionality broken by new additions
+
+If current failures == baseline failures:
+  
+  VERDICT: BASELINE PRESERVED - no regressions introduced
+```
+
+### Step 5: Report Structure for Existing Projects
+
+The validation report for existing projects MUST have this structure:
+
+````markdown
+# Validation Report (Existing Project Enhancement)
+
+**Project Type:** Existing Camel {detectedCamelVersion} Application
+**Validation Scope:** Baseline preservation + new capabilities
+
+## Baseline Validation Summary
+
+**Existing Routes (unchanged):** N routes
+**Existing Routes (modified):** N routes
+**New Routes:** N routes
+
+**Baseline Test Results:**
+- Baseline: N tests, N failures, N errors
+- Current: N tests, N failures, N errors
+- Regressions: YES/NO
+
+---
+
+## Validation Results
+
+### 1. Baseline Preservation
+
+[Results for existing unmodified routes - should match baseline]
+
+### 2. Modified Routes Validation
+
+[Results for routes in "Affected Files" - full validation]
+
+### 3. New Routes Validation
+
+[Results for newly created routes - full validation]
+
+---
+
+## Overall Verdict
+
+**Baseline Preserved:** YES/NO  
+**New Capabilities Valid:** YES/NO  
+**Ready for Production:** YES/NO
+
+### Blocking Issues
+[List any regressions or critical new-route failures]
+
+### Warnings
+[List non-blocking quality issues]
+
+### Unavailable Evidence
+[List every check that could not run, with the reason. Write "None" only if every check ran.]
+````
+
+### Unavailable Evidence
+
+A check that cannot run is **not** a pass. Never infer a result for it and never omit it from the report. Report each
+one under **Unavailable Evidence** with the check name, the reason, and what would be needed to run it.
+
+Typical cases for existing projects:
+
+- Baseline `status` is `not_run` or `timeout` and the re-run in Step 1 also cannot complete
+- `baseline-routes.txt` or `baseline-tests.txt` is missing, so the git-based fallback was used
+- The build tool, a required service or credentials are unavailable, so tests or endpoint checks cannot execute
+
+If any check that covers existing behavior is unavailable, set **Baseline Preserved** to `UNVERIFIED` instead of `YES`
+and **Ready for Production** to `NO`. If only new-capability checks are unavailable, set **New Capabilities Valid** to
+`UNVERIFIED`.
+
+### Red Flags for Existing Projects
+
+If validation shows any of these, flag as REGRESSION:
+
+- ❌ Existing tests that passed in baseline now fail
+- ❌ Existing routes that validated successfully now have errors
+- ❌ Build succeeds in baseline but fails now
+- ❌ Existing endpoints return different responses
+- ❌ Existing route IDs changed without approval
+
+---
+
 ## Pipeline Resolution
 
 Before running validation, resolve the active pipeline using `shared/pipeline-infrastructure.md`:

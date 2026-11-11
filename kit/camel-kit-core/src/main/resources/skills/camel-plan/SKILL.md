@@ -146,6 +146,180 @@ otherwise unauthorized action is genuinely required, return `NEEDS_USER_CONFIRMA
 
 ---
 
+## Existing Project Scope Protection
+
+**Check `.camel-kit/config.properties` for `project.type=existing`.**
+
+If this is an existing project, enforce these additional constraints during planning:
+
+### Step 1: Load Discovered Constraints
+
+**Read discovered project metadata from `.camel-kit/config.properties`:**
+
+```properties
+project.type=existing              # Confirms existing project mode
+project.camelVersion=4.8.0         # LOCKED - cannot upgrade
+project.detectedCamelVersion=4.8.0 # Original detected version
+project.runtime=spring-boot        # LOCKED - cannot change
+project.platformBomVersion=3.3.4   # LOCKED - cannot upgrade  
+project.primaryDsl=yaml            # LOCKED - all new routes must use this DSL
+project.dslTypes=YAML              # All detected DSL types
+project.routeCount=3               # Number of existing routes at init
+project.hasTests=true              # Baseline tests exist
+project.baselineTestStatus=not_run # not_run | passed | failed | timeout (see camel-validate)
+project.modules=svc/a,svc/b        # Only present for multi-module projects
+project.moduleCount=2              # Number of entries in project.modules
+project.beansCount=2               # Annotated classes plus YAML `beans:` entries; @Bean methods are not counted
+project.configFilesCount=1         # application*.properties / application*.yml files read by the graph
+project.contractFilesCount=1       # Interface contract files (OpenAPI, WSDL, XSD, proto, Avro) listed in .camel-kit/baseline-contracts.txt
+project.discoveryGaps=...          # Only present when discovery could not cover something - inspect source, ask the user
+project.unsupportedCombination=... # Only present for an unsupported runtime/DSL - STOP, do not plan additions
+project.unsupportedVersion=true    # Only present for Camel 3.x - STOP, do not plan additions
+```
+
+**`project.unsupportedVersion=true` is a hard stop.** Tell the user the detected version is not supported and ask
+them to upgrade to Camel 4.x before planning. Do not plan against a guessed or newer version.
+
+**`project.unsupportedCombination` is a hard stop.** Report its value to the user. Do not plan additions, convert the
+DSL or switch the runtime to make the project fit.
+
+**`project.discoveryGaps` lists what discovery could not determine** (for example no routes found in the graph, or
+routes in more than one DSL). Inspect the source for those items and ask the user about anything still ambiguous before
+planning around it. A missing `project.routeCount`, `project.primaryDsl` or `project.modules` means discovery found
+nothing, not that nothing exists.
+
+**Contract files are PROTECTED.** `.camel-kit/baseline-contracts.txt` lists the interface contract files that existed at
+init. The plan must list every one it changes under "Affected Files" with the reason, and must keep each contract
+backward compatible. Init only inventories these files; it does not analyse their content, so read the relevant ones
+before designing against them.
+
+**These values are CONSTRAINTS - plans must NOT violate them:**
+- Cannot upgrade Camel version beyond `project.camelVersion`
+- Cannot change runtime (e.g., cannot switch from Spring Boot to Quarkus)
+- Must generate new routes in `project.primaryDsl` format only
+- Cannot upgrade platform BOM (Spring Boot, Quarkus, etc.)
+
+**If baseline inventory files exist, read them:**
+```bash
+# Routes that existed at init
+cat .camel-kit/baseline-routes.txt
+
+# Tests that existed at init
+cat .camel-kit/baseline-tests.txt
+```
+
+These files define what MUST continue to work (regression prevention).
+
+### Step 2: Scope Boundaries (From Design Spec)
+
+The approved design spec for existing projects contains:
+- **Requested Additions** — what new capabilities to add
+- **Affected Files** — which files will be modified
+- **Unchanged Behavior Constraints** — routes/features that MUST remain unchanged
+- **Integration Points** — how new capabilities connect to existing routes
+
+**Planning MUST respect these boundaries.**
+
+### Protected Elements
+
+**Files:**
+- Only create/modify files listed in design spec's "Affected Files" section
+- Do NOT modify files in "Files that will NOT be modified (protected)" list
+- Do NOT modify any file not explicitly mentioned in the design spec
+
+**Dependencies:**
+- Do NOT upgrade `project.detectedCamelVersion` from config.properties
+- Do NOT upgrade platform BOM or runtime versions
+- Only add new dependencies if listed in design spec
+- Verify new dependencies are compatible with detected Camel version
+
+**DSL:**
+- Read `project.primaryDsl` from config.properties (yaml/xml/java/groovy)
+- Generate all new routes in the SAME DSL as existing routes
+- Do NOT convert existing routes to a different DSL
+- Do NOT mix DSLs within the project
+
+**Existing Routes:**
+- Do NOT modify routes not listed in "Affected Files"
+- Do NOT change existing route IDs unless required by design spec
+- Do NOT change existing endpoint URLs/contracts
+- Do NOT change existing error handling behavior
+
+### Validation Tasks
+
+For existing projects, add these validation tasks to the plan:
+
+**After implementation tasks:**
+```markdown
+### Task N: Validate Scope Compliance
+
+**Goal:** Verify changes are limited to approved scope
+
+**Steps:**
+1. Read design spec's "Affected Files" section
+2. Run: `git diff --name-only` to list changed files
+3. Verify ONLY approved files were modified
+4. Verify no files in "protected" list were touched
+5. Verify no version upgrades occurred in pom.xml
+
+**Expected:** Only approved files changed, versions unchanged
+
+**Review:**
+- Spec compliance: all changes within approved scope
+- Quality: changes follow project conventions
+```
+
+**Before final validation:**
+```markdown
+### Task M: Verify Existing Functionality
+
+**Goal:** Ensure existing routes still work after additions
+
+**Steps:**
+1. Run existing tests: `./mvnw test -Dtest=ExistingTest*`
+2. Verify all existing tests pass
+3. Check logs for errors in existing routes
+4. Verify no regressions in existing behavior
+
+**Expected:** All pre-existing tests pass (baseline preserved)
+
+**Review:**
+- Spec compliance: no regressions introduced
+- Quality: integration is clean
+```
+
+### Task Decomposition for Existing Projects
+
+When breaking down tasks:
+
+1. **Separation of concerns:**
+   - Task A: Implement new capability
+   - Task B: Integrate with existing route (uses direct:, seda:, shared bean)
+   - Task C: Verify existing behavior unchanged
+
+2. **File modification order:**
+   - Create new files first (new routes, new beans)
+   - Modify existing files last (integration points)
+   - This minimizes risk to existing functionality
+
+3. **Testing strategy:**
+   - Test new capability in isolation first
+   - Test integration with existing routes second
+   - Re-run existing tests to verify no regressions
+
+### Red Flags for Existing Projects
+
+If the plan contains any of these, STOP and revise:
+
+- ❌ "Upgrade Camel to latest version"
+- ❌ "Convert XML routes to YAML for consistency"
+- ❌ "Refactor existing error handling to use new pattern"
+- ❌ "Update all routes to use new component"
+- ❌ "Modify routes not in the design spec's affected files list"
+- ❌ Tasks that touch files in the "protected" list
+
+---
+
 ## Plan Content Rules
 
 ### What Goes IN the Plan

@@ -64,12 +64,17 @@ public class YamlRouteParser implements GraphParser {
             if (root.isArray()) {
                 int routeIndex = 0;
                 for (JsonNode element : root) {
+                    if (element.has("beans")) {
+                        parseBeans(element.get("beans"), projectRoot, yamlFile, graph);
+                    }
                     if (element.has("route")) {
                         parseRoute(element.get("route"), projectRoot, yamlFile, graph, routeIndex++);
                     } else if (element.has("from")) {
                         parseRoute(element, projectRoot, yamlFile, graph, routeIndex++);
                     }
                 }
+            } else if (root.has("beans")) {
+                parseBeans(root.get("beans"), projectRoot, yamlFile, graph);
             } else if (root.has("route")) {
                 parseRoute(root.get("route"), projectRoot, yamlFile, graph, 0);
             } else if (root.has("from")) {
@@ -78,6 +83,33 @@ public class YamlRouteParser implements GraphParser {
         } catch (Exception e) {
             warnings.add("Could not parse YAML route file " + GraphParser.relativeFileName(projectRoot, yamlFile)
                          + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Records beans declared in a Camel YAML {@code beans:} block. They get their own {@code yaml-bean:} node id so
+     * they cannot overwrite the {@code class:} node the Java parser creates for the same type.
+     */
+    private void parseBeans(JsonNode beansNode, Path projectRoot, Path yamlFile, ProjectGraph graph) {
+        if (beansNode == null || !beansNode.isArray()) {
+            return;
+        }
+        for (JsonNode bean : beansNode) {
+            String name = bean.path("name").asText("");
+            if (name.isEmpty()) {
+                continue;
+            }
+            Map<String, String> props = new HashMap<>();
+            props.put("name", name);
+            props.put("beanName", name);
+            props.put("bean", "true");
+            props.put("source", "yaml");
+            props.put("file", projectRoot.relativize(yamlFile).toString());
+            String type = bean.path("type").asText("");
+            if (!type.isEmpty()) {
+                props.put("type", type);
+            }
+            graph.addNode(new GraphNode("yaml-bean:" + name, NodeType.CLASS, props));
         }
     }
 

@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -884,6 +885,8 @@ public class InitService {
             mvnw.toFile().setExecutable(true);
             // Send output to a file so the child can never block on a full pipe buffer
             output = Files.createTempFile("camel-kit-baseline-", ".log");
+            // Capture the timestamp before starting the test process so we can reject stale reports.
+            Instant testStartTime = Instant.now();
             Process testProcess = new ProcessBuilder()
                     .command("./mvnw", "test", "-B", "-q")
                     .directory(projectRoot.toFile())
@@ -901,13 +904,29 @@ public class InitService {
             }
 
             // Per-test outcomes and the revision they belong to: validation compares test identities, never totals.
-            var tests = BaselineTestResults.collect(projectRoot);
-            String status = testProcess.exitValue() == 0 ? "passed" : "failed";
-            String reason = testProcess.exitValue() == 0
+            // Only collect reports from this invocation; stale reports are rejected.
+            var collectionResult = BaselineTestResults.collect(projectRoot, testStartTime);
+            var tests = collectionResult.outcomes();
+            int exitCode = testProcess.exitValue();
+
+            // If no fresh reports were produced, the build likely failed before tests or tests were skipped.
+            // Exit 0 with no reports is not the same as "tests passed"; it means tests did not run.
+            if (tests.isEmpty() && exitCode == 0) {
+                writeBaselineStatus(baselineResultsFile, "not_run",
+                        "Tests did not run (no reports were produced despite successful Maven exit)", projectRoot);
+                config.setProperty("project.baselineTestStatus", "not_run");
+                return;
+            }
+
+            String status = exitCode == 0 ? "passed" : "failed";
+            String reason = exitCode == 0
                     ? "All tests passed"
                     : "Tests had failures (baseline state)";
             if (tests.isEmpty()) {
-                reason += "; no Surefire/Failsafe reports were found, so per-test outcomes are unavailable";
+                reason += "; no Surefire/Failsafe reports were produced, so per-test outcomes are unavailable";
+            } else if (!collectionResult.complete()) {
+                reason += "; " + collectionResult.failedReportCount() + " report(s) could not be parsed"
+                          + " (incomplete evidence, validation will report UNVERIFIED)";
             }
             writeBaselineFile(projectRoot, baselineResultsFile,
                     BaselineTestResults.toJson(status, reason, sourceRevision(projectRoot),

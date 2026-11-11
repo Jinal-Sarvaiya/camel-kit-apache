@@ -1355,6 +1355,19 @@ class InitServiceTest {
     @EnabledOnOs({OS.LINUX, OS.MAC})
     void recordBaselineRecordsPassedWhenTheProjectTestsPass() throws Exception {
         Path targetDir = projectWithFakeWrapper("baseline-pass", 0);
+        // The fake wrapper must write reports so they're created during the test invocation.
+        Files.writeString(targetDir.resolve("mvnw"), """
+                #!/bin/sh
+                touch mvnw-was-run
+                mkdir -p target/surefire-reports
+                cat > target/surefire-reports/TEST-com.example.PassTest.xml <<'XML'
+                <testsuite name="com.example.PassTest" tests="1">
+                  <testcase classname="com.example.PassTest" name="passesTest"/>
+                </testsuite>
+                XML
+                exit 0
+                """);
+        targetDir.resolve("mvnw").toFile().setExecutable(true);
 
         new InitService().initialize(recordingBaselineRequest(targetDir));
 
@@ -1417,10 +1430,12 @@ class InitServiceTest {
 
         var baseline = new com.fasterxml.jackson.databind.ObjectMapper()
                 .readTree(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json")));
-        assertEquals("passed", baseline.get("status").asText());
+        // Exit 0 with no fresh reports means tests did not run (build failed before tests, tests skipped, etc.)
+        // This is distinct from "tests passed" and must be recorded as "not_run" per Finding 1.
+        assertEquals("not_run", baseline.get("status").asText());
         assertEquals(0, baseline.get("testCount").asInt());
-        assertTrue(baseline.get("reason").asText().contains("per-test outcomes are unavailable"),
-                "an empty test list must be flagged so validation reports unavailable evidence");
+        assertTrue(baseline.get("reason").asText().contains("no reports were produced"),
+                "exit 0 without reports must explain that tests did not run");
     }
 
     @Test

@@ -131,8 +131,10 @@ public final class ProjectDiscovery {
     }
 
     private static boolean isCamelBom(String groupId, String artifactId) {
+        // Only Camel core BOMs (org.apache.camel group) represent Camel core versions.
+        // Camel Quarkus extension BOMs (org.apache.camel.quarkus group) have independent versioning.
         return artifactId != null && artifactId.startsWith("camel-") && artifactId.endsWith("-bom")
-                && groupId != null && groupId.startsWith("org.apache.camel");
+                && "org.apache.camel".equals(groupId);
     }
 
     private static void addVersion(Map<String, Set<String>> versions, String version, String source) {

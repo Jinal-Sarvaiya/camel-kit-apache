@@ -92,8 +92,61 @@ class PomParserTest {
         var bom = local.getNode("maven-managed:org.apache.camel.springboot:camel-spring-boot-bom");
         assertNotNull(bom);
         assertEquals("managed", bom.properties().get("kind"));
-        assertEquals("${camel.version}", bom.properties().get("version"));
+        assertEquals("4.8.0", bom.properties().get("version"),
+                "version should be resolved against declaring POM's properties");
         assertEquals("pom", bom.properties().get("type"));
         assertEquals("import", bom.properties().get("scope"));
+    }
+
+    @Test
+    void resolvesVersionsAgainstDeclaringModulePropertiesToPreventCrossModuleCollision(@TempDir Path root)
+            throws Exception {
+        // Module a imports Camel Spring Boot BOM ${bom.version} with bom.version=4.8.0
+        Files.createDirectories(root.resolve("module-a"));
+        Files.writeString(root.resolve("module-a/pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>module-a</artifactId>
+                  <version>1.0.0</version>
+                  <properties>
+                    <bom.version>4.8.0</bom.version>
+                  </properties>
+                  <dependencyManagement>
+                    <dependencies>
+                      <dependency>
+                        <groupId>org.apache.camel.springboot</groupId>
+                        <artifactId>camel-spring-boot-bom</artifactId>
+                        <version>${bom.version}</version>
+                        <type>pom</type>
+                        <scope>import</scope>
+                      </dependency>
+                    </dependencies>
+                  </dependencyManagement>
+                </project>
+                """);
+
+        // Module b has bom.version=1.0.0 (unrelated, no Camel)
+        Files.createDirectories(root.resolve("module-b"));
+        Files.writeString(root.resolve("module-b/pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>module-b</artifactId>
+                  <version>1.0.0</version>
+                  <properties>
+                    <bom.version>1.0.0</bom.version>
+                  </properties>
+                </project>
+                """);
+
+        ProjectGraph reactor = new ProjectGraph();
+        new PomParser().parse(root, reactor);
+
+        var bom = reactor.getNode("maven-managed:org.apache.camel.springboot:camel-spring-boot-bom");
+        assertNotNull(bom, "Camel Spring Boot BOM should be recorded");
+        assertEquals("4.8.0", bom.properties().get("version"),
+                "BOM version should be resolved from module-a's bom.version property, not module-b's");
+        assertEquals("module-a/pom.xml", bom.properties().get("file"));
     }
 }

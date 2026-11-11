@@ -505,4 +505,104 @@ class ProjectDiscoveryTest {
         assertTrue(result.hasTests());
         assertFalse(result.isUnsupportedVersion());
     }
+
+    private static GraphNode managed(String artifactId, String version) {
+        return new GraphNode(
+                "maven-managed:org.example:" + artifactId, NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "managed", "groupId", artifactId.startsWith("camel-")
+                        ? "org.apache.camel.springboot"
+                        : "org.springframework.boot", "artifactId", artifactId, "version", version, "type", "pom",
+                        "scope", "import"));
+    }
+
+    private static GraphNode springBootStarter(String file) {
+        return new GraphNode(
+                "maven:org.apache.camel.springboot:camel-spring-boot-starter", NodeType.MAVEN_ARTIFACT,
+                Map.of("groupId", "org.apache.camel.springboot", "artifactId", "camel-spring-boot-starter",
+                        "version", "managed", "file", file));
+    }
+
+    @Test
+    void resolvesPlatformBomAndSpringBootVersionsFromImportedBoms() {
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(
+                new GraphNode("maven-property:camel.version", NodeType.CONFIG_PROPERTY, Map.of("value", "4.8.0")));
+        graph.addNode(new GraphNode(
+                "maven-property:spring-boot.version", NodeType.CONFIG_PROPERTY,
+                Map.of("value", "3.3.5")));
+        graph.addNode(springBootStarter("pom.xml"));
+        graph.addNode(managed("camel-spring-boot-bom", "${camel.version}"));
+        graph.addNode(managed("spring-boot-dependencies", "${spring-boot.version}"));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertEquals("spring-boot", result.runtime());
+        assertEquals("4.8.0", result.camelVersion(), "the Camel BOM version is Camel version evidence");
+        assertEquals("4.8.0", result.platformBomVersion());
+        assertEquals("3.3.5", result.springBootVersion(), "the framework version is kept apart from the Camel BOM");
+        assertTrue(result.coverageGaps().stream()
+                .noneMatch(g -> g.contains("BOM") || g.contains("Spring Boot framework")));
+    }
+
+    @Test
+    void springBootVersionFallsBackToTheStarterParent() {
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(springBootStarter("pom.xml"));
+        graph.addNode(new GraphNode(
+                "maven-parent:org.springframework.boot:spring-boot-starter-parent",
+                NodeType.CONFIG_PROPERTY, Map.of("kind", "parent", "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-starter-parent", "version", "3.2.1")));
+
+        assertEquals("3.2.1", ProjectDiscovery.discover(graph).springBootVersion());
+    }
+
+    @Test
+    void anUnresolvablePlatformBomIsAGapAndNeverAGuess() {
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(springBootStarter("pom.xml"));
+        graph.addNode(managed("camel-spring-boot-bom", "${no.such.property}"));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertNull(result.platformBomVersion());
+        assertNull(result.springBootVersion());
+        assertNull(result.camelVersion(), "an unresolved placeholder is not version evidence");
+        assertTrue(result.coverageGaps().stream()
+                .anyMatch(g -> g.contains("platform BOM version could not be established")));
+        assertTrue(result.coverageGaps().stream().anyMatch(g -> g.contains("Spring Boot framework version")));
+    }
+
+    @Test
+    void conflictingRuntimesAreNotLockedAndAreReportedWithTheirEvidence() {
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(springBootStarter("pom.xml"));
+        graph.addNode(new GraphNode(
+                "maven:org.apache.camel.quarkus:camel-quarkus-core", NodeType.MAVEN_ARTIFACT,
+                Map.of("groupId", "org.apache.camel.quarkus", "artifactId", "camel-quarkus-core", "version", "3.15.0",
+                        "file", "pom.xml")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertNull(result.runtime(), "no runtime may be picked from conflicting evidence");
+        assertTrue(result.hasConflict());
+        assertTrue(result.coverageGaps().stream().anyMatch(g -> g.contains("Conflicting runtimes")
+                && g.contains("camel-spring-boot-starter") && g.contains("camel-quarkus-core")));
+    }
+
+    @Test
+    void conflictingCamelVersionsAreNotLockedAndAreReportedWithTheirSources() {
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(
+                new GraphNode("maven-property:camel.version", NodeType.CONFIG_PROPERTY, Map.of("value", "4.8.0")));
+        graph.addNode(new GraphNode(
+                "maven:org.apache.camel:camel-core", NodeType.MAVEN_ARTIFACT,
+                Map.of("groupId", "org.apache.camel", "artifactId", "camel-core", "version", "4.10.0")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertNull(result.camelVersion(), "no version may be picked from conflicting evidence");
+        assertTrue(result.hasConflict());
+        assertTrue(result.coverageGaps().stream().anyMatch(g -> g.contains("Conflicting Camel versions")
+                && g.contains("4.8.0") && g.contains("4.10.0")));
+    }
 }

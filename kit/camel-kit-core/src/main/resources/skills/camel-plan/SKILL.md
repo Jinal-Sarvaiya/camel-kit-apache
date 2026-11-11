@@ -161,12 +161,13 @@ project.type=existing              # Confirms existing project mode
 project.camelVersion=4.8.0         # LOCKED - cannot upgrade
 project.detectedCamelVersion=4.8.0 # Original detected version
 project.runtime=spring-boot        # LOCKED - cannot change
-project.platformBomVersion=3.3.4   # LOCKED - cannot upgrade  
+project.platformBomVersion=3.3.4   # LOCKED - cannot upgrade
+project.springBootVersion=3.3.4    # Spring Boot framework version read from the pom - LOCKED, never taken from the version tables
 project.primaryDsl=yaml            # LOCKED - all new routes must use this DSL
 project.dslTypes=YAML              # All detected DSL types
 project.routeCount=3               # Number of existing routes at init
 project.hasTests=true              # Baseline tests exist
-project.baselineTestStatus=not_run # not_run | passed | failed | timeout (see camel-validate)
+project.baselineTestStatus=not_run # not_run | passed | failed | timeout; per-test outcomes are in .camel-kit/baseline-test-results.json (see camel-validate)
 project.modules=svc/a,svc/b        # Only present for multi-module projects
 project.moduleCount=2              # Number of entries in project.modules
 project.beansCount=2               # Annotated classes plus YAML `beans:` entries; @Bean methods are not counted
@@ -182,6 +183,16 @@ them to upgrade to Camel 4.x before planning. Do not plan against a guessed or n
 
 **`project.unsupportedCombination` is a hard stop.** Report its value to the user. Do not plan additions, convert the
 DSL or switch the runtime to make the project fit.
+
+**A missing `project.runtime` or `project.camelVersion` is a hard stop.** It means discovery found conflicting
+evidence (two runtimes, or two Camel versions) or could not read the project. The matching `project.discoveryGaps` entry
+names the evidence. Report it and ask the user to resolve it; do not pick one, and do not fill the value in from the
+shipped version tables.
+
+**The test baseline must exist before execution.** Add a first task to the plan that confirms
+`.camel-kit/baseline-test-results.json` is usable (`status` `passed` or `failed`, non-empty `tests`, `dirty` false,
+`revision` equal to the current HEAD) and, if not, that `camel-execute` captures it before any edit (see its Step 0.6).
+If it cannot be captured, the plan must say that baseline preservation will be UNVERIFIED.
 
 **`project.discoveryGaps` lists what discovery could not determine** (for example no routes found in the graph, or
 routes in more than one DSL). Inspect the source for those items and ask the user about anything still ambiguous before

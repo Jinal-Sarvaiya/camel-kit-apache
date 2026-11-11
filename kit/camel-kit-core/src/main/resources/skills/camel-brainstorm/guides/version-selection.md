@@ -7,51 +7,49 @@
 
 ---
 
-## Special Case: Existing Projects
+## Existing Projects (separate path)
 
-**Check `.camel-kit/config.properties` FIRST:**
+**Check `.camel-kit/config.properties` FIRST.** If `project.type=existing`, follow ONLY this section and then stop.
+Steps 1-4 below are for greenfield projects; an existing project never goes through them, in particular never through
+the Step 2 version tables or the Step 3 mapping rules. Those tables describe what this distribution generates, not what
+the project uses.
+
+The project's own declarations are the constraint. Init recorded them from the pom; they are read, never chosen:
+
+| Key | Meaning |
+|-----|---------|
+| `project.runtime` | Runtime found in the pom (`main`, `spring-boot`, `quarkus`) |
+| `project.camelVersion` / `project.detectedCamelVersion` | Camel version the project declares |
+| `project.platformBomVersion` / `project.detectedPlatformBomVersion` | Imported platform BOM version, if one is declared |
+| `project.springBootVersion` | Spring Boot framework version, if declared (Spring Boot only) |
 
 ```
 if project.type == "existing":
-    runtime = project.runtime  # already detected
-    camelVersion = project.detectedCamelVersion  # already detected
-    platformBomVersion = project.detectedPlatformBomVersion  # already detected
-    
-    VALIDATE:
-    - Is camelVersion supported? (check against supported versions below)
-    - Is it Camel 4.x? (Camel 3.x is unsupported)
-    
-    if camelVersion starts with "3.":
-        STOP: "This project uses Camel {camelVersion}, which is not supported.
-               Camel Kit requires Camel 4.x. Run /camel-migrate to upgrade first."
-    
-    if camelVersion is not in supported list:
-        WARN: "Detected Camel {camelVersion} on {runtime}.
-               This version is not in the recommended list, but Camel Kit will use it.
-               Recommended: {latest version for runtime}
-               
-               Do you want to upgrade to the recommended version? (y/N)"
-        
-        if user says no:
-            USE DETECTED VERSION (do not override)
-    
-    BIND to detected values:
-    - project.runtime = {detected runtime}
-    - project.camelVersion = {detected version}
-    - project.platformBomVersion = {detected platform BOM}
-    
-    SKIP Steps 1-4 entirely — existing projects use their detected versions AS-IS.
-    The detected versions are already stored in config.properties by init.
-    DO NOT validate against mapping tables (Step 3) — existing projects may use
-    versions not in the shipped tables, and that's acceptable.
+    STOP and report, do not continue, when ANY of these hold:
+      - project.runtime or project.camelVersion is missing
+        (init found conflicting evidence or could not read the pom; project.discoveryGaps says which)
+      - project.unsupportedVersion is set   (Camel 3.x: "run the migration workflow first")
+      - project.unsupportedCombination is set
+
+    otherwise:
+      bind to the recorded values AS-IS:
+        runtime, camelVersion, platformBomVersion, springBootVersion  (only the ones that are present)
+      write nothing to config.properties: init already recorded them
+      DO NOT ask the user to choose a runtime or a version
+      DO NOT replace a recorded value with a value from the tables below
+      DO NOT infer a missing value (for example a Spring Boot version) from the tables
 ```
 
-**For existing projects:**
-- DO NOT ask the user to choose a runtime (it's already detected)
-- DO NOT ask the user to choose a version (it's already in use)
-- DO validate that the detected version is supported
-- DO flag unsupported versions with an actionable error
-- DO offer to upgrade, but respect "no" as keeping the detected version
+**Checking the detected version against the catalog (read-only):** after binding, you may check whether the recorded
+Camel version exists in the component catalog the tooling can reach, so later component lookups are not made against a
+version the catalog does not know. If it is available, say nothing. If it is not, tell the user: "Camel {version} is not
+in the catalog this distribution can reach, so component lookups may be incomplete. The project stays on {version}."
+The check never selects, suggests as a requirement, or writes a different version. Being outside the recommended
+versions is not an error and never blocks work.
+
+**Upgrades are out of scope for this skill.** If the user volunteers that they want a different version, record that as
+a separate request and keep the project on its recorded version for this pipeline. Offer `camel-migrate` only when the
+version is Camel 3.x.
 
 ---
 
@@ -75,7 +73,7 @@ Record: `project.runtime` (`main`, `spring-boot`, or `quarkus`)
 
 ## Step 2: Select Camel Version (Greenfield Projects Only)
 
-**Note:** For existing projects, this step is SKIPPED — versions are bound to detected values (see "Special Case: Existing Projects" above).
+**Note:** Existing projects never reach this step — they use the recorded values (see "Existing Projects" above).
 
 First inspect the analyzed requirements and recorded answers. If they conclusively select a version supported by the
 chosen runtime, preserve that decision and its evidence instead of asking again. Otherwise present the supported

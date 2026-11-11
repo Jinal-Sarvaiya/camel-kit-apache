@@ -98,6 +98,92 @@ class CamelKitCommandParityTest {
         assertTrue(pluginCitrusMcp.contains("\"citrus\""), "Plugin --with-citrus-mcp must include citrus");
     }
 
+    @Test
+    void pluginForwardsTheExistingProjectOptions() throws Exception {
+        CamelKitMain standaloneMain = new CamelKitMain();
+        standaloneMain.disableTui();
+        CommandLine standalone = CamelKitMain.commandLine(standaloneMain);
+        CamelJBangMain main = new CamelJBangMain();
+        CommandLine plugin = new CommandLine(main);
+        new CamelKitPlugin().customize(plugin, main);
+
+        // --dry-run: nothing is written
+        for (String[] entry : new String[][]{{"standalone-dry"}, {"plugin-dry"}}) {
+            Path dir = existingProject(entry[0], "#!/bin/sh\nexit 0\n");
+            int exit = entry[0].startsWith("plugin")
+                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                            "--dry-run")
+                    : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                            "--dry-run");
+            assertEquals(0, exit, entry[0]);
+            assertFalse(Files.exists(dir.resolve(".camel-kit")), entry[0] + ": --dry-run must not write anything");
+        }
+
+        // --record-baseline: the project's own wrapper is run and the result is recorded
+        for (String name : new String[]{"standalone-baseline", "plugin-baseline"}) {
+            Path dir = existingProject(name, "#!/bin/sh\ntouch mvnw-was-run\nexit 0\n");
+            int exit = name.startsWith("plugin")
+                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                            "--record-baseline")
+                    : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                            "--record-baseline");
+            assertEquals(0, exit, name);
+            assertTrue(Files.exists(dir.resolve("mvnw-was-run")), name + ": --record-baseline must run the wrapper");
+            assertEquals("passed", loadConfig(dir).getProperty("project.baselineTestStatus"), name);
+        }
+
+        // without --replace-wrapper the project's wrapper is kept; with it, it is replaced
+        for (String name : new String[]{"standalone-keep", "plugin-keep"}) {
+            Path dir = existingProject(name, "#!/bin/sh\n# ORIGINAL\n");
+            int exit = name.startsWith("plugin")
+                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force")
+                    : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force");
+            assertEquals(0, exit, name);
+            assertTrue(Files.readString(dir.resolve("mvnw")).contains("ORIGINAL"), name);
+        }
+        for (String name : new String[]{"standalone-replace", "plugin-replace"}) {
+            Path dir = existingProject(name, "#!/bin/sh\n# ORIGINAL\n");
+            int exit = name.startsWith("plugin")
+                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                            "--replace-wrapper")
+                    : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                            "--replace-wrapper");
+            assertEquals(0, exit, name);
+            assertFalse(Files.readString(dir.resolve("mvnw")).contains("ORIGINAL"),
+                    name + ": --replace-wrapper must replace the project's wrapper");
+        }
+    }
+
+    private Path existingProject(String name, String wrapperScript) throws Exception {
+        Path dir = Files.createDirectories(tempDir.resolve(name));
+        Files.writeString(dir.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>existing</artifactId>
+                  <version>1.0.0</version>
+                  <properties><camel.version>4.8.0</camel.version></properties>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.camel</groupId>
+                      <artifactId>camel-main</artifactId>
+                      <version>${camel.version}</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """);
+        Files.createDirectories(dir.resolve("src/main/resources/camel"));
+        Files.writeString(dir.resolve("src/main/resources/camel/r.yaml"),
+                "- route:\n    id: r\n    from:\n      uri: timer:t\n      steps:\n        - log: hi\n");
+        Files.createDirectories(dir.resolve("src/test/java/com/example"));
+        Files.writeString(dir.resolve("src/test/java/com/example/RouteTest.java"),
+                "package com.example;\nclass RouteTest {\n}\n");
+        Path wrapper = dir.resolve("mvnw");
+        Files.writeString(wrapper, wrapperScript);
+        wrapper.toFile().setExecutable(true);
+        return dir;
+    }
+
     private Properties loadConfig(Path workspace) throws Exception {
         Properties config = new Properties();
         try (var input = Files.newInputStream(workspace.resolve(".camel-kit/config.properties"))) {

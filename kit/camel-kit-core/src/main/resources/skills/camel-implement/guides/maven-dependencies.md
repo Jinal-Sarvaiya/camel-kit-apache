@@ -6,6 +6,16 @@ This guide updates `pom.xml` with Camel dependencies.
 
 ---
 
+## Existing Projects
+
+If `.camel-kit/config.properties` has `project.type=existing`, skip Step 1 and do not load `pom-spring-boot.md` or
+`pom-quarkus.md` for POM generation: the project's own `pom.xml` and BOMs are authoritative and locked. Only run Step 2,
+as an in-place edit that adds the dependencies the design spec lists, following the "Existing Projects: Never Replace
+the POM" rule in those guides. Read versions from the project's pom and `.camel-kit/config.properties`; they were
+recorded from the pom by init.
+
+---
+
 ## Step 1: Verify BOM Configuration
 
 Before adding dependencies, verify that `pom.xml` has the correct BOM in `<dependencyManagement>`. The BOM version is **NOT** the same as `CAMEL_VERSION` — each runtime has its own BOM with a different version.

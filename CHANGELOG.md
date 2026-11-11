@@ -60,6 +60,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   runtime or no YAML routes), `camel-plan` stops on the latter, and `camel-validate` reports checks that could not run
   under Unavailable Evidence instead of counting them as passes. Init also inventories interface contract files in
   `.camel-kit/baseline-contracts.txt` (`project.contractFilesCount`); plan, execute and validate protect them.
+  Review follow-ups: existing projects record only what the pom declares (Camel version from `camel.version`, Camel
+  dependencies or an imported Camel BOM; the platform BOM from `camel-spring-boot-bom`/`quarkus-bom`;
+  `project.springBootVersion` from `spring-boot-dependencies` or the starter parent) and never seed or select a version
+  from the distribution tables. Conflicting runtimes or Camel versions leave the value unlocked and become a
+  `project.discoveryGaps` entry that stops plan and execute; a pom that cannot be read does the same. The brainstorm
+  version guide has a separate existing-project path that never reaches the greenfield tables, and `camel-implement`
+  edits an existing `pom.xml` in place instead of copying a template over it. All baseline files (`baseline-*.txt`,
+  `baseline-test-results.json`) are written through confined atomic writes and are part of the symlink/hard-link
+  preflight. `.camel-kit/baseline-test-results.json` stores per-test outcomes (`class#method`), the Git revision and a
+  dirty flag; `camel-execute` captures it before the first edit when `--record-baseline` was not used, and
+  `camel-validate` compares by test identity and reports `UNVERIFIED` when no pre-edit baseline exists instead of
+  re-baselining after the changes. Shipped skill, guide and shared files are refreshed on reinit; user-added files are
+  left alone. Multi-document `application.yml` keeps the default document under `config:<key>` and profile-specific
+  documents under `config:<key>:profile=<name>`. The jbang plugin forwards `--dry-run`, `--replace-wrapper` and
+  `--record-baseline`, with a parity test.
 - **Google Antigravity native Ship (#95)** — eligible sessions relay controller-issued stages through a dedicated
   `camel-ship-worker` agent with `commandExecutionPolicy: "off"` and read-only tools.
   `--backend antigravity-native` reuses the native task/result, recovery, oversight and deterministic publication

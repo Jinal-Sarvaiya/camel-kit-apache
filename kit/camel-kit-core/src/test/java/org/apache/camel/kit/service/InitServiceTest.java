@@ -1273,6 +1273,71 @@ class InitServiceTest {
     }
 
     @Test
+    void existingProjectWithMalformedPomSeedsNoVersionsAndRecordsADiscoveryGap() throws Exception {
+        Path targetDir = tempDir.resolve("broken-pom-gap");
+        Files.createDirectories(targetDir.resolve("src/main/resources/camel"));
+        Files.writeString(targetDir.resolve("pom.xml"),
+                "<project><dependencies><dependency><groupId>org.apache.camel</groupId>");
+        Files.writeString(targetDir.resolve("src/main/resources/camel/r.yaml"),
+                "- route:\n    id: r\n    from:\n      uri: timer:t\n      steps:\n        - log: hi\n");
+
+        new InitService().initialize(
+                requestForExistingProject(targetDir, "claude", InitProgress.noop(), new RecordingReporter()));
+
+        Properties config = loadConfig(targetDir);
+        assertEquals("existing", config.getProperty("project.type"));
+        assertNull(config.getProperty("project.camelVersion"), "no version may be seeded from the distribution");
+        assertNull(config.getProperty("project.runtime"));
+        assertNull(config.getProperty("project.platformBomVersion"));
+        assertTrue(config.getProperty("project.discoveryGaps", "").contains("Project discovery failed"),
+                "later stages must be told discovery produced nothing");
+    }
+
+    @Test
+    void existingProjectWithConflictingRuntimesAndVersionsLocksNeitherAndReportsTheGaps() throws Exception {
+        Path targetDir = tempDir.resolve("conflicting");
+        Files.createDirectories(targetDir.resolve("src/main/resources/camel"));
+        Files.writeString(targetDir.resolve("pom.xml"), """
+                <project xmlns="http://maven.apache.org/POM/4.0.0">
+                  <modelVersion>4.0.0</modelVersion>
+                  <groupId>com.example</groupId>
+                  <artifactId>conflicting</artifactId>
+                  <version>1.0.0</version>
+                  <properties><camel.version>4.8.0</camel.version></properties>
+                  <dependencies>
+                    <dependency>
+                      <groupId>org.apache.camel.quarkus</groupId>
+                      <artifactId>camel-quarkus-core</artifactId>
+                      <version>3.15.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.apache.camel.springboot</groupId>
+                      <artifactId>camel-spring-boot-starter</artifactId>
+                      <version>4.8.0</version>
+                    </dependency>
+                    <dependency>
+                      <groupId>org.apache.camel</groupId>
+                      <artifactId>camel-core</artifactId>
+                      <version>4.10.0</version>
+                    </dependency>
+                  </dependencies>
+                </project>
+                """);
+        Files.writeString(targetDir.resolve("src/main/resources/camel/r.yaml"),
+                "- route:\n    id: r\n    from:\n      uri: timer:t\n      steps:\n        - log: hi\n");
+
+        new InitService().initialize(
+                requestForExistingProject(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        Properties config = loadConfig(targetDir);
+        assertNull(config.getProperty("project.runtime"), "conflicting runtimes must not be locked");
+        assertNull(config.getProperty("project.camelVersion"), "conflicting versions must not be locked");
+        String gaps = config.getProperty("project.discoveryGaps", "");
+        assertTrue(gaps.contains("Conflicting runtimes"), gaps);
+        assertTrue(gaps.contains("Conflicting Camel versions"), gaps);
+    }
+
+    @Test
     void baselineTestsAreNotRunUnlessRequested() throws Exception {
         Path targetDir = projectWithFakeWrapper("baseline-default", 0);
 
@@ -1283,7 +1348,7 @@ class InitServiceTest {
                 "init must not execute project build code unless --record-baseline is given");
         assertEquals("not_run", loadConfig(targetDir).getProperty("project.baselineTestStatus"));
         assertTrue(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json"))
-                .contains("\"status\": \"not_run\""));
+                .contains("\"status\" : \"not_run\""));
     }
 
     @Test
@@ -1296,7 +1361,7 @@ class InitServiceTest {
         assertTrue(Files.exists(targetDir.resolve("mvnw-was-run")), "the wrapper must have been invoked");
         assertEquals("passed", loadConfig(targetDir).getProperty("project.baselineTestStatus"));
         assertTrue(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json"))
-                .contains("\"status\": \"passed\""));
+                .contains("\"status\" : \"passed\""));
     }
 
     @Test
@@ -1308,7 +1373,54 @@ class InitServiceTest {
 
         assertEquals("failed", loadConfig(targetDir).getProperty("project.baselineTestStatus"));
         assertTrue(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json"))
-                .contains("\"status\": \"failed\""));
+                .contains("\"status\" : \"failed\""));
+    }
+
+    @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void recordBaselineStoresPerTestOutcomesAndTheSourceRevision() throws Exception {
+        Path targetDir = projectWithFakeWrapper("baseline-per-test", 1);
+        // The fake wrapper "runs" the tests by writing Surefire reports with one failing and one passing test.
+        Files.writeString(targetDir.resolve("mvnw"), """
+                #!/bin/sh
+                mkdir -p target/surefire-reports
+                cat > target/surefire-reports/TEST-com.example.OldTest.xml <<'XML'
+                <testsuite name="com.example.OldTest" tests="2">
+                  <testcase classname="com.example.OldTest" name="oldA"/>
+                  <testcase classname="com.example.OldTest" name="oldB"><failure message="was already red"/></testcase>
+                </testsuite>
+                XML
+                exit 1
+                """);
+        targetDir.resolve("mvnw").toFile().setExecutable(true);
+
+        new InitService().initialize(recordingBaselineRequest(targetDir));
+
+        var baseline = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json")));
+        assertEquals("failed", baseline.get("status").asText());
+        assertEquals("passed", baseline.at("/tests/com.example.OldTest#oldA/status").asText());
+        assertEquals("failed", baseline.at("/tests/com.example.OldTest#oldB/status").asText());
+        assertEquals("was already red", baseline.at("/tests/com.example.OldTest#oldB/reason").asText());
+        assertEquals("com.example.OldTest#oldB", baseline.get("nonPassing").get(0).asText(),
+                "a pre-existing failure must be identifiable by name");
+        assertTrue(baseline.has("revision") && !baseline.get("revision").asText().isEmpty());
+        assertTrue(baseline.has("dirty"));
+    }
+
+    @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void recordBaselineSaysWhenNoPerTestReportsExist() throws Exception {
+        Path targetDir = projectWithFakeWrapper("baseline-no-reports", 0);
+
+        new InitService().initialize(recordingBaselineRequest(targetDir));
+
+        var baseline = new com.fasterxml.jackson.databind.ObjectMapper()
+                .readTree(Files.readString(targetDir.resolve(".camel-kit/baseline-test-results.json")));
+        assertEquals("passed", baseline.get("status").asText());
+        assertEquals(0, baseline.get("testCount").asInt());
+        assertTrue(baseline.get("reason").asText().contains("per-test outcomes are unavailable"),
+                "an empty test list must be flagged so validation reports unavailable evidence");
     }
 
     @Test
@@ -1411,6 +1523,10 @@ class InitServiceTest {
                 "project.camelVersion must use detected version for existing projects");
 
         assertTrue(config.contains("project.runtime=spring-boot"), "Should detect Spring Boot runtime");
+        assertTrue(config.contains("project.platformBomVersion=4.8.0"),
+                "the platform BOM version comes from the imported camel-spring-boot-bom");
+        assertTrue(config.contains("project.springBootVersion=3."),
+                "the Spring Boot version comes from the imported spring-boot-dependencies");
         assertTrue(config.contains("project.primaryDsl=yaml"), "Should detect YAML DSL");
         assertTrue(config.contains("project.hasTests=true"), "Should detect existing tests");
         assertTrue(config.contains("project.routeCount=3"), "Should count existing routes");
@@ -1469,9 +1585,33 @@ class InitServiceTest {
     }
 
     @Test
-    void e2eExistingProjectWorkflow() throws Exception {
-        // This is the core acceptance test: complete workflow on existing project fixture
-        // Tests init, adding capability, running tests, verifying preservation
+    void reinitRefreshesSharedSkillResourcesAndKeepsUserOwnedFiles() throws Exception {
+        Path targetDir = tempDir.resolve("shared-refresh");
+        Files.createDirectories(targetDir);
+        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        Path shared = targetDir.resolve(".claude/skills/shared/context-authority.md");
+        assertTrue(Files.exists(shared), "the shared resource must be installed");
+        String shipped = Files.readString(shared);
+        Files.writeString(shared, "# STALE SHARED COPY\n" + shipped);
+        Path userFile = targetDir.resolve(".claude/skills/shared/my-team-notes.md");
+        Files.writeString(userFile, "# mine\n");
+
+        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+
+        assertEquals(shipped, Files.readString(shared), "a shipped shared resource must be refreshed on reinit");
+        assertEquals("# mine\n", Files.readString(userFile), "a user-owned file must survive reinit");
+    }
+
+    /**
+     * Init-level check on the existing-project fixture, with the agent's work simulated by hand. It runs the real init,
+     * then writes a route and a test the way an agent following the installed skills would, and runs the project's own
+     * Maven build. It does NOT execute the AI skills (brainstorm, plan, execute, validate): those are Markdown
+     * contracts, so this test also checks that the installed skills carry the contracts that connect to what init
+     * recorded.
+     */
+    @Test
+    void existingProjectInitThenHandWrittenCapabilityKeepsTheProjectIntact() throws Exception {
         Path fixtureSource = Path.of("src/test/resources/fixtures/existing-project-spring-boot");
         Path targetDir = tempDir.resolve("e2e-workflow");
 
@@ -1625,6 +1765,18 @@ class InitServiceTest {
             assertTrue(routeFilesAfterAddition.contains(routeFile),
                     "Original route file should still exist after adding new capability: " + routeFile);
         }
+
+        // Verify: the installed skills carry the contracts that consume what init recorded
+        Path skills = targetDir.resolve(".claude/skills");
+        assertTrue(
+                Files.readString(skills.resolve("camel-validate/SKILL.md")).contains("`ROUTE_FILES` is NOT limited to"),
+                "validation must inventory the fixture's api-routes.yaml / timer-routes.yaml");
+        assertTrue(Files.readString(skills.resolve("camel-execute/SKILL.md"))
+                .contains("Capture the test baseline BEFORE the first edit"));
+        assertTrue(Files.readString(skills.resolve("camel-implement/guides/pom-spring-boot.md"))
+                .contains("Existing Projects: Never Replace the POM"));
+        assertTrue(Files.readString(skills.resolve("camel-brainstorm/guides/version-selection.md"))
+                .contains("Existing Projects (separate path)"));
 
         // Verify: Skills and workspace created
         assertTrue(Files.exists(targetDir.resolve(".claude/skills")),

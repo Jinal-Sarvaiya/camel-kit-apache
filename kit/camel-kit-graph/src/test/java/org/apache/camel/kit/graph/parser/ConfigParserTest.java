@@ -95,4 +95,36 @@ class ConfigParserTest {
                 yamlGraph.getNode("config:port").properties().get("file"));
         assertEquals("dev", yamlGraph.getNode("config:order.retries").properties().get("profile"));
     }
+
+    @Test
+    void multiDocumentYamlKeepsTheDefaultAndTheProfileSpecificValues(@TempDir Path root) throws Exception {
+        Path res = Files.createDirectories(root.resolve("src/main/resources"));
+        Files.writeString(res.resolve("application.yml"), """
+                camel:
+                  component:
+                    kafka:
+                      brokers: localhost:9092
+                ---
+                spring:
+                  config:
+                    activate:
+                      on-profile: prod
+                camel:
+                  component:
+                    kafka:
+                      brokers: prod:9092
+                """);
+        ProjectGraph yamlGraph = new ProjectGraph();
+
+        new ConfigParser().parse(root, yamlGraph);
+
+        var base = yamlGraph.getNode("config:camel.component.kafka.brokers");
+        assertNotNull(base, "the default document must stay reachable by its plain key");
+        assertEquals("localhost:9092", base.properties().get("value"));
+        assertNull(base.properties().get("profile"));
+        var prod = yamlGraph.getNode("config:camel.component.kafka.brokers:profile=prod");
+        assertNotNull(prod, "the profile-specific value must be preserved, not merged away");
+        assertEquals("prod:9092", prod.properties().get("value"));
+        assertEquals("prod", prod.properties().get("profile"));
+    }
 }

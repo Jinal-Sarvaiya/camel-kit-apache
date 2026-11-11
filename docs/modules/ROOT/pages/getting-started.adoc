@@ -213,13 +213,13 @@ Camel Kit can enhance **existing Camel 4 applications** in addition to creating 
 * Your `pom.xml`, existing routes, and configuration are **preserved**
 * Camel Kit detects your Camel version, runtime (Spring Boot, Quarkus, etc.), and DSL type
 * The Maven wrapper is **skipped** if it already exists
-* Skills are added without overwriting your customizations
+* Skills are added; the files Camel Kit ships are refreshed on reinit, and files you add are never touched
 
 The workflow is the same (`/camel-start` → `/camel-brainstorm` → `/camel-plan` → `/camel-execute` → `/camel-validate`), but with additional safeguards:
 
 * **Scope protection** - only approved files are modified
-* **Baseline validation** - existing tests run first to detect regressions
-* **Version locking** - your Camel version is not upgraded
+* **Baseline validation** - the per-test baseline is captured before the first edit, and later compared test by test
+* **Version locking** - the versions your pom declares are recorded and not upgraded
 
 See xref:existing-project.adoc[] for the complete guide with a worked example.
 

@@ -131,10 +131,12 @@ public final class ProjectDiscovery {
     }
 
     private static boolean isCamelBom(String groupId, String artifactId) {
-        // Only Camel core BOMs (org.apache.camel group) represent Camel core versions.
-        // Camel Quarkus extension BOMs (org.apache.camel.quarkus group) have independent versioning.
-        return artifactId != null && artifactId.startsWith("camel-") && artifactId.endsWith("-bom")
-                && "org.apache.camel".equals(groupId);
+        // Camel core BOMs (org.apache.camel and org.apache.camel.springboot groups) represent Camel core versions.
+        // Camel Quarkus extension BOMs (org.apache.camel.quarkus group) have independent versioning and are excluded.
+        if (artifactId == null || !artifactId.startsWith("camel-") || !artifactId.endsWith("-bom")) {
+            return false;
+        }
+        return "org.apache.camel".equals(groupId) || "org.apache.camel.springboot".equals(groupId);
     }
 
     private static void addVersion(Map<String, Set<String>> versions, String version, String source) {
@@ -184,37 +186,68 @@ public final class ProjectDiscovery {
     /**
      * The Spring Boot framework version: an imported {@code spring-boot-dependencies}, otherwise the
      * {@code spring-boot-starter-parent} parent. This is a different artifact from the Camel BOM and is kept apart so
-     * the two are never mixed up.
+     * the two are never mixed up. Returns null if modules disagree on the version.
      */
     private static String detectSpringBootVersion(ProjectGraph graph) {
-        String fromBom = firstManaged(graph, "spring-boot-dependencies");
-        if (fromBom != null) {
-            return fromBom;
+        Map<String, Set<String>> bomVersions = collectManagedVersions(graph, "spring-boot-dependencies");
+        if (!bomVersions.isEmpty()) {
+            // If modules agree on the BOM version, use it; if they conflict, return null
+            return bomVersions.size() == 1 ? bomVersions.keySet().iterator().next() : null;
         }
-        for (GraphNode parent : graph.findByType(NodeType.CONFIG_PROPERTY)) {
-            if ("parent".equals(parent.properties().get("kind"))
-                    && "spring-boot-starter-parent".equals(parent.properties().get("artifactId"))) {
-                String version = resolve(graph, parent.properties().get("version"));
-                if (version != null && !version.contains("${") && !"null".equals(version)) {
-                    return version;
-                }
-            }
+        Map<String, Set<String>> parentVersions = collectParentVersions(graph, "spring-boot-starter-parent");
+        if (!parentVersions.isEmpty()) {
+            // If modules agree on the parent version, use it; if they conflict, return null
+            return parentVersions.size() == 1 ? parentVersions.keySet().iterator().next() : null;
         }
         return null;
     }
 
-    private static String firstManaged(ProjectGraph graph, String... artifactIds) {
+    /**
+     * Collects all distinct versions of the given managed artifacts across all modules, with their module provenance.
+     * Returns a map of version → set of sources (e.g., "4.8.0" → {"module-a/pom.xml"}).
+     */
+    private static Map<String, Set<String>> collectManagedVersions(ProjectGraph graph, String... artifactIds) {
         List<String> wanted = List.of(artifactIds);
+        Map<String, Set<String>> versions = new TreeMap<>();
         for (GraphNode managed : graph.findByType(NodeType.CONFIG_PROPERTY)) {
             if ("managed".equals(managed.properties().get("kind"))
                     && wanted.contains(managed.properties().get("artifactId"))) {
                 String version = resolve(graph, managed.properties().get("version"));
-                if (version != null && !"managed".equals(version) && !version.contains("${")) {
-                    return version;
+                String file = managed.properties().get("file");
+                if (version != null && !"managed".equals(version) && !version.contains("${") && file != null) {
+                    versions.computeIfAbsent(version, k -> new TreeSet<>()).add(file);
                 }
             }
         }
-        return null;
+        return versions;
+    }
+
+    /**
+     * Collects all distinct versions of the given parent artifacts across all modules, with their module provenance.
+     * Returns a map of version → set of sources.
+     */
+    private static Map<String, Set<String>> collectParentVersions(ProjectGraph graph, String artifactId) {
+        Map<String, Set<String>> versions = new TreeMap<>();
+        for (GraphNode parent : graph.findByType(NodeType.CONFIG_PROPERTY)) {
+            if ("parent".equals(parent.properties().get("kind"))
+                    && artifactId.equals(parent.properties().get("artifactId"))) {
+                String version = resolve(graph, parent.properties().get("version"));
+                String file = parent.properties().get("file");
+                if (version != null && !version.contains("${") && !"null".equals(version) && file != null) {
+                    versions.computeIfAbsent(version, k -> new TreeSet<>()).add(file);
+                }
+            }
+        }
+        return versions;
+    }
+
+    private static String firstManaged(ProjectGraph graph, String... artifactIds) {
+        Map<String, Set<String>> versions = collectManagedVersions(graph, artifactIds);
+        if (versions.isEmpty()) {
+            return null;
+        }
+        // If modules agree, return the single version; if they conflict, return null
+        return versions.size() == 1 ? versions.keySet().iterator().next() : null;
     }
 
     private static Set<DslType> detectDslTypes(ProjectGraph graph) {

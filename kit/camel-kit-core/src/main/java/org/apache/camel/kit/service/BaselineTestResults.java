@@ -158,9 +158,12 @@ final class BaselineTestResults {
      * @param reason   why, for a human or the validation report
      * @param revision the source revision the results were recorded against (the Git HEAD, or {@code unknown})
      * @param dirty    whether the working tree had uncommitted changes when the tests ran
+     * @param complete whether all test reports were successfully parsed; false if any were malformed or unreadable
      * @param tests    per-test outcomes; empty when none were recorded
      */
-    static String toJson(String status, String reason, String revision, boolean dirty, Map<String, Outcome> tests)
+    static String toJson(
+            String status, String reason, String revision, boolean dirty, boolean complete,
+            Map<String, Outcome> tests)
             throws IOException {
         ObjectNode root = MAPPER.createObjectNode();
         root.put("status", status);
@@ -168,6 +171,7 @@ final class BaselineTestResults {
         root.put("timestamp", Instant.now().toString());
         root.put("revision", revision);
         root.put("dirty", dirty);
+        root.put("complete", complete);
         root.put("testCount", tests.size());
         ObjectNode testNode = root.putObject("tests");
         tests.forEach((id, outcome) -> {

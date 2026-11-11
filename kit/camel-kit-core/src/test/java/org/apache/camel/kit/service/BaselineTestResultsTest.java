@@ -209,11 +209,12 @@ class BaselineTestResultsTest {
         tests.put("com.example.A#ok", new BaselineTestResults.Outcome("passed", ""));
         tests.put("com.example.A#bad", new BaselineTestResults.Outcome("failed", "nope"));
 
-        JsonNode json = MAPPER.readTree(BaselineTestResults.toJson("failed", "reason", "abc123", true, tests));
+        JsonNode json = MAPPER.readTree(BaselineTestResults.toJson("failed", "reason", "abc123", true, true, tests));
 
         assertEquals("failed", json.get("status").asText());
         assertEquals("abc123", json.get("revision").asText());
         assertTrue(json.get("dirty").asBoolean());
+        assertTrue(json.get("complete").asBoolean(), "all reports parsed successfully");
         assertEquals(2, json.get("testCount").asInt());
         assertEquals("passed", json.at("/tests/com.example.A#ok/status").asText());
         assertEquals("nope", json.at("/tests/com.example.A#bad/reason").asText());
@@ -224,9 +225,10 @@ class BaselineTestResultsTest {
     @Test
     void statusOnlyBaselinesHaveTheSameShapeWithAnEmptyTestList() throws Exception {
         JsonNode json = MAPPER.readTree(
-                BaselineTestResults.toJson("not_run", "not run", "unknown", true, Map.of()));
+                BaselineTestResults.toJson("not_run", "not run", "unknown", true, true, Map.of()));
 
         assertEquals("not_run", json.get("status").asText());
+        assertTrue(json.get("complete").asBoolean(), "no collection means no parse failures");
         assertEquals(0, json.get("testCount").asInt());
         assertTrue(json.get("tests").isObject());
         assertEquals(0, json.get("tests").size());

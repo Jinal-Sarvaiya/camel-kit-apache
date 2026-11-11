@@ -101,22 +101,24 @@ The baseline is `.camel-kit/baseline-test-results.json`. It is written before an
   "timestamp": "2026-01-01T00:00:00Z",
   "revision": "<git HEAD the tests ran against, or unknown>",
   "dirty": false,
+  "complete": true,
   "testCount": 2,
   "tests": {
     "com.example.ExistingTest#testA": {"status": "passed"},
-    "com.example.ExistingTest#testB": {"status": "failed", "reason": "..."}
+    "module-a:com.example.SharedTest#sameTest": {"status": "failed", "reason": "..."}
   },
-  "nonPassing": ["com.example.ExistingTest#testB"]
+  "nonPassing": ["module-a:com.example.SharedTest#sameTest"]
 }
 ```
 
-`tests` maps `class#method` to `passed`, `failed`, `error` or `skipped`. Read the file with the file-reading tool; do not
-derive anything from counts.
+`tests` maps `[module:]class#method` to `passed`, `failed`, `error` or `skipped`. Module prefix is only present for
+non-root modules. Read the file with the file-reading tool; do not derive anything from counts.
 
 The baseline is usable only when ALL of these hold:
 
 - `status` is `passed` or `failed` and `tests` is not empty. (`not_run`, `timeout`, a missing file, or an empty `tests`
   means there is no per-test evidence.)
+- `complete` is `true`. If `complete` is `false`, some test reports could not be parsed, so the evidence is incomplete.
 - `revision` is a Git revision (not `unknown`) and `dirty` is `false` (no tracked file had uncommitted changes), so the
   results describe the project as it was before this pipeline. If `git merge-base --is-ancestor <revision> HEAD` fails, the baseline belongs to different code.
 
@@ -226,9 +228,10 @@ Run the project's tests again with the project's own wrapper, so the current res
 
 Then read the current per-test outcomes from the Surefire/Failsafe XML reports (`target/surefire-reports/TEST-*.xml`,
 `target/failsafe-reports/TEST-*.xml`, including module directories). Delete stale reports first if they predate this run.
-Do not run a subset of the baseline tests and do not rely on console totals.
+Do not run a subset of the baseline tests and do not rely on console totals. Build test IDs using the same module-qualified
+format as the baseline: `[module:]class#method` (module prefix only for non-root modules).
 
-If the baseline is usable (Step 1), compare **by test identity** (`class#method`), never by totals:
+If the baseline is usable (Step 1), compare **by test identity** (`[module:]class#method`), never by totals:
 
 | Baseline | Current | Verdict |
 |----------|---------|---------|
@@ -250,6 +253,7 @@ comparison above reports that as a regression.
 | Test | Baseline | Current | Verdict |
 |------|----------|---------|---------|
 | com.example.FooTest#a | passed | failed | REGRESSION |
+| module-b:com.example.SharedTest#sameTest | passed | passed | OK |
 ```
 
 **Verdict:**
@@ -275,8 +279,8 @@ The validation report for existing projects MUST have this structure:
 **New Routes:** N routes
 
 **Baseline Test Results (per-test comparison):**
-- Baseline revision: <revision> (dirty: false)
-- Baseline tests compared: N; regressions: N (list each `class#method`); pre-existing failures: N; fixed: N
+- Baseline revision: <revision> (dirty: false, complete: true)
+- Baseline tests compared: N; regressions: N (list each `[module:]class#method`); pre-existing failures: N; fixed: N
 - Regressions: YES/NO/UNVERIFIED
 
 ---

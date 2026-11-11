@@ -507,12 +507,17 @@ class ProjectDiscoveryTest {
     }
 
     private static GraphNode managed(String artifactId, String version) {
+        return managed(artifactId, version, "pom.xml");
+    }
+
+    private static GraphNode managed(String artifactId, String version, String file) {
+        String groupId = artifactId.startsWith("camel-")
+                ? "org.apache.camel.springboot"
+                : "org.springframework.boot";
         return new GraphNode(
-                "maven-managed:org.example:" + artifactId, NodeType.CONFIG_PROPERTY,
-                Map.of("kind", "managed", "groupId", artifactId.startsWith("camel-")
-                        ? "org.apache.camel.springboot"
-                        : "org.springframework.boot", "artifactId", artifactId, "version", version, "type", "pom",
-                        "scope", "import"));
+                "maven-managed:" + file + ":" + groupId + ":" + artifactId, NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "managed", "groupId", groupId, "artifactId", artifactId, "version", version, "type",
+                        "pom", "scope", "import", "file", file));
     }
 
     private static GraphNode springBootStarter(String file) {
@@ -549,9 +554,9 @@ class ProjectDiscoveryTest {
         ProjectGraph graph = new ProjectGraph();
         graph.addNode(springBootStarter("pom.xml"));
         graph.addNode(new GraphNode(
-                "maven-parent:org.springframework.boot:spring-boot-starter-parent",
+                "maven-parent:pom.xml:org.springframework.boot:spring-boot-starter-parent",
                 NodeType.CONFIG_PROPERTY, Map.of("kind", "parent", "groupId", "org.springframework.boot",
-                        "artifactId", "spring-boot-starter-parent", "version", "3.2.1")));
+                        "artifactId", "spring-boot-starter-parent", "version", "3.2.1", "file", "pom.xml")));
 
         assertEquals("3.2.1", ProjectDiscovery.discover(graph).springBootVersion());
     }
@@ -683,6 +688,7 @@ class ProjectDiscoveryTest {
                         "groupId", "org.apache.camel.quarkus",
                         "artifactId", "camel-quarkus-bom",
                         "version", "3.15.0",
+                        "type", "pom",
                         "file", "pom.xml")));
 
         ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
@@ -706,6 +712,7 @@ class ProjectDiscoveryTest {
                         "groupId", "org.apache.camel.quarkus",
                         "artifactId", "camel-quarkus-bom",
                         "version", "3.15.0",
+                        "type", "pom",
                         "file", "pom.xml")));
         graph.addNode(new GraphNode(
                 "maven:org.apache.camel.quarkus:camel-quarkus-core",
@@ -721,5 +728,65 @@ class ProjectDiscoveryTest {
                 "Camel Quarkus extension BOM alone should not provide Camel core version");
         assertTrue(result.allCamelVersions().isEmpty(),
                 "no Camel core version evidence should be present");
+    }
+
+    @Test
+    void camelSpringBootBomProvidesCamelCoreVersion() {
+        // org.apache.camel.springboot:camel-spring-boot-bom version represents Camel core version
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(new GraphNode(
+                "maven-managed:org.apache.camel.springboot:camel-spring-boot-bom",
+                NodeType.CONFIG_PROPERTY,
+                Map.of(
+                        "kind", "managed",
+                        "groupId", "org.apache.camel.springboot",
+                        "artifactId", "camel-spring-boot-bom",
+                        "version", "4.8.0",
+                        "type", "pom",
+                        "file", "pom.xml")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertEquals("4.8.0", result.camelVersion(),
+                "Camel Spring Boot BOM version should be recognized as Camel core version");
+        assertTrue(result.allCamelVersions().contains("4.8.0"));
+    }
+
+    @Test
+    void detectsSpringBootVersionConflictAcrossModules() {
+        // Two modules with different Spring Boot versions should cause conflict detection
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(springBootStarter("module-a/pom.xml"));
+        graph.addNode(springBootStarter("module-b/pom.xml"));
+
+        // Module-a uses Spring Boot 3.3.4
+        graph.addNode(new GraphNode(
+                "maven-managed:module-a/pom.xml:org.springframework.boot:spring-boot-dependencies",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "managed",
+                        "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-dependencies",
+                        "version", "3.3.4",
+                        "type", "pom",
+                        "scope", "import",
+                        "file", "module-a/pom.xml")));
+
+        // Module-b uses Spring Boot 3.4.0
+        graph.addNode(new GraphNode(
+                "maven-managed:module-b/pom.xml:org.springframework.boot:spring-boot-dependencies",
+                NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "managed",
+                        "groupId", "org.springframework.boot",
+                        "artifactId", "spring-boot-dependencies",
+                        "version", "3.4.0",
+                        "type", "pom",
+                        "scope", "import",
+                        "file", "module-b/pom.xml")));
+
+        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+
+        assertNull(result.springBootVersion(),
+                "Conflicting Spring Boot versions across modules should not be resolved");
+        assertEquals("spring-boot", result.runtime());
     }
 }

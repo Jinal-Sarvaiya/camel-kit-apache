@@ -85,11 +85,11 @@ class PomParserTest {
 
         new PomParser().parse(root, local);
 
-        var parent = local.getNode("maven-parent:org.springframework.boot:spring-boot-starter-parent");
+        var parent = local.getNode("maven-parent:pom.xml:org.springframework.boot:spring-boot-starter-parent");
         assertNotNull(parent);
         assertEquals("parent", parent.properties().get("kind"));
         assertEquals("3.3.5", parent.properties().get("version"));
-        var bom = local.getNode("maven-managed:org.apache.camel.springboot:camel-spring-boot-bom");
+        var bom = local.getNode("maven-managed:pom.xml:org.apache.camel.springboot:camel-spring-boot-bom");
         assertNotNull(bom);
         assertEquals("managed", bom.properties().get("kind"));
         assertEquals("4.8.0", bom.properties().get("version"),
@@ -143,7 +143,8 @@ class PomParserTest {
         ProjectGraph reactor = new ProjectGraph();
         new PomParser().parse(root, reactor);
 
-        var bom = reactor.getNode("maven-managed:org.apache.camel.springboot:camel-spring-boot-bom");
+        var bom = reactor
+                .getNode("maven-managed:module-a/pom.xml:org.apache.camel.springboot:camel-spring-boot-bom");
         assertNotNull(bom, "Camel Spring Boot BOM should be recorded");
         assertEquals("4.8.0", bom.properties().get("version"),
                 "BOM version should be resolved from module-a's bom.version property, not module-b's");

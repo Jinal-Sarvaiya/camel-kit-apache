@@ -121,7 +121,18 @@ class CamelKitCommandParityTest {
 
         // --record-baseline: the project's own wrapper is run and the result is recorded
         for (String name : new String[]{"standalone-baseline", "plugin-baseline"}) {
-            Path dir = existingProject(name, "#!/bin/sh\ntouch mvnw-was-run\nexit 0\n");
+            // The wrapper must produce fresh Surefire reports for the baseline to be recorded as "passed"
+            Path dir = existingProject(name, """
+                    #!/bin/sh
+                    touch mvnw-was-run
+                    mkdir -p target/surefire-reports
+                    cat > target/surefire-reports/TEST-com.example.RouteTest.xml <<'XML'
+                    <testsuite name="com.example.RouteTest" tests="1">
+                      <testcase classname="com.example.RouteTest" name="testRoute"/>
+                    </testsuite>
+                    XML
+                    exit 0
+                    """);
             int exit = name.startsWith("plugin")
                     ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
                             "--record-baseline")
@@ -130,6 +141,20 @@ class CamelKitCommandParityTest {
             assertEquals(0, exit, name);
             assertTrue(Files.exists(dir.resolve("mvnw-was-run")), name + ": --record-baseline must run the wrapper");
             assertEquals("passed", loadConfig(dir).getProperty("project.baselineTestStatus"), name);
+        }
+
+        // --record-baseline with exit 0 but no reports: recorded as not_run
+        for (String name : new String[]{"standalone-no-reports", "plugin-no-reports"}) {
+            Path dir = existingProject(name, "#!/bin/sh\ntouch mvnw-was-run\nexit 0\n");
+            int exit = name.startsWith("plugin")
+                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                            "--record-baseline")
+                    : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                            "--record-baseline");
+            assertEquals(0, exit, name);
+            assertTrue(Files.exists(dir.resolve("mvnw-was-run")), name + ": --record-baseline must run the wrapper");
+            assertEquals("not_run", loadConfig(dir).getProperty("project.baselineTestStatus"),
+                    name + ": exit 0 without fresh reports must record not_run");
         }
 
         // without --replace-wrapper the project's wrapper is kept; with it, it is replaced

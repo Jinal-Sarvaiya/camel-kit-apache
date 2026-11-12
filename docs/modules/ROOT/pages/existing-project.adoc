@@ -416,7 +416,7 @@ READY FOR PRODUCTION: YES
 
 === Version 1 Scope
 
-* **Single-module projects** - Multi-module support planned for future release
+* **Multi-module projects** - Discovery supports multi-module Maven projects with `.camel-kit/` at the root. Full end-to-end workflow validation across multiple modules is tracked in follow-up work
 * **YAML DSL only** - Version 1 supports YAML DSL. XML, Java and Groovy routes are detected and reported through `project.unsupportedCombination` when no YAML routes exist, but the workflow stops instead of planning additions (broader Java DSL support is tracked in issue #52)
 * **Discovery is a starting point** - The graph reads Maven poms, Java/Groovy/XML/YAML routes, `beans:` blocks and `application*.properties` / `application*.yml`. Anything else, such as beans created by `@Bean` methods, is not counted and is listed in `project.discoveryGaps` or must be inspected in the source
 * **One runtime** - Cannot mix Spring Boot and Quarkus in the same project

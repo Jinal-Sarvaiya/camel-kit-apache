@@ -144,7 +144,7 @@ protect them; it does not analyse their content (tracked in #111).
 Only values your project declares are recorded. `project.camelVersion` comes from the `camel.version` property, an
 `org.apache.camel` dependency, or an imported Camel BOM. `project.platformBomVersion` is the imported
 `camel-spring-boot-bom` or `quarkus-bom` and `project.springBootVersion` is the imported `spring-boot-dependencies` or
-the `spring-boot-starter-parent`, with `${property}` references resolved from the pom. Nothing is filled in from Camel
+the `spring-boot-starter-parent`, with `+${property}+` references resolved from the pom. Nothing is filled in from Camel
 Kit's own version tables. If a value cannot be established it is left out and reported as a gap.
 
 If the pom shows two runtimes (for example `camel-spring-boot-starter` and `camel-quarkus-core`) or two different Camel
@@ -497,7 +497,7 @@ The new route may have accidentally removed a shared bean. Review the execution 
 
 == Next Steps
 
-* Learn about xref:workflows.adoc[Camel Kit workflows]
+* Learn about xref:pipeline.adoc[Camel Kit pipeline]
 * Explore xref:skills.adoc[available skills]
 * Read about xref:constitution.adoc[design rules]
 * See xref:getting-started.adoc[Getting Started] for greenfield projects
@@ -505,5 +505,5 @@ The new route may have accidentally removed a shared bean. Review the execution 
 == Related Topics
 
 * xref:migration.adoc[Migrating from other platforms]
-* xref:validation.adoc[Route validation]
-* xref:testing.adoc[Testing integrations]
+* xref:camel-validate.adoc[Route validation]
+* xref:verification.adoc[Runtime verification]

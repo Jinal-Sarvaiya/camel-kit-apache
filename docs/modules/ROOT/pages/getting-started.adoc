@@ -20,7 +20,7 @@ xref:manual::camel-jbang.adoc[Camel JBang]. Both forms provide the same commands
 | See the installation commands below
 
 | xref:manual::camel-jbang.adoc[Camel JBang]
-| `camel run` and `camel run --check` for route execution and validation
+| `camel run` for route execution and runtime verification
 | `jbang app install camel@apache/camel`
 
 | Camel JBang test plugin

@@ -59,7 +59,7 @@ Utilities:    /camel-ship          (Technology Preview — delegate to the local
 |-------------|---------|---------|
 | Java 17+ | Runtime | [SDKMAN](https://sdkman.io/), [Adoptium](https://adoptium.net/), or your package manager |
 | [JBang](https://www.jbang.dev/) | CLI launcher for camel-kit | See below |
-| [Camel JBang](https://camel.apache.org/manual/camel-jbang.html) | `camel run`, `camel run --check` for route execution and validation | `jbang app install camel@apache/camel` |
+| [Camel JBang](https://camel.apache.org/manual/camel-jbang.html) | `camel run` for route execution and runtime verification | `jbang app install camel@apache/camel` |
 | [Camel JBang test plugin](https://camel.apache.org/manual/camel-jbang.html) | `camel test run` for Citrus integration tests in the verify loop | `camel plugin add test` |
 | [Docker](https://docs.docker.com/get-docker/) | Conditional: external-service probes and full Citrus/Testcontainers verification | Install Docker Engine or Docker Desktop |
 

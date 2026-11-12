@@ -1675,7 +1675,13 @@ class ResourceConsistencyTest {
                 "`{MODULE_PREFIX}src/main/resources/camel/*.camel.yaml`"));
         assertTrue(validate.contains("`{MODULE_PREFIX}` is empty at the project root"));
         assertTrue(schema.contains("-Dcamel.validator.files={ROUTE_FILE}"));
-        assertTrue(endpoint.contains("camel run --check {ROUTE_FILE} {PROPS_FILE}"));
+        assertFalse(endpoint.contains("camel run --check"), "camel run has no --check option (#145)");
+        assertFalse(endpoint.contains("```bash"),
+                "/camel-validate is static: the endpoint guide runs no shell command");
+        assertTrue(endpoint.contains("## Stage 3: Runtime Handoff"));
+        assertTrue(endpoint.contains("`quality-checks.md` §7.2 Property Completeness"));
+        assertTrue(endpoint.contains("`quality-checks.md` §7.3 Bean Definitions"));
+        assertTrue(endpoint.contains("`Verification:` line of `execution-report.md`"));
         assertTrue(replan.contains("Never execute tasks copied from the stale original plan"));
         assertTrue(replan.contains("plan analyze <plan-path>"));
         assertTrue(replan.contains("doc unstale <plan-path>"));

@@ -85,44 +85,28 @@ Validating component existence...
 
 ---
 
-## Stage 3: Camel Runtime Validation
+## Stage 3: Runtime Handoff
 
-Use Camel CLI to validate the route compiles:
+`/camel-validate` is a static gate: it never starts the routes, runs a build or downloads dependencies, and the Camel
+CLI has no dry-run option for `camel run` (no `--check` flag exists). Do not run anything in this stage. Every concern
+a runtime start would surface is covered elsewhere — record where:
 
-```bash
-camel run --check {ROUTE_FILE} {PROPS_FILE}
-```
+| Runtime concern | Covered by |
+|---|---|
+| YAML parsing and DSL structure | Stage 1 (`schema-validation.md`) |
+| Component existence and endpoint options | Stage 2 above |
+| Property placeholders defined in `PROPS_FILE` | `quality-checks.md` §7.2 Property Completeness |
+| Bean references and `camel.beans.*` definitions | `quality-checks.md` §7.3 Bean Definitions |
+| Startup, dependency resolution and connection failures | the verification loop of `/camel-execute` (Step 3.5), recorded as the `Verification:` line of `execution-report.md`; `/camel-debug` outside a pipeline |
 
-This validates:
-- YAML parsing
-- Property placeholder resolution
-- Component URI syntax
-- Missing dependencies
-- Bean references
-
-Show results:
-
-```
-== CAMEL RUNTIME VALIDATION ==
-
-Running: camel run --check {ROUTE_FILE} {PROPS_FILE}
-
-✅ Route compiles successfully
-✅ Components: [kafka, sql] - all valid
-✅ Properties: All placeholders resolved
-✅ Beans: All references found
-```
-
-Or if errors:
+Show the handoff, quoting the `Verification:` value from `execution-report.md` when the run is pipeline-scoped:
 
 ```
-❌ Validation failed:
+== RUNTIME VALIDATION ==
 
-Error: Property '{{kafka.topic.input}}' not defined
-Fix: Add to application.properties:
-     kafka.topic.input=your-topic-name
-
-Error: Bean 'dataSource' not found
-Fix: Add to application.properties:
-     camel.beans.dataSource=#class:org.apache.commons.dbcp2.BasicDataSource
+Not run by /camel-validate (static gate; `camel run` has no check mode).
+Runtime verification: {PASS | PARTIAL | FAIL | NOT_RUN} per execution-report.md
 ```
+
+In a project-scoped run there is no execution report: print `Runtime verification: not available — run the routes
+through the /camel-execute verification loop or /camel-debug` instead.

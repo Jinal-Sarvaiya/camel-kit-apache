@@ -30,6 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Preserve legitimate init layouts containing unrelated symlinks and normal permissions on new generated files.
 - Exclude VCS, build and dependency trees from graphs; support up to 256 MiB of recognized sources while retaining per-file limits and validation before XML sniffing.
 - Derive Claude MCP grants from the workflow manifest and validate catalog cache version components.
+- `/camel-validate` no longer tells the agent to run `camel run --check`, an option the Camel CLI does not have (#145).
+  Stage 3 of the endpoint guide is a static hand-off to the placeholder and bean checks and to the `/camel-execute`
+  verification loop.
 
 ### Added
 

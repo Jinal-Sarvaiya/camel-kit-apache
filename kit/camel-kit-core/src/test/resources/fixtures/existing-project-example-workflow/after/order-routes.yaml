@@ -1,0 +1,11 @@
+- route:
+    id: get-orders-api
+    from:
+      uri: rest:get:/api/orders
+      steps:
+        - setHeader:
+            name: Content-Type
+            constant: application/json
+        - setBody:
+            constant: '[{"id":101,"product":"Widget","quantity":5,"total":49.95},{"id":102,"product":"Gadget","quantity":2,"total":29.98}]'
+        - to: log:api-response

@@ -29,8 +29,8 @@ $ mvn test
 ### After Adding order-routes.yaml and OrderApiTest.java
 
 ```
-$ cp example-workflow/after/order-routes.yaml src/main/resources/camel/
-$ cp example-workflow/after/OrderApiTest.java src/test/java/org/apache/camel/kit/test/fixture/
+$ cp ../existing-project-example-workflow/after/order-routes.yaml src/main/resources/camel/
+$ cp ../existing-project-example-workflow/after/OrderApiTest.java src/test/java/org/apache/camel/kit/test/fixture/
 $ mvn test
 
 [INFO] Tests run: 7, Failures: 0, Errors: 0, Skipped: 0

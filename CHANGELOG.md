@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   longer leave a partly initialized workspace (#174).
 - A preserved Maven wrapper is reported as kept without a proposed copy and points to `--replace-wrapper`; the
   documentation now describes the wrapper as the exception to `.camel-kit/conflicts/` proposals (#174).
+- The shared Forage guide and the camel-test configuration guide no longer claim that environment variables and
+  system properties can override only default-bean keys: a named bean's `forage.myDb.jdbc.url` is overridden by
+  `FORAGE_MYDB_JDBC_URL` or `-Dforage.myDb.jdbc.url=...` with the same precedence (#122).
 - Preserve legitimate init layouts containing unrelated symlinks and normal permissions on new generated files.
 - Exclude VCS, build and dependency trees from graphs; support up to 256 MiB of recognized sources while retaining per-file limits and validation before XML sniffing.
 - Derive Claude MCP grants from the workflow manifest and validate catalog cache version components.

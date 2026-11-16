@@ -1772,6 +1772,26 @@ class ResourceConsistencyTest {
     }
 
     @Test
+    void forageGuidesDescribeNamedBeanOverrideChannels() throws IOException {
+        Path skills = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String forage = Files.readString(skills.resolve("shared/forage.md"));
+        String testConfiguration = Files.readString(skills.resolve("camel-test/guides/test-configuration.md"));
+
+        for (String guide : List.of(forage, testConfiguration)) {
+            // Forage resolves FORAGE_<NAME>_<DOMAIN>_<PROP> and -Dforage.<name>.<domain>.<prop> for named beans
+            // with the same precedence as the default-bean form (#122).
+            assertContainsAll(guide,
+                    "FORAGE_<NAME>_<DOMAIN>_<PROP>",
+                    "FORAGE_MYDB_JDBC_URL",
+                    "-Dforage.myDb.jdbc.url=");
+            assertFalse(guide.contains("cannot target a NAMED bean"),
+                    "Named-bean keys are overridable from the environment and system properties (#122)");
+            assertFalse(guide.contains("DEFAULT-bean key form"),
+                    "The default-bean-only restriction does not exist in Forage (#122)");
+        }
+    }
+
+    @Test
     void commandReferenceDefaultsMatchTheDistribution() throws IOException {
         DistributionConfig distribution = DistributionConfig.loadBundled();
         String commands = Files.readString(repositoryRoot().resolve("docs/commands.md"));

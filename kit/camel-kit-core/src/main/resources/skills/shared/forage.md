@@ -151,11 +151,12 @@ forage.myBroker.jms.pool.enabled=true
 
 Route usage: `jms:queue:orders?connectionFactory=#myBroker`.
 
-**Configuration precedence:** Forage resolves each key from, highest to lowest: environment variables
-(`FORAGE_<DOMAIN>_<PROP>`, e.g. `FORAGE_JDBC_URL`) > system properties (`-Dforage.jdbc.url=...`) >
-properties files > defaults. Env vars and system properties only address the DEFAULT-bean key form
-(no name segment) — they cannot target a NAMED bean's key (`forage.myDb.jdbc.url`). Override a named
-bean's config through the properties file.
+**Configuration precedence:** Forage resolves each key from, highest to lowest: environment variables >
+system properties > properties files > defaults. Both override channels address default and named beans alike:
+`forage.jdbc.url` is overridden by `FORAGE_JDBC_URL` or `-Dforage.jdbc.url=...`, and a named bean's
+`forage.myDb.jdbc.url` by `FORAGE_MYDB_JDBC_URL` or `-Dforage.myDb.jdbc.url=...`. The variable form is the key
+upper-cased with every `.` replaced by `_` (`FORAGE_<NAME>_<DOMAIN>_<PROP>`); the system property is the key itself.
+Deployment and CI can therefore override a named bean without editing the properties file.
 
 ## Catalog queries (never load the whole file)
 

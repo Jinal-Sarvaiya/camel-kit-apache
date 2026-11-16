@@ -139,6 +139,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Post-move housekeeping (#162)** — repository links point at `apache/camel-kit` and the published documentation
+  at https://camel.apache.org/camel-kit/next/; `docs/camel-kit-overview.md`, `docs/antigravity.md`,
+  `docs/ship-codex.md` and `docs/ship-copilot.md` are pointers to the Antora pages that replaced them.
+  `docs/agent-architectures.md`, `docs/ship-claude.md`, `docs/ship-native.md` and `docs/user-guide.md` stay in
+  place because `docs/security-model.md` cites them as provenance sources.
 - **Preserve existing project files on `init` (#168)** — `camel-kit init` no longer replaces files the
   project owns. In `AGENTS.md`, `CLAUDE.md`, `QWEN.md` and `.github/copilot-instructions.md` Camel Kit
   now writes its content inside a marked block: it appends the block to an existing file and later
@@ -754,9 +759,9 @@ Changes since 0.3.1. Ship remains a Technology Preview.
 - Heavily inspired by [GitHub Spec-Kit](https://github.com/github/spec-kit)
 - Built for the Apache Camel community
 
-[Unreleased]: https://github.com/luigidemasi/camel-kit/compare/camel-kit-0.4.1...HEAD
-[0.4.1]: https://github.com/luigidemasi/camel-kit/compare/camel-kit-0.4.0...camel-kit-0.4.1
-[0.4.0]: https://github.com/luigidemasi/camel-kit/compare/camel-kit-0.3.1...camel-kit-0.4.0
-[0.3.1]: https://github.com/luigidemasi/camel-kit/compare/camel-kit-0.3.0...camel-kit-0.3.1
-[0.3.0]: https://github.com/luigidemasi/camel-kit/compare/camel-kit-0.2.0...camel-kit-0.3.0
-[0.2.0]: https://github.com/luigidemasi/camel-kit/tree/camel-kit-0.2.0
+[Unreleased]: https://github.com/apache/camel-kit/compare/camel-kit-0.4.1...HEAD
+[0.4.1]: https://github.com/apache/camel-kit/compare/camel-kit-0.4.0...camel-kit-0.4.1
+[0.4.0]: https://github.com/apache/camel-kit/compare/camel-kit-0.3.1...camel-kit-0.4.0
+[0.3.1]: https://github.com/apache/camel-kit/compare/camel-kit-0.3.0...camel-kit-0.3.1
+[0.3.0]: https://github.com/apache/camel-kit/compare/camel-kit-0.2.0...camel-kit-0.3.0
+[0.2.0]: https://github.com/apache/camel-kit/tree/camel-kit-0.2.0

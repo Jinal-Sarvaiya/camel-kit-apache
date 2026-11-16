@@ -42,7 +42,7 @@ This project follows the [Apache Software Foundation Code of Conduct](https://ww
    ```
 3. Add upstream remote:
    ```bash
-   git remote add upstream https://github.com/luigidemasi/camel-kit.git
+   git remote add upstream https://github.com/apache/camel-kit.git
    ```
 
 ## Development Setup

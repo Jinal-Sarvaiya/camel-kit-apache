@@ -1797,6 +1797,29 @@ class ResourceConsistencyTest {
     }
 
     @Test
+    void repositoryLinksPointAtTheApacheRepository() throws IOException {
+        Path root = repositoryRoot();
+        List<Path> files = new ArrayList<>(
+                List.of(
+                        root.resolve("README.md"),
+                        root.resolve("kit/README.md"),
+                        root.resolve("CONTRIBUTING.md"),
+                        root.resolve("kit/camel-jbang-plugin-kit/README.md")));
+        try (Stream<Path> docs = Files.list(root.resolve("docs"))) {
+            docs.filter(path -> path.toString().endsWith(".md")).forEach(files::add);
+        }
+
+        for (Path file : files) {
+            // The former repository is only referenced by the JBang alias of the published 0.4.1 release and by
+            // historical CHANGELOG compare links; every URL into it from the documentation is stale (#162).
+            assertFalse(Files.readString(file).contains("github.com/luigidemasi/camel-kit/"),
+                    file.getFileName() + " links to the former repository (#162)");
+        }
+        assertTrue(Files.readString(root.resolve("kit/README.md")).contains("https://camel.apache.org/camel-kit/next/"),
+                "The Kit README must point at the published documentation (#162)");
+    }
+
+    @Test
     void commandReferenceDefaultsMatchTheDistribution() throws IOException {
         DistributionConfig distribution = DistributionConfig.loadBundled();
         String commands = Files.readString(repositoryRoot().resolve("docs/commands.md"));

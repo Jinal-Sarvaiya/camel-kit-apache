@@ -69,7 +69,7 @@ Release `0.4.1` supports `bob2`, `antigravity`, `claude`, `codex`, `copilot`, `p
 | `camel kit nextId` | Create the next pipeline ID |
 | `camel kit ship` | Run or control the local Ship workflow (Technology Preview) |
 
-When upgrading from `0.3.1`, replace the retired `bob` and `gemini` targets with `bob2` and `antigravity`; see [migration guidance](../docs/antigravity.md).
+When upgrading from `0.3.1`, replace the retired `bob` and `gemini` targets with `bob2` and `antigravity`; see [migration guidance](https://camel.apache.org/camel-kit/next/agents.html#retired-targets).
 
 ## Development
 
@@ -77,7 +77,7 @@ The plugin uses `@CamelJBangPlugin` discovery and delegates its commands to `cam
 
 ## Related Projects
 
-- [Camel Kit](https://github.com/luigidemasi/camel-kit)
+- [Camel Kit](https://github.com/apache/camel-kit)
 - [Apache Camel](https://camel.apache.org/)
 - [Camel JBang](https://camel.apache.org/manual/camel-jbang.html)
 

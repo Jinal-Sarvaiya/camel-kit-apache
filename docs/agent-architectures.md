@@ -187,7 +187,7 @@ See [Google's skills documentation](https://antigravity.google/docs/skills/),
 [subagent format](https://antigravity.google/docs/subagents/),
 [CLI 1.1.6 MCP inheritance support](https://antigravity.google/changelog), and
 [MCP configuration](https://antigravity.google/docs/mcp/).
-For existing projects, follow the [migration instructions](antigravity.md).
+For existing projects, follow the [migration instructions](https://camel.apache.org/camel-kit/next/agents.html#retired-targets).
 
 ---
 
@@ -480,7 +480,7 @@ marked MCP block. Invalid TOML or conflicting managed server tables fail clearly
 
 - **Native repository skills:** all shared Camel-Kit skills use Codex's `.agents/skills/` discovery path.
 - **Eight custom roles:** pipeline work maps to explicit Codex custom-agent definitions, including a Ship worker with instruction-level restrictions (host enforcement depends on Codex CLI version).
-- **Native Ship relay:** eligible sessions dispatch controller-issued stages through `camel_ship_worker` with `--backend codex-native`. See [Codex CLI native Ship](ship-codex.md).
+- **Native Ship relay:** eligible sessions dispatch controller-issued stages through `camel_ship_worker` with `--backend codex-native`. See the published [Ship native subagents](https://camel.apache.org/camel-kit/next/ship.html#native) section.
 - **Parent-owned parallel dispatch:** independent implementation-wave tasks can run together without recursive delegation.
 - **Trust-gated project config:** MCP configuration loads only for a trusted repository.
 - **Least-privilege MCP:** exact allowlists and per-call prompt approval for Camel, knowledge, and Citrus tools.

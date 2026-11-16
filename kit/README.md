@@ -7,7 +7,7 @@ Part of the [Apache Camel Kit monorepo](../README.md). Source-build commands bel
 </p>
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Documentation](https://img.shields.io/badge/Documentation-Antora-orange)](../docs/modules/ROOT/pages/index.adoc)
+[![Documentation](https://img.shields.io/badge/Documentation-camel.apache.org-orange)](https://camel.apache.org/camel-kit/next/)
 
 > Design, implement, and verify Apache Camel integrations with AI coding assistants.
 
@@ -67,7 +67,7 @@ Camel JBang and its test plugin are needed for the complete execution and verifi
 
 **Technology Preview:** Camel Ship is still being stabilized. Its behavior and interfaces may change, and it is not recommended for production use. For the established staged workflow, start with `/camel-start`.
 
-The optional Ship controller requires Linux and supports Camel Main projects with YAML DSL routes. Its default backend requires Pi and Node. Bob 2, GitHub Copilot CLI and Claude Code can use their own read-only native subagents through the generated Ship skill; the controller writes their proposals and validates the result. Current development builds also support Codex native Ship. See [Bob native Ship](../docs/ship-native.md), [Copilot native Ship](../docs/ship-copilot.md), [Claude Code native Ship](../docs/ship-claude.md) and [Codex native Ship](../docs/ship-codex.md). The maintained versions are Pi `0.84.2` or `0.83.0` with Node `22.22.2`; unverified versions run only with `--accept-experimental`, while explicitly incompatible versions remain rejected. See [`camel-ship`](../docs/commands.md#camel-ship) for the complete contract.
+The optional Ship controller requires Linux and supports Camel Main projects with YAML DSL routes. Its default backend requires Pi and Node. Bob 2, GitHub Copilot CLI and Claude Code can use their own read-only native subagents through the generated Ship skill; the controller writes their proposals and validates the result. Current development builds also support Codex native Ship. See [Bob native Ship](../docs/ship-native.md), [Claude Code native Ship](../docs/ship-claude.md) and, for Copilot CLI and Codex CLI, the published [Ship native subagents](https://camel.apache.org/camel-kit/next/ship.html#native) section. The maintained versions are Pi `0.84.2` or `0.83.0` with Node `22.22.2`; unverified versions run only with `--accept-experimental`, while explicitly incompatible versions remain rejected. See [`camel-ship`](../docs/commands.md#camel-ship) for the complete contract.
 
 `camel-kit init` checks Java, JBang, Camel JBang, and the Camel test plugin. Missing tools produce warnings but don't block initialization; Docker and Ship prerequisites are checked when those workflows run.
 
@@ -121,7 +121,7 @@ camel kit init my-integration --ai claude
 
 To upgrade from `0.3.1`, reinstall the plugin at `0.4.1`. The retired `bob` and `gemini`
 targets are replaced by `bob2` (the default) and `antigravity`; see the
-[migration instructions](../docs/antigravity.md). Back up customized generated files before reinitializing with `--force`.
+[migration instructions](https://camel.apache.org/camel-kit/next/agents.html#retired-targets). Back up customized generated files before reinitializing with `--force`.
 
 ### Upgrade from 0.4.0
 
@@ -270,7 +270,7 @@ All supported targets use shared markdown skills with agent-specific traits and 
 
 ---
 
-See [Antigravity setup and migration from Gemini or Bob v1](../docs/antigravity.md).
+See [Google Antigravity](https://camel.apache.org/camel-kit/next/agents.html#antigravity) and [Retired targets](https://camel.apache.org/camel-kit/next/agents.html#retired-targets) in the published documentation.
 
 ## Key Features
 

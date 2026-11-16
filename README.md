@@ -23,8 +23,9 @@ For released installation commands and a first integration, see the
 [Kit installation guide](kit/README.md#installation). For standalone documentation
 search, see [running Knowledge](knowledge/README.md#running-the-mcp-server).
 
-The [shared Antora documentation](docs/modules/ROOT/pages/index.adoc) covers both
-products. Its component descriptor is [docs/antora.yml](docs/antora.yml).
+The documentation for both products is published at https://camel.apache.org/camel-kit/next/
+from the [shared Antora source](docs/modules/ROOT/pages/index.adoc); its component
+descriptor is [docs/antora.yml](docs/antora.yml).
 
 ## Repository layout
 

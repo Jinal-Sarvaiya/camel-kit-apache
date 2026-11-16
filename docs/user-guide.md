@@ -132,7 +132,7 @@ The verification loop treats code, dependencies, and the execution environment a
 
 **Technology Preview:** Camel Ship is still being stabilized. Its behavior and interfaces may change, and it is not recommended for production use. For the established staged workflow, start with `/camel-start`.
 
-The standalone `/camel-ship` workflow additionally requires Linux. Its default backend needs Pi and Node; eligible Bob 2, Copilot CLI, Claude Code and OpenAI Codex CLI sessions can use their own native children. See [Bob native Ship](ship-native.md), [Copilot native Ship](ship-copilot.md), [Claude Code native Ship](ship-claude.md) and [Codex CLI native Ship](ship-codex.md). Its current deterministic evidence path accepts Camel Main projects with Camel YAML DSL route artifacts; Spring Boot and Quarkus Ship projects are not yet supported.
+The standalone `/camel-ship` workflow additionally requires Linux. Its default backend needs Pi and Node; eligible Bob 2, Copilot CLI, Claude Code and OpenAI Codex CLI sessions can use their own native children. See [Bob native Ship](ship-native.md), [Claude Code native Ship](ship-claude.md) and, for Copilot CLI and Codex CLI, the published [Ship native subagents](https://camel.apache.org/camel-kit/next/ship.html#native) section. Its current deterministic evidence path accepts Camel Main projects with Camel YAML DSL route artifacts; Spring Boot and Quarkus Ship projects are not yet supported.
 
 ### Initializing a Project
 
@@ -193,7 +193,7 @@ reports each affected `SKILL.md` as `FAIL` with regeneration instructions, inclu
 when a nested `metadata.user-invocable` value overrides the top-level field.
 
 If only `$camel-start` appears in the skill picker, upgrade to a build containing the
-[#213 fix](https://github.com/luigidemasi/camel-kit/issues/213), exit Bob, and regenerate
+[#89 fix](https://github.com/apache/camel-kit/issues/89), exit Bob, and regenerate
 from the project root using the same command surface as the original initialization:
 
 ```bash

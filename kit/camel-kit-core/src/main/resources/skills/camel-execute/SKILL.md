@@ -6,9 +6,8 @@ user_invocable: false
 
 # Camel Execute — Phase 3 Orchestrator
 
-**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
-completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
-
+**Documentation lifecycle:** For behavior, contract, architecture or operations work, read the entry policy in
+`shared/documentation-lifecycle.md`, including standalone invocation. Load the recording procedure only at reconciliation.
 
 Execute the ready implementation plan derived from the approved design with target-appropriate task execution, an adversarial pre-filter, and ordered spec and quality review after each task.
 
@@ -640,8 +639,8 @@ After the cross-cutting review, run the full verification loop in an isolated su
 ### Step 3.6: Reconcile Current Documentation
 
 The execute parent owns the current-system description and ADR status/link updates, following
-`shared/documentation-lifecycle.md`. After code verification, settle approved ADR metadata and draft coherent current
-docs from all affected applications and existing behavior. Record discrepancies and missing checks. Do not yet call
+`shared/documentation-lifecycle.md`. After code verification, load `shared/documentation-reconciliation.md`,
+settle approved ADR metadata and draft coherent current docs from all affected applications and existing behavior. Record discrepancies and missing checks. Do not yet call
 the documentation current. In chained mode, finalize the review record after `camel-validate` returns; in standalone
 mode record partial evidence and the validation/documentation-only handoff before stopping.
 
@@ -667,7 +666,7 @@ Review Results:
 
 Cross-Cutting Review: PASS/FAIL
 
-Documentation: COMPLETE/PARTIAL/FAILED/PENDING
+Documentation: PENDING/PARTIAL/FAILED
   [current docs, ADR links, review evidence, scope and unresolved discrepancies]
 
 Verification: PASS/PARTIAL/FAIL/NOT_RUN
@@ -686,9 +685,12 @@ Save the completion summary as `docs/camel-kit/<PIPELINE_ID>/execution-report.md
 
 - **Chained mode:** auto-invoke `camel-validate` (the pipeline continues to Phase 4). After its report returns, the
   execute parent finishes documentation reconciliation and records its honest result using
-  `shared/documentation-lifecycle.md`. Capture a source snapshot before the final comparison; use the validation
+  `shared/documentation-reconciliation.md`. Capture a source snapshot before the final comparison; use the validation
   report as evidence, not permission to change code or accepted decisions. Report documentation separately from
-  implementation/validation completion. Do not ask the validator to perform the parent's writes.
+  implementation/validation completion. Do not ask the validator to perform the parent's writes. Finalize the
+  documentation review report before recording, then emit a separate final summary with COMPLETE/PARTIAL/FAILED,
+  current-doc paths, receipt/report paths and unresolved discrepancies. Preserve the earlier execution and validation
+  reports as evidence of their stage; do not rewrite them to imply the receipt existed before finalization.
 - **Standalone mode:** print confirmation and STOP. Do NOT auto-invoke validate.
 
 ---

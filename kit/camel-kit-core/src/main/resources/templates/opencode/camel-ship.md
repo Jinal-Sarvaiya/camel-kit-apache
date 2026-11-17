@@ -93,9 +93,9 @@ A failed native attempt stays native on retry.
 ## After Successful Publication
 
 For a new run, submission or explicit resume that actually completes publication, the parent owns the separate
-project documentation step in `shared/documentation-lifecycle.md` (installed under `{SKILLS_DIR}`). Run its
-documentation-only procedure against the published project, using the controller reports/Stamp as evidence and
-checking actual code. This is after the controller finishes; never edit candidates, run state, native proposals,
+project documentation step in `shared/documentation-lifecycle.md`. Load
+`shared/documentation-reconciliation.md` and run its documentation-only procedure against the published project,
+using the controller reports/Stamp as evidence and checking actual code. This is after the controller finishes; never edit candidates, run state, native proposals,
 imported artifacts or the Stamp to satisfy documentation requirements. Surface unresolved decisions instead of
 accepting them from worker prose. Preserve ADR history and existing documentation conventions.
 

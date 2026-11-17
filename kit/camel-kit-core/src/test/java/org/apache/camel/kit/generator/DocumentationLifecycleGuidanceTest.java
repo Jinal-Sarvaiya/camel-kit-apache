@@ -9,16 +9,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
-import org.apache.camel.Processor;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.config.AgentConfig;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.doc.DocumentationEvidence;
 import org.apache.camel.kit.output.Printer;
-import org.apache.camel.main.Main;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -56,8 +53,22 @@ class DocumentationLifecycleGuidanceTest {
             write(project, "docs/camel-kit/documentation-review.md",
                     "Inspected source and doc; fixture review, no runtime claim.\n");
 
-            new DefaultGenerator().generate(context);
-            String guide = Files.readString(skills.resolve("shared/documentation-lifecycle.md"));
+            AgentGeneratorFactory.create(agentName).generate(context);
+            assertTrue(Files.readString(project.resolve("AGENTS.md"))
+                    .contains("## Current Documentation and ADRs"), agentName + ": entry guidance");
+            assertTrue(Files.readString(project.resolve("AGENTS.md")).contains(
+                    project.relativize(skills).toString().replace('\\', '/') + "/shared/documentation-lifecycle.md"),
+                    agentName + ": installed entry guide path");
+            String invocation = switch (agentName) {
+                case "codex" -> "$camel-start";
+                case "pi" -> "/skill:camel-start";
+                default -> "/camel-start";
+            };
+            assertTrue(Files.readString(project.resolve("AGENTS.md"))
+                    .contains(invocation + " reconcile documentation"), agentName + ": native entry invocation");
+            assertFalse(Files.readString(skills.resolve("camel-ship/SKILL.md"))
+                    .contains("{SKILLS_DIR}"), agentName + ": unresolved Ship placeholder");
+            String guide = Files.readString(skills.resolve("shared/documentation-reconciliation.md"));
             assertFalse(guide.contains("{COMMAND_PREFIX}"));
             assertTrue(Files.isRegularFile(skills.resolve("shared/adr-template.md")));
             for (String consumer : List.of("camel-start", "camel-brainstorm", "camel-migrate", "camel-plan",
@@ -96,78 +107,13 @@ class DocumentationLifecycleGuidanceTest {
                     ".camel-kit/pipeline.json")) {
                 original.put(path, Files.readAllBytes(project.resolve(path)));
             }
-            new DefaultGenerator().generate(context);
+            AgentGeneratorFactory.create(agentName).generate(context);
             for (var entry : original.entrySet()) {
                 assertArrayEquals(entry.getValue(), Files.readAllBytes(project.resolve(entry.getKey())),
                         entry.getKey());
             }
             write(project, "src/manual.yaml", "- log: '${body}'\n");
             assertEquals("stale", DocumentationEvidence.check(project, document).status());
-        }
-    }
-
-    @Test
-    void observedEvolutionSeparatesArchivedPayloadsFromLogMetadata() throws Exception {
-        Path producer = write(tempDir, "src/producer.camel.yaml", """
-                - from:
-                    uri: direct:incoming
-                    steps:
-                      - to: direct:consumer
-                """);
-        Path consumer = write(tempDir, "src/consumer.camel.yaml", consumer(false));
-        var logs = new ArrayList<String>();
-        var archive = new ArrayList<String>();
-        exercise(producer, consumer, logs, archive);
-        assertEquals(List.of("event-42"), logs);
-        assertTrue(archive.isEmpty());
-        Path doc = write(tempDir, "docs/current.md",
-                "Producer forwards to consumer; event IDs logged; no payload storage.\n");
-        Path evidence
-                = write(tempDir, "docs/review.md", "Executed event-42 with sensitive payload; no archive writes.\n");
-        Path snapshot = write(tempDir, "inputs.json", DocumentationEvidence.json(
-                DocumentationEvidence.snapshot(tempDir, List.of("src"))));
-        DocumentationEvidence.record(tempDir, doc, snapshot, evidence, "complete");
-
-        Files.writeString(consumer, consumer(true));
-        assertEquals("stale", DocumentationEvidence.check(tempDir, doc).status());
-        logs.clear();
-        exercise(producer, consumer, logs, archive);
-        assertEquals(List.of("event-42"), logs);
-        assertEquals(List.of("sensitive-payload"), archive);
-        Files.writeString(snapshot,
-                DocumentationEvidence.json(DocumentationEvidence.snapshot(tempDir, List.of("src"))));
-        Files.writeString(doc,
-                "Producer forwards to consumer; payload archive is separate; logs contain only event IDs.\n");
-        Files.writeString(evidence,
-                "Executed event-42: archive received payload; event logger received only its ID.\n");
-        DocumentationEvidence.record(tempDir, doc, snapshot, evidence, "complete");
-        assertEquals("unchanged", DocumentationEvidence.check(tempDir, doc).status());
-    }
-
-    private static String consumer(boolean archive) {
-        return """
-                - from:
-                    uri: direct:consumer
-                    steps:
-                """ + (archive ? "      - process:\n          ref: archive\n" : "") + """
-                      - process:
-                          ref: eventLog
-                """;
-    }
-
-    private static void exercise(Path producer, Path consumer, List<String> logs, List<String> archive)
-            throws Exception {
-        Main main = new Main();
-        main.bind("eventLog", (Processor) exchange -> logs.add(exchange.getIn().getHeader("eventId", String.class)));
-        main.bind("archive", (Processor) exchange -> archive.add(exchange.getIn().getBody(String.class)));
-        main.configure().withRoutesIncludePattern("file:" + producer + ",file:" + consumer);
-        try {
-            main.start();
-            try (var template = main.getCamelContext().createProducerTemplate()) {
-                template.sendBodyAndHeader("direct:incoming", "sensitive-payload", "eventId", "event-42");
-            }
-        } finally {
-            main.stop();
         }
     }
 

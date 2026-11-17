@@ -6,9 +6,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import picocli.CommandLine;
@@ -26,13 +28,17 @@ class DocReconciliationTest {
     }
 
     private Result run(String... args) {
+        return runAt(project, args);
+    }
+
+    private Result runAt(Path root, String... args) {
         var out = new StringWriter();
         var err = new StringWriter();
         var cli = new CommandLine(new DocCommand());
         cli.setOut(new PrintWriter(out));
         cli.setErr(new PrintWriter(err));
         var arguments = new ArrayList<>(List.of(args));
-        arguments.addAll(List.of("--project", project.toString()));
+        arguments.addAll(List.of("--project", root.toString()));
         return new Result(cli.execute(arguments.toArray(String[]::new)), out.toString(), err.toString());
     }
 
@@ -219,5 +225,105 @@ class DocReconciliationTest {
         assertEquals(1, run("record", "docs/current.md", "--snapshot", "review-input.json",
                 "--evidence", "docs/review.md", "--result", "complete").code());
         assertFalse(Files.exists(project.resolve("docs/current.md.reconciliation.json")));
+    }
+
+    @Test
+    void acceptsRootAliasesWithoutAllowingTraversalOrDescendantSymlinks() throws Exception {
+        Path root = Files.createDirectories(project.resolve("real-project")).toRealPath();
+        Path alias = project.resolve("alias").toAbsolutePath();
+        Files.createSymbolicLink(alias, root);
+        write("real-project/src/route.yaml", "- to: direct:consumer\n");
+        write("real-project/docs/current.md", "Producer forwards to consumer.\n");
+        write("real-project/docs/review.md", "Inspected the producer route.\n");
+
+        for (Path spelling : List.of(Path.of(""), alias, root)) {
+            Result snapshot = runAt(alias, "snapshot", "--source", spelling.resolve("src").toString());
+            assertEquals(0, snapshot.code(), snapshot.err());
+            assertEquals(JSON.valueToTree(List.of("src")), JSON.readTree(snapshot.out()).path("sources"));
+            write("real-project/review-input.json", snapshot.out());
+            Result record = runAt(alias, "record", spelling.resolve("docs/current.md").toString(),
+                    "--snapshot", spelling.resolve("review-input.json").toString(),
+                    "--evidence", spelling.resolve("docs/review.md").toString(), "--result", "complete");
+            assertEquals(0, record.code(), record.err());
+            Result checked = runAt(alias, "check", spelling.resolve("docs/current.md").toString());
+            assertEquals(0, checked.code(), checked.err());
+            assertEquals("unchanged", JSON.readTree(checked.out()).path("reconciliation").path("status").asText());
+        }
+
+        Path outside = write("outside.yaml", "Must remain outside the review.\n");
+        assertEquals(1, runAt(alias, "snapshot", "--source", outside.toString()).code());
+        assertEquals(1, runAt(alias, "snapshot", "--source",
+                alias.resolve("../real-project/src").toString()).code());
+        Files.createSymbolicLink(root.resolve("linked"), root.resolve("src"));
+        assertEquals(1, runAt(alias, "snapshot", "--source", "linked").code());
+        assertEquals(1, runAt(alias, "snapshot", "--source", alias.resolve("linked/route.yaml").toString()).code());
+    }
+
+    @Test
+    void acceptedLargeSnapshotCanBeRecordedAndChecked() throws Exception {
+        for (int i = 0; i < 7550; i++) {
+            write("src/" + "x".repeat(48) + String.format(Locale.ROOT, "%08d", i), "source\n");
+        }
+        write("docs/current.md", "Current source description.\n");
+        write("docs/review.md", "Reviewed the complete source inventory.\n");
+        Result snapshot = run("snapshot", "--source", "src");
+        assertEquals(0, snapshot.code(), snapshot.err());
+        assertEquals(7551, JSON.readTree(snapshot.out()).path("files").size());
+        write("review-input.json", snapshot.out());
+        record("complete");
+        check("unchanged");
+    }
+
+    @Test
+    void rejectsReceiptBeyondItsBudgetEvenWhenItsJsonIsValid() throws Exception {
+        initialSystem();
+        snapshot();
+        record("complete");
+        Path receipt = project.resolve("docs/current.md.reconciliation.json");
+        String recorded = Files.readString(receipt);
+        Files.writeString(receipt, recorded + " ".repeat(2 * 1024 * 1024));
+        assertTrue(check("unverified").path("reconciliation").path("reason").asText().contains("exceeds 2 MiB"));
+    }
+
+    @Test
+    void missingOrNullReviewResultHasAnExplicitDiagnostic() throws Exception {
+        initialSystem();
+        snapshot();
+        record("complete");
+        ObjectNode receipt = (ObjectNode) JSON.readTree(
+                Files.readString(project.resolve("docs/current.md.reconciliation.json")));
+        for (boolean explicitNull : List.of(false, true)) {
+            if (explicitNull) {
+                receipt.putNull("result");
+            } else {
+                receipt.remove("result");
+            }
+            write("docs/current.md.reconciliation.json", JSON.writeValueAsString(receipt));
+            assertEquals("Invalid documentation review", check("unverified").path("reconciliation")
+                    .path("reason").asText());
+        }
+    }
+
+    @Test
+    void reconciliationReasonDoesNotInheritTheLegacyStaleDate() throws Exception {
+        initialSystem();
+        write("docs/current.md", org.apache.camel.kit.doc.FrontmatterHandler.markStale(
+                "Current source description.\n", "Previous design changed", "2020-01-01T00:00:00Z"));
+        JsonNode checked = check("unverified");
+        assertEquals("No recorded documentation review", checked.path("reason").asText());
+        assertTrue(checked.path("since").isNull(), "The new reason has no known staleness date");
+    }
+
+    @Test
+    void staleReviewIdentifiesAddedChangedAndDeletedSourcePaths() throws Exception {
+        initialSystem();
+        snapshot();
+        record("complete");
+        write("apps/producer/routes.yaml", "- to: kafka:other-events\n");
+        Files.delete(project.resolve("apps/consumer/routes.yaml"));
+        write("apps/consumer/new.yaml", "- log: '${body}'\n");
+        JsonNode checked = check("stale");
+        assertEquals(JSON.valueToTree(List.of("apps/consumer/new.yaml", "apps/consumer/routes.yaml",
+                "apps/producer/routes.yaml")), checked.path("reconciliation").path("changedPaths"));
     }
 }

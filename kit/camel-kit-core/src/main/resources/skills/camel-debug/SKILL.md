@@ -6,9 +6,8 @@ user_invocable: false
 
 # Camel Debug — Standalone Troubleshooting
 
-**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
-completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
-
+**Documentation lifecycle:** For behavior, contract, architecture or operations work, read the entry policy in
+`shared/documentation-lifecycle.md`, including standalone invocation. Load the recording procedure only at reconciliation.
 
 > Diagnose and fix a broken Camel route using a structured STOP → PRESERVE → DIAGNOSE → FIX → GUARD workflow.
 
@@ -76,7 +75,7 @@ the fix target and action.
 
 ## After the Fix
 
-The debug parent applies `shared/documentation-lifecycle.md` after normal verification. Reconcile behavior/contract/
+After normal verification, the debug parent loads `shared/documentation-reconciliation.md`. Reconcile behavior/contract/
 operations changes, or record why a repair restores the documented behavior without a prose change. Significant new
 choices need a proposed ADR and user decision; routine repairs do not. Failed or unavailable verification remains
 partial/failed. Finish this documentation responsibility before reporting overall completion.

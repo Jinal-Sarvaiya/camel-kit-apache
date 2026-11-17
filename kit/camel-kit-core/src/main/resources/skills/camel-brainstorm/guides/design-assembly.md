@@ -17,10 +17,25 @@ declared requirements and scope interpreted by shipped planning/execution workfl
 - Configuration properties
 - MCP verification evidence
 - Explicit scope boundaries (what will not be built, and why)
+- Affected current-system docs and proposed significant ADRs for this approval
 
 **Iron Law 3 reminder:** The user MUST explicitly approve this spec before `camel-plan` is invoked.
 
 ---
+
+## Current Documentation and ADRs
+
+For every design, including amendments, consult the adopted current docs and active ADRs alongside actual code.
+Surface conflicts before dependent design. Apply `shared/documentation-lifecycle.md` and prepare significant
+proposed decisions with `shared/adr-template.md`; preserve accepted reasoning and propose successors for reversals.
+Add a `## Documentation and Decisions` section to the spec listing:
+
+- Adopted current-doc paths and the changes each will need after implementation.
+- Relevant active ADR paths and proposed ADR paths, decisions and supersession links (or why no ADR is needed).
+- Intent/code discrepancies, unavailable evidence and accepted-but-unimplemented work.
+
+Keep current-system prose about observed behavior. Present proposed ADR context, credible alternatives, consequences
+and responses with the spec at its existing approval gate. Approval applies only to the presented decisions.
 
 ## Spec Structure
 
@@ -415,6 +430,9 @@ After assembling the spec, check:
    exclusions, does `## Not Doing (and Why)` contain only project-specific exclusions with a concrete reason for each
    one? Remove the template examples, and verify that no flow implements an excluded capability. Do not invent a
    migration exclusion solely to populate this section.
+9. **Documentation and decisions:** Does the spec list adopted current docs, affected paths and proposed ADRs?
+   Have neutral context, credible alternatives, consequences and responses been reviewed? Preserve accepted reasoning,
+   check supersession links and distinguish pending implementation from current behavior.
 
 Fix any issues inline.
 
@@ -447,9 +465,13 @@ Present the spec to the user:
 ```
 Design spec saved to docs/camel-kit/<PIPELINE_ID>/design-spec.md
 
-Please review the spec. Once you approve it, I'll create a detailed implementation plan.
+Proposed ADRs: [exact paths and decisions, including any superseded decision; or no ADR needed and why]
+Affected current docs: [exact paths and intended updates after implementation]
+
+Please review the spec and the proposed ADRs presented with it. Once you approve this package, I'll create a detailed implementation plan.
 
 Do you approve this design? (yes / changes needed)
 ```
 
-**Wait for explicit approval before proceeding to `camel-plan`.**
+**Wait for explicit approval before proceeding to `camel-plan`.** Then accept only the presented ADR decisions and
+update reciprocal supersession links. Unpresented or ambiguous records stay proposed.

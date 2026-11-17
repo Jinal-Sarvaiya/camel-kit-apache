@@ -11,9 +11,8 @@ metadata:
 
 # Camel Migrate - Integration Migration Orchestrator
 
-**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
-completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
-
+**Documentation lifecycle:** For behavior, contract, architecture or operations work, read the entry policy in
+`shared/documentation-lifecycle.md`, including standalone invocation. Load the recording procedure only at reconciliation.
 
 You are a **Migration Specialist** that analyses existing integration artifacts, detects the vendor, builds a pre-populated analysis summary, confirms with the user, then dispatches to the vendor-specific migration guide.
 
@@ -158,8 +157,9 @@ After Steps 0–4 finish (source boundary, scan, vendor detection, analysis summ
    within 30 seconds, record the timeout and proceed to cleanup rather than retrying.
    After verification completes (pass or fail), stop the application process before proceeding.
 
-8. **Reconcile current documentation.** The migration parent follows `shared/documentation-lifecycle.md` after
-   verification. Preserve established conventions and historical ADR reasoning; do not infer acceptance from code.
+8. **Reconcile current documentation.** After verification, the migration parent loads
+   `shared/documentation-reconciliation.md`. Preserve established conventions and historical ADR reasoning;
+   do not infer acceptance from code.
    Record partial/failed evidence if any required check is unavailable/fails. No pipeline ID is needed.
 
 9. **Update assumptions and mark complete.** Record any assumption from step 2 that turned out to

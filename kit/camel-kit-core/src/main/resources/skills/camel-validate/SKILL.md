@@ -6,9 +6,8 @@ user_invocable: false
 
 # Camel Validate — Pipeline Quality Gate
 
-**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
-completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
-
+**Documentation lifecycle:** For behavior, contract, architecture or operations work, read the entry policy in
+`shared/documentation-lifecycle.md`, including standalone invocation. Load the recording procedure only at reconciliation.
 
 > **Tier 1 pipeline step.** Final stage after execute — produces a comprehensive quality report.
 
@@ -377,12 +376,21 @@ When invoked standalone without pipeline context (project-scoped), fall back to 
 ## Documentation Consistency (Reporting Only)
 
 Apply `shared/documentation-lifecycle.md`: compare the consolidated current description and active ADRs with current
-code and the checks actually run, including accepted-but-unimplemented choices and supersession. Run
-`{COMMAND_PREFIX} doc check <current-doc> --project .` for each adopted current document. Report the checked boundary,
-source/evidence drift, semantic discrepancies and missing evidence in a separate Documentation Consistency section.
-An unchanged fingerprint alone cannot pass this review. Missing documentation/review records are UNVERIFIED, not PASS.
-Do not rewrite current docs, accept/supersede ADRs, clear stale flags or record a completed review. Return findings to
-the execute parent in chained mode; standalone output names `/camel-start reconcile documentation` as the finalizer.
+code and checks actually run, including pending implementation and supersession. Do not load the recording procedure.
+Run `{COMMAND_PREFIX} doc check <current-doc> --project .` for each adopted current document. In the report's
+Documentation Consistency section, distinguish:
+
+- **Consistency: PASS/FAIL/UNVERIFIED** — checked boundary, actual evidence, semantic discrepancies and missing checks.
+  Missing docs or unavailable verification remain UNVERIFIED; an unchanged fingerprint alone cannot establish PASS.
+- **Recorded review inputs: unchanged/stale/unverified** — preserve the CLI result and changed paths. A missing receipt
+  remains unverified even when this invocation's consistency checks pass; do not present it as a completed review.
+- **Finalization:** in chained mode, PENDING execute parent for new/changed docs; an existing unchanged completed
+  receipt may remain current if this review finds no discrepancy. A pending receipt alone does not fail consistency.
+  In standalone mode, name `/camel-start reconcile documentation` for any needed finalization.
+
+Do not rewrite docs, accept/supersede ADRs, clear stale flags or run `doc record`. Return findings to the execute parent
+in chained mode. Keep this report as evidence of the checks and receipt state observed here; the parent reports its
+later finalization separately. Pending finalization never excuses real discrepancies or missing verification.
 
 ## Validation Report
 

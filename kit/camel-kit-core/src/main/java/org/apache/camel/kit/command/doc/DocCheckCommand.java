@@ -51,6 +51,7 @@ public class DocCheckCommand implements Callable<Integer> {
                 if (!status.status().equals("unchanged")) {
                     result.put("stale", true);
                     result.put("reason", status.reason());
+                    result.putNull("since");
                 }
                 json = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(result);
             }

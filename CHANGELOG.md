@@ -43,7 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   migration, debug and Ship; documentation-only reconciliation through `camel-start`; neutral-context ADR guidance
   preserving accepted reasoning and supersession. Add source snapshots, review records and opt-in project-aware
   `doc check` to detect manual changes without treating hashes as semantic proof. Existing document commands and
-  project-owned documentation remain compatible.
+  project-owned documentation remain compatible. Install entry guidance for every supported agent, support aliased
+  project roots, identify changed review inputs and distinguish pending finalization from consistency results.
+  Keep recording instructions on demand and allow receipt space for a full accepted snapshot.
 
 - **Verified process inventory (#156)** — correct CLI/Ship/Knowledge host effects and clock assumptions, distinguish source evidence from runtime observations, and record the six verification outcomes.
 

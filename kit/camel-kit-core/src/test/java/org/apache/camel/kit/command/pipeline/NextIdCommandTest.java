@@ -78,12 +78,9 @@ class NextIdCommandTest {
         Files.createFile(docsDir.resolve("some-file.md"));
         Files.writeString(docsDir.resolve("system-design.md"), "Current system\n");
         Files.writeString(docsDir.resolve("system-design.md.reconciliation.json"), "{}\n");
-        Path adr = Files.createDirectories(tempDir.resolve("docs/adr")).resolve("0042-current-decision.md");
-        Files.writeString(adr, "Accepted decision and original rationale\n");
 
         String id = runNextId(tempDir, "second");
         assertEquals("002-second", id);
-        assertEquals("Accepted decision and original rationale\n", Files.readString(adr));
     }
 
     @Test

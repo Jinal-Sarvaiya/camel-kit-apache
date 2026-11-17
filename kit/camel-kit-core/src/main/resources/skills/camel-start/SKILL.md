@@ -13,7 +13,8 @@ This project uses camel-kit skills for all integration work. Use this decision t
 ## Documentation-only requests
 
 Before pipeline routing, when the request is to reconcile/update current documentation, consolidate existing pipeline
-pieces, or document manual changes, read `shared/documentation-lifecycle.md` and perform its documentation-only entry.
+pieces, or document manual changes, read `shared/documentation-lifecycle.md`, then load
+`shared/documentation-reconciliation.md` and perform its documentation-only entry.
 This branch does not allocate a pipeline, implement code or change the active pipeline. Surface unresolved intent and
 record unavailable verification honestly. Then stop; do not fall through to implementation routing.
 

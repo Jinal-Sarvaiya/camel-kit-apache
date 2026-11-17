@@ -165,7 +165,8 @@ metadata; Kit configures it for each harness, and it also serves MCP clients tha
 
 ## 4.4 Trust boundaries and data flow
 
-Current-system docs, ADRs and review receipts remain loaded data under `skills/shared/documentation-lifecycle.md`.
+Current-system docs, ADRs and review receipts remain loaded data under `skills/shared/documentation-lifecycle.md`;
+writers load `skills/shared/documentation-reconciliation.md` only at reconciliation.
 The shipped lifecycle plus explicit user/design approval selects allowed documentation actions. Accepted decisions
 are not proof of implementation; superseded records are historical. A receipt cannot expand scope or waive a gate.
 
@@ -436,7 +437,7 @@ Per-entry-point trust table. "Caller" is the developer unless stated otherwise.
 | `camel-kit graph <sub> [root]` | file bodies, names and link targets under `root` | **yes** | Same as `init --here`; confinement to `root` and bounded time and memory are claimed by P1, with enforcement verified under V2 |
 | `camel-kit graph …` output, `.camel-kit/project-graph.json` | graph JSON consumed by skills | derived from the tree | Treat as data in prompts *(documented — umbrella "Reading route sources")* |
 | `camel-kit doc check/stale/unstale <file>` | YAML frontmatter of pipeline artifacts | model-authored → **yes** | Legacy frontmatter flags parsed as data by `FrontmatterHandler` (Jackson YAML); no separate byte quota is claimed for these legacy commands |
-| `camel-kit doc snapshot/record`, `doc check --project` | source tree, JSON snapshot/receipt and documentation review | tree/model-authored → **yes** | `DocumentationEvidence` confines reads and receipt writes to the selected project, rejects symlink segments, traversal and Git internals; hashes regular files only. Source limits: 10,000 entries, 64 MiB/file, 512 MiB total; JSON/report/document inputs to `record`: 1 MiB each. Duplicate/trailing JSON is rejected. No source execution or network access. Hashes bind review inputs; they do not prove coverage, approval or semantic correctness. |
+| `camel-kit doc snapshot/record`, `doc check --project` | source tree, JSON snapshot/receipt and documentation review | tree/model-authored → **yes** | `DocumentationEvidence` resolves the selected project root (including an alias), confines reads and receipt writes to it, and rejects descendant symlinks, traversal and Git internals; hashes regular files only. Source limits: 10,000 entries, 64 MiB/file, 512 MiB total; snapshot/report/document inputs to `record`: 1 MiB each; receipts: 2 MiB to fit the embedded snapshot and review fields. Count and byte limits apply together. Duplicate/trailing JSON and scalar coercion are rejected. No source execution or network access. Hashes bind review inputs; they do not prove coverage, approval or semantic correctness. |
 | `camel-kit plan analyze` | `implementation-plan.md` task metadata | model-authored → **yes** | Parsed as data by `PlanAnalyzer`; no project execution |
 | `camel-kit nextId <slug>` | slug → `docs/camel-kit/NNN-slug/` | no — operator | — |
 | `camel-kit ship --text`, `--document PATH` | context for the model | supplied by the developer; **content is loaded context** for the model | Do not pass secrets; third-party documents can carry instruction-like text (§4.3, §4.10) |

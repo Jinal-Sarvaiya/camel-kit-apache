@@ -6,9 +6,8 @@ user_invocable: false
 
 # Camel Plan — Phase 2 Orchestrator
 
-**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
-completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
-
+**Documentation lifecycle:** For behavior, contract, architecture or operations work, read the entry policy in
+`shared/documentation-lifecycle.md`, including standalone invocation. Load the recording procedure only at reconciliation.
 
 Write comprehensive implementation plans assuming the engineer has zero context and questionable taste. Document everything they need to know: which files to touch for each task, which guides to load, which MCP tools to call, how to verify. Give them the whole plan as bite-sized tasks. DRY. YAGNI.
 

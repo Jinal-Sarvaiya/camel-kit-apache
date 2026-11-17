@@ -122,7 +122,7 @@ camel-kit doc unstale <file>
 ----
 
 With `--project`, `doc check` also checks the source-bound review receipt and reports `unchanged`, `stale` or
-`unverified`. Without it, the legacy behavior below is preserved. `snapshot` captures review inputs; `record` binds a
+`unverified`, with `reconciliation.changedPaths` identifying changed inputs. Without it, the legacy behavior below is preserved. `snapshot` captures review inputs; `record` binds a
 review result to unchanged sources, document and evidence without editing the document. They do not perform semantic
 review. See xref:documentation.adoc[the lifecycle and worked example] for scope, limits and status semantics.
 

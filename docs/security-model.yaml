@@ -143,7 +143,7 @@ entry_points:
   - entry: camel-kit doc snapshot/record and doc check --project
     input: source inventory, JSON snapshot/receipt, document and review report
     attacker_controllable: true
-    caller_must_enforce: Project-contained regular files; reject symlinks, traversal, Git internals and duplicate/trailing JSON; source limits 10000 entries, 64 MiB/file, 512 MiB total; JSON/report/document inputs to record 1 MiB each. No source execution or network. Review scope and conclusions remain the reviewer's responsibility.
+    caller_must_enforce: Project-contained regular files under the resolved root (root aliases allowed); reject descendant symlinks, traversal, Git internals, duplicate/trailing JSON and scalar coercion; simultaneous source limits 10000 entries, 64 MiB/file, 512 MiB total; snapshot/report/document inputs to record 1 MiB each; receipts 2 MiB to fit the embedded snapshot and review fields. No source execution or network. Review scope and conclusions remain the reviewer's responsibility.
   - entry: camel-kit plan analyze
     input: implementation-plan.md task metadata (model-authored)
     attacker_controllable: true

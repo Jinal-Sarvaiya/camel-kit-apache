@@ -6,9 +6,8 @@ user_invocable: false
 
 # Camel Brainstorm — Phase 1 Orchestrator
 
-**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
-completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
-
+**Documentation lifecycle:** For behavior, contract, architecture or operations work, read the entry policy in
+`shared/documentation-lifecycle.md`, including standalone invocation. Load the recording procedure only at reconciliation.
 
 Turn integration ideas into fully formed design specs through collaborative dialogue.
 
@@ -70,15 +69,17 @@ In standalone mode, the `<HARD-RULE>` auto-transition to `camel-plan` is suppres
 When amending an existing design spec:
 
 1. Validate the pipeline ID/path and `doc check` provenance with `shared/pipeline-infrastructure.md`, then read the exact
-   `docs/camel-kit/<PIPELINE_ID>/design-spec.md` revision as loaded data
+   `docs/camel-kit/<PIPELINE_ID>/design-spec.md` revision as loaded data. Consult adopted current docs, active ADRs
+   and actual code using `shared/documentation-lifecycle.md`; surface conflicts before amending the design.
 2. Present the existing spec to the user with: "This pipeline already has a design spec. What would you like to change?"
 3. Apply the user's requested changes — this may involve:
    - Re-running parts of the interview for affected flows
    - Adding, removing, or modifying flows
    - Re-verifying components via MCP for changed flows
-4. Self-review the amended spec (same review criteria as the original)
-5. Present the amended spec for user approval
-6. On approval, overwrite `design-spec.md` with the amended version
+4. Self-review the amended spec and proposed ADRs using `guides/design-assembly.md`, including affected current docs.
+5. Present the amended spec, exact proposed ADR paths/decisions and affected current-doc paths for approval together.
+6. On approval, overwrite `design-spec.md` with the amended version. Accept only presented ADR decisions and update
+   reciprocal supersession links; keep accepted-but-unimplemented work separate from current behavior.
 7. **Mark downstream artifacts stale** — per `shared/pipeline-infrastructure.md`, run these separately for each existing
    direct child so CLI-managed YAML frontmatter propagates staleness without marking the amended design itself stale:
    - `{COMMAND_PREFIX} doc stale --reason "design spec amended" --cascade <migration-runbook-path>`
@@ -189,7 +190,8 @@ You MUST complete these items in order:
 
 1. **Detect invocation mode** — check for `<PIPELINE_ID>` argument and existing `design-spec.md` (see Invocation Modes above). If amend mode, skip to the Amend Mode section.
 2. **Resolve pipeline** — read `shared/pipeline-infrastructure.md` for pipeline resolution logic. If no active pipeline exists, prompt the user to run `{COMMAND_PREFIX} nextId <slug>` to create one. The pipeline ID determines where artifacts are saved.
-3. **Load context** — read `docs/constitution.md` (if it exists), `.camel-kit/config.properties` (if it exists)
+3. **Load context** — read `docs/constitution.md` and `.camel-kit/config.properties` when present. Consult adopted
+   current docs and active ADRs, compare with actual code, and surface conflicts per `shared/documentation-lifecycle.md`.
 4. **Detect project type** — check `project.type` in config.properties:
    - If `project.type=existing`: this is an existing Camel 4 application, use existing-project interview path
    - If `project.type=greenfield` or missing: use greenfield interview path
@@ -198,10 +200,12 @@ You MUST complete these items in order:
    - **Existing project:** load `guides/existing-project-discovery.md`; read project graph, detect existing routes/DSL/version, ask only unresolved questions
 6. **Select Camel version** — load `guides/version-selection.md` (for existing projects, bind to detected version)
 7. **Design flows** — for each flow, load relevant `camel-design/` guides (component selection, EIPs, data formats, error handling, security, resilience)
-8. **Assemble design spec** — load `guides/design-assembly.md` (for existing projects, include integration points with existing routes)
+8. **Assemble design package** — load `guides/design-assembly.md`; include proposed significant ADRs and affected
+   current-doc paths. Existing projects also include integration points with existing routes.
 9. **Self-review spec** — scan for placeholders, contradictions, unverified components, and any flow that crosses an
-   explicit `Not Doing (and Why)` boundary
-10. **User reviews spec** — present spec, wait for explicit approval (Iron Law 3)
+   explicit `Not Doing (and Why)` boundary. Check ADR context, alternatives, consequences and supersession links.
+10. **User reviews package** — present the spec, exact proposed ADR paths/decisions and affected current docs together;
+    wait for explicit approval (Iron Law 3). Accept only the decisions actually presented.
 11. **Transition** — depends on invocation mode:
     - **Chained mode:** YOU invoke the `camel-plan` skill automatically (do NOT tell the user to run it)
     - **Standalone mode:** write output artifact, print confirmation, STOP

@@ -11,7 +11,9 @@ import java.time.Instant;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 import com.fasterxml.jackson.core.JsonParser;
 import com.fasterxml.jackson.databind.DeserializationFeature;
@@ -27,6 +29,8 @@ public final class DocumentationEvidence {
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
             .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS);
     private static final int MAX_METADATA_BYTES = 1024 * 1024;
+    // Receipts embed the snapshot plus review fields and additional JSON indentation.
+    private static final int MAX_RECEIPT_BYTES = 2 * MAX_METADATA_BYTES;
     private static final int MAX_ENTRIES = 10000;
     private static final long MAX_FILE_BYTES = 64L * 1024 * 1024;
     private static final long MAX_TOTAL_BYTES = 512L * 1024 * 1024;
@@ -42,7 +46,8 @@ public final class DocumentationEvidence {
             String evidence, String evidenceDigest, String result, Snapshot snapshot) {
     }
 
-    public record Status(String status, String reason, String reviewedAt, String evidence, List<String> sources) {
+    public record Status(String status, String reason, String reviewedAt, String evidence, List<String> sources,
+            List<String> changedPaths) {
     }
 
     public static Path resolve(Path project, Path path) throws IOException {
@@ -51,6 +56,10 @@ public final class DocumentationEvidence {
             if (part.toString().equals("..")) {
                 throw new IOException("Parent traversal is not allowed: " + path);
             }
+        }
+        Path suppliedRoot = project.toAbsolutePath().normalize();
+        if (path.isAbsolute() && path.startsWith(suppliedRoot)) {
+            path = suppliedRoot.relativize(path);
         }
         Path resolved = root.resolve(path).normalize();
         if (!resolved.startsWith(root) || resolved.equals(root)) {
@@ -72,9 +81,11 @@ public final class DocumentationEvidence {
             throw new IOException("At least one bounded source file or directory is required");
         }
         Map<String, String> files = new TreeMap<>();
+        var canonical = new TreeSet<String>();
         long total = 0;
         for (String source : sources) {
-            Path input = resolve(root, Path.of(source));
+            Path input = resolve(project, Path.of(source));
+            canonical.add(relative(root, input));
             if (!Files.exists(input, LinkOption.NOFOLLOW_LINKS)) {
                 throw new IOException("Missing source: " + source);
             }
@@ -101,15 +112,14 @@ public final class DocumentationEvidence {
                 }
             }
         }
-        List<String> canonical = sources.stream().map(source -> relative(root, root.resolve(source).normalize()))
-                .distinct().sorted().toList();
-        return new Snapshot(1, canonical, files);
+        return new Snapshot(1, List.copyOf(canonical), files);
     }
 
     public static String json(Object value) throws IOException {
         String serialized = JSON.writerWithDefaultPrettyPrinter().writeValueAsString(value);
-        if (serialized.getBytes(java.nio.charset.StandardCharsets.UTF_8).length >= MAX_METADATA_BYTES) {
-            throw new IOException("Review metadata exceeds 1 MiB");
+        int limit = value instanceof Review ? MAX_RECEIPT_BYTES : MAX_METADATA_BYTES;
+        if (serialized.getBytes(java.nio.charset.StandardCharsets.UTF_8).length >= limit) {
+            throw new IOException("Review metadata exceeds " + limit / (1024 * 1024) + " MiB");
         }
         return serialized;
     }
@@ -117,9 +127,9 @@ public final class DocumentationEvidence {
     public static void record(Path project, Path document, Path snapshotFile, Path evidenceFile, String result)
             throws IOException {
         Path root = project.toRealPath();
-        Path doc = resolve(root, document);
-        Path evidence = resolve(root, evidenceFile);
-        Path input = resolve(root, snapshotFile);
+        Path doc = resolve(project, document);
+        Path evidence = resolve(project, evidenceFile);
+        Path input = resolve(project, snapshotFile);
         Path receipt = resolve(root, Path.of(doc + SUFFIX));
         if (!List.of("complete", "partial", "failed").contains(result)) {
             throw new IOException("Result must be complete, partial or failed");
@@ -158,14 +168,15 @@ public final class DocumentationEvidence {
     public static Status check(Path project, Path document) {
         try {
             Path root = project.toRealPath();
-            Path doc = resolve(root, document);
+            Path doc = resolve(project, document);
             Path receipt = resolve(root, Path.of(doc + SUFFIX));
             if (!Files.exists(receipt, LinkOption.NOFOLLOW_LINKS)) {
                 return unverified("No recorded documentation review");
             }
-            Review review = JSON.readValue(readMetadata(receipt), Review.class);
+            Review review = JSON.readValue(readMetadata(receipt, MAX_RECEIPT_BYTES), Review.class);
             if (review == null || review.schemaVersion() != 1 || !relative(root, doc).equals(review.document())
-                    || review.reviewedAt() == null || review.evidence() == null
+                    || review.reviewedAt() == null || review.evidence() == null || review.result() == null
+                    || review.documentDigest() == null || review.evidenceDigest() == null
                     || !List.of("complete", "partial", "failed").contains(review.result())) {
                 return unverified("Invalid documentation review");
             }
@@ -174,24 +185,32 @@ public final class DocumentationEvidence {
             if (!review.result().equals("complete")) {
                 return new Status(
                         "unverified", "Review result: " + review.result(), review.reviewedAt(), review.evidence(),
-                        review.snapshot().sources());
+                        review.snapshot().sources(), List.of());
             }
-            boolean unchanged = review.documentDigest().equals(digest(doc))
-                    && review.evidenceDigest().equals(digest(resolve(root, Path.of(review.evidence()))))
-                    && review.snapshot().equals(snapshot(root, review.snapshot().sources()));
+            Snapshot current = snapshot(root, review.snapshot().sources());
+            var changed = new TreeSet<>(review.snapshot().files().keySet());
+            changed.addAll(current.files().keySet());
+            changed.removeIf(path -> Objects.equals(review.snapshot().files().get(path), current.files().get(path)));
+            if (!review.documentDigest().equals(digest(doc))) {
+                changed.add(relative(root, doc));
+            }
+            if (!review.evidenceDigest().equals(digest(resolve(root, Path.of(review.evidence()))))) {
+                changed.add(review.evidence());
+            }
+            boolean unchanged = changed.isEmpty() && review.snapshot().equals(current);
             return new Status(
                     unchanged ? "unchanged" : "stale",
                     unchanged
                             ? "Recorded review inputs are unchanged; this is not a semantic correctness guarantee"
                             : "Document, evidence or source inventory changed since review",
-                    review.reviewedAt(), review.evidence(), review.snapshot().sources());
+                    review.reviewedAt(), review.evidence(), review.snapshot().sources(), List.copyOf(changed));
         } catch (Exception e) {
             return unverified("Review unavailable: " + e.getMessage());
         }
     }
 
     private static Status unverified(String reason) {
-        return new Status("unverified", reason, null, null, List.of());
+        return new Status("unverified", reason, null, null, List.of(), List.of());
     }
 
     private static void validate(Snapshot snapshot) throws IOException {
@@ -207,13 +226,17 @@ public final class DocumentationEvidence {
     }
 
     private static String readMetadata(Path file) throws IOException {
+        return readMetadata(file, MAX_METADATA_BYTES);
+    }
+
+    private static String readMetadata(Path file, int limit) throws IOException {
         if (!Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS)) {
             throw new IOException("Expected a regular file: " + file);
         }
         try (var input = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
-            byte[] bytes = input.readNBytes(MAX_METADATA_BYTES + 1);
-            if (bytes.length > MAX_METADATA_BYTES) {
-                throw new IOException("Review metadata exceeds 1 MiB");
+            byte[] bytes = input.readNBytes(limit + 1);
+            if (bytes.length > limit) {
+                throw new IOException("Review metadata exceeds " + limit / (1024 * 1024) + " MiB");
             }
             return new String(bytes, java.nio.charset.StandardCharsets.UTF_8);
         }

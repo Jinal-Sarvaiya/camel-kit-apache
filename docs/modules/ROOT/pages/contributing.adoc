@@ -26,6 +26,10 @@ repository root.
 jbang kit/camel-kit-main/src/main/jbang/main/CamelKit.java --help
 ----
 
+The standalone JBang launcher enables native access for its terminal libraries. When invoking
+`org.apache.camel.kit.CamelKitMain` directly with `java`, include `--enable-native-access=ALL-UNNAMED`
+before the main class, as the launcher does.
+
 [cols="1,3"]
 |===
 | Module | Content

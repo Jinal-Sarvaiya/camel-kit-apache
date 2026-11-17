@@ -118,8 +118,25 @@ class HostedCliCompatibilityTest {
                                          + quote("-Duser.home=" + directory) + "\n" + entryPoint.getName()
                                          + "\n");
         List<String> command = new ArrayList<>(
-                List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
-                        "@" + javaArguments));
+                List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString()));
+        if (entryPoint == CamelKitMain.class) {
+            Path root = Path
+                    .of(HostedCliCompatibilityTest.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+            Path launcher = Path.of("kit/camel-kit-main/src/main/jbang/main/CamelKit.java");
+            while (root != null && !Files.isRegularFile(root.resolve(launcher))) {
+                root = root.getParent();
+            }
+            assertNotNull(root, "Could not locate the shipped JBang launcher");
+            List<String> source = Files.readAllLines(root.resolve(launcher));
+            assertEquals(source, Files.readAllLines(root.resolve("kit/camel-kit-main/dist/CamelKit.java")),
+                    "Source and distribution launchers must have the same JVM options and dependencies");
+            for (String line : source) {
+                if (line.startsWith("//JAVA_OPTIONS ")) {
+                    command.addAll(List.of(line.substring("//JAVA_OPTIONS ".length()).trim().split("\\s+")));
+                }
+            }
+        }
+        command.add("@" + javaArguments);
         command.addAll(List.of(arguments));
         Path out = directory.resolve("stdout"), err = directory.resolve("stderr");
         var builder = new ProcessBuilder(command).directory(directory.toFile())

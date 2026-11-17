@@ -14,6 +14,7 @@ import org.apache.camel.kit.graph.ParserDiagnostic;
 
 import org.aesh.command.CommandDefinition;
 import org.aesh.command.option.Option;
+import org.aesh.command.option.OptionVisibility;
 
 @CommandDefinition(name = "generate", description = "Generate or rebuild the project graph from source files")
 public class GraphGenerateCommand extends CliCommand {
@@ -22,7 +23,7 @@ public class GraphGenerateCommand extends CliCommand {
             converter = PathConverter.class)
     Path output;
     @Option(parser = KitOptionParser.class, name = "project-dir", defaultValue = ".",
-            visibility = org.aesh.command.option.OptionVisibility.HIDDEN,
+            visibility = OptionVisibility.HIDDEN,
             converter = PathConverter.class)
     Path projectDir;
 

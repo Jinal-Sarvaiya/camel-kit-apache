@@ -27,7 +27,7 @@ This project follows the [Apache Software Foundation Code of Conduct](https://ww
 
 ### Prerequisites
 
-- Java 21 or higher for the full reactor (standalone Kit and Knowledge also support Java 17)
+- Java 21 or higher for Kit, its plugin, Knowledge, and the full reactor
 - [JBang](https://www.jbang.dev/) (for running the CLI)
 - Maven 3.9+ (included via Maven Wrapper)
 - Git
@@ -84,7 +84,7 @@ CLI commands use Aesh's one-shot argv runtime. Keep error output on stderr, retu
 performing side effects, and keep service/controller logic independent of parsing. `camel.cli.version` pins
 the Camel JBang plugin host; `camel.main.version` continues to select the generated integration runtime.
 The current plugin build targets the Aesh-based Camel 4.24.0 development line and requires Java 21 or later.
-Standalone Kit retains Java 17 support; the Java 17 CI lane excludes the host plugin. It cannot load in older Picocli hosts.
+Kit and Knowledge also require Java 21 or later. CI covers Java 21 and 25, including the plugin. The plugin cannot load in older Picocli hosts.
 
 ## Project Structure
 

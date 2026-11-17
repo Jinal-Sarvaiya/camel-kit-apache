@@ -1,6 +1,7 @@
 package org.apache.camel.kit.command;
 
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
 import java.util.concurrent.Callable;
 
 import org.aesh.command.Command;
@@ -11,8 +12,8 @@ import org.aesh.command.option.ParentCommand;
 
 /** Shared execution and output contract for standalone and hosted commands. */
 public abstract class CliCommand implements Command<CommandInvocation>, Callable<Integer> {
-    protected PrintWriter out = new PrintWriter(System.out, true, java.nio.charset.Charset.defaultCharset());
-    protected PrintWriter err = new PrintWriter(System.err, true, java.nio.charset.Charset.defaultCharset());
+    protected PrintWriter out = new PrintWriter(System.out, true, Charset.defaultCharset());
+    protected PrintWriter err = new PrintWriter(System.err, true, Charset.defaultCharset());
     protected CommandInvocation invocation;
     @ParentCommand
     protected Command<CommandInvocation> parent;

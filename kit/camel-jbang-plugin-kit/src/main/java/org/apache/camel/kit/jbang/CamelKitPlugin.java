@@ -6,11 +6,13 @@ import org.apache.camel.dsl.jbang.core.common.CommandTree;
 import org.apache.camel.dsl.jbang.core.common.Plugin;
 import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.command.DoctorCommand;
+import org.apache.camel.kit.command.InitCommand;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.command.graph.GraphCommand;
 import org.apache.camel.kit.command.pipeline.NextIdCommand;
 import org.apache.camel.kit.command.plan.PlanCommand;
 import org.apache.camel.kit.command.ship.ShipCommand;
+import org.apache.camel.kit.output.SystemPrinter;
 
 /**
  * Camel JBang plugin for Camel Kit - Design Apache Camel Integrations with AI
@@ -20,10 +22,9 @@ public class CamelKitPlugin implements Plugin {
 
     @Override
     public void customize(CommandTree commandLine, CamelJBangMain main) {
-        CamelKitMain camelKitMain = new CamelKitMain(new org.apache.camel.kit.output.SystemPrinter());
-        camelKitMain.disableTui();
+        CamelKitMain camelKitMain = new CamelKitMain(new SystemPrinter());
         CommandTree kit = new CommandTree(new KitCommand())
-                .addSubcommand("init", new CommandTree(new KitInitCommand(main, camelKitMain)))
+                .addSubcommand("init", new CommandTree(new InitCommand(camelKitMain)))
                 .addSubcommand("doctor", new CommandTree(new DoctorCommand(camelKitMain)))
                 .addSubcommand("doc", new CommandTree(new DocCommand()))
                 .addSubcommand("graph", new CommandTree(new GraphCommand()))

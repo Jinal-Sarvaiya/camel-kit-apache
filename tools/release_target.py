@@ -7,6 +7,8 @@ import urllib.request
 from pathlib import Path
 import xml.etree.ElementTree as ET
 
+from sync_distribution_mirrors import load_properties
+
 NS = "{http://maven.apache.org/POM/4.0.0}"
 TARGETS = {
     "parent": ("pom.xml", "camel-kit-parent", ["-N"]),
@@ -44,6 +46,13 @@ def validate(root, target, tag=None, snapshot=False):
                     or child.findtext(f"{NS}parent/{NS}version") != version
                     or child.findtext(NS + "version", version) != version):
                 raise ValueError(f"{child_path}: module and product versions must match {version}")
+    if target == "kit" and not snapshot:
+        host = load_properties(root / "distribution.properties").get("camel.cli.version", "")
+        if (not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", host)
+                or tuple(map(int, host.split("."))) < (4, 24, 0)):
+            raise ValueError(f"A released Camel CLI host 4.24.0 or newer is required, got {host!r}")
+        if pom.findtext(f"{NS}properties/{NS}camel.cli.version") != host:
+            raise ValueError("Synchronize the Camel CLI host version in kit/pom.xml before releasing")
     return version, list(arguments)
 
 

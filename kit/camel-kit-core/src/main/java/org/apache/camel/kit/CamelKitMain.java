@@ -4,8 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-import org.apache.camel.kit.command.CliCommand;
 import org.apache.camel.kit.command.DoctorCommand;
+import org.apache.camel.kit.command.HelpAwareCommand;
 import org.apache.camel.kit.command.InformationOptionParser;
 import org.apache.camel.kit.command.InitCommand;
 import org.apache.camel.kit.command.doc.DocCommand;
@@ -35,12 +35,7 @@ import org.jline.utils.AttributedStyle;
                    name = "camel-kit",
                    generateHelp = true,
                    description = "Design Apache Camel integrations with AI coding assistants")
-public class CamelKitMain extends CliCommand {
-    @org.aesh.command.option.Option(name = "help", shortName = 'h', hasValue = false, overrideRequired = true,
-                                    parser = InformationOptionParser.class,
-                                    description = "Display help and exit")
-    protected boolean helpRequested;
-
+public class CamelKitMain extends HelpAwareCommand {
     private static DistributionConfig DISTRIBUTION = loadDistribution();
 
     public static String LATEST_CAMEL_LTS_VERSION = DISTRIBUTION.camelMainVersion();
@@ -63,6 +58,11 @@ public class CamelKitMain extends CliCommand {
             = org.apache.camel.kit.tui.TaskTracker.noop();
 
     public CamelKitMain() {
+        if (System.console() == null) {
+            this.printer = new SystemPrinter();
+            this.tuiEnabled = false;
+            return;
+        }
         try {
             this.terminal = TerminalBuilder.builder()
                     .system(true)
@@ -206,10 +206,11 @@ public class CamelKitMain extends CliCommand {
     public void printBanner() {
         int terminalWidth = terminal != null ? terminal.getWidth() : 80;
         int terminalHeight = terminal != null ? terminal.getHeight() : 24;
+        boolean interactive = System.console() != null;
 
         printer.println();
 
-        boolean imageRendered = LogoRenderer.tryRender(System.out, terminalWidth, terminalHeight);
+        boolean imageRendered = interactive && LogoRenderer.tryRender(System.out, terminalWidth, terminalHeight);
 
         if (!imageRendered) {
             // ASCII art fallback
@@ -222,9 +223,9 @@ public class CamelKitMain extends CliCommand {
                 camelLines = new String[]{""};
                 bannerLines = new String[]{""};
             }
-            printCenteredBlock(camelLines, AnsiColors.CAMEL_GRADIENT);
+            printCenteredBlock(camelLines, AnsiColors.CAMEL_GRADIENT, interactive);
             printer.println();
-            printCenteredBlock(bannerLines, AnsiColors.CAMEL_GRADIENT);
+            printCenteredBlock(bannerLines, AnsiColors.CAMEL_GRADIENT, interactive);
         }
 
         printer.println();
@@ -240,8 +241,12 @@ public class CamelKitMain extends CliCommand {
         // "Camel-Kit — " dimmed, rest in amber
         int splitAt = "Camel-Kit \u2014 ".length();
         printer.print(pad);
-        printer.print(new AttributedString(tagline.substring(0, splitAt), dimStyle).toAnsi(terminal));
-        printer.println(new AttributedString(tagline.substring(splitAt), mainStyle).toAnsi(terminal));
+        printer.print(!interactive
+                ? tagline.substring(0, splitAt)
+                : new AttributedString(tagline.substring(0, splitAt), dimStyle).toAnsi(terminal));
+        printer.println(!interactive
+                ? tagline.substring(splitAt)
+                : new AttributedString(tagline.substring(splitAt), mainStyle).toAnsi(terminal));
         printer.println();
     }
 
@@ -249,7 +254,7 @@ public class CamelKitMain extends CliCommand {
      * Prints a block of text centered on the terminal screen. Calculates padding once based on the longest line to
      * preserve the block's shape.
      */
-    private void printCenteredBlock(String[] lines, int[] colors) {
+    private void printCenteredBlock(String[] lines, int[] colors, boolean interactive) {
         int terminalWidth = (terminal != null && terminal.getWidth() > 0) ? terminal.getWidth() : 100;
 
         // Find max width of the block
@@ -265,7 +270,7 @@ public class CamelKitMain extends CliCommand {
             int color = colors[i % colors.length];
             AttributedStyle style = AttributedStyle.DEFAULT.foregroundRgb(color);
             printer.print(paddingStr);
-            printer.println(new AttributedString(lines[i], style).toAnsi(terminal));
+            printer.println(!interactive ? lines[i] : new AttributedString(lines[i], style).toAnsi(terminal));
         }
     }
 }

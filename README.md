@@ -44,9 +44,8 @@ modules use `org.apache.camel`.
 
 ## Building from source
 
-Use Java 21 or later and the checked-in Maven wrapper for the full reactor.
-Standalone Kit and Knowledge also support Java 17; the Aesh-based Camel plugin requires Java 21. Run these commands from
-the repository root:
+Kit, its Camel JBang plugin, and Knowledge require Java 21 or later. Use the checked-in Maven wrapper
+and run these commands from the repository root:
 
 ```bash
 git clone https://github.com/apache/camel-kit.git

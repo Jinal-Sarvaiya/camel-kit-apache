@@ -11,8 +11,8 @@ xref:manual::camel-jbang.adoc[Camel JBang]. Both forms provide the same commands
 |===
 | Requirement | Purpose | Install
 
-| Java 17 or later
-| Runtime for Camel Kit, Camel JBang and the generated projects
+| Java 21 or later
+| Runtime for development Kit, Knowledge and the Aesh-based Camel JBang host
 | SDKMAN, Adoptium or your package manager
 
 | https://www.jbang.dev/[JBang]
@@ -31,6 +31,9 @@ xref:manual::camel-jbang.adoc[Camel JBang]. Both forms provide the same commands
 | Environment probes for external services and full Citrus/Testcontainers verification
 | Docker Engine or Docker Desktop
 |===
+
+Released Kit {camel-kit-version} and Knowledge {camel-kit-knowledge-version} still support Java 17.
+Generated integrations have their own Java requirements, determined by their selected Camel runtime.
 
 Camel JBang and its test plugin are needed for the complete execution and verification loops. When Docker is not
 available, the checks that need containers are reported as skipped; design, planning and the container-free checks
@@ -160,10 +163,11 @@ release coordinates; this page is updated with it.
 
 The development CLI uses Aesh in both entry points. The plugin requires the Aesh-based Camel 4.24.0 line;
 the current build is tested against `{camel-cli-version}`. This host requires Java 21 or later. Use that development host for source/snapshot testing.
-A released Camel 4.24.0 host must be verified before releasing this Kit version. Older Picocli-based hosts cannot
+Kit release validation rejects a snapshot `camel.cli.version`; a released Camel 4.24.0 host must be verified before releasing this Kit version. Older Picocli-based hosts cannot
 load the new plugin. These requirements do not change the released {camel-kit-version} plugin.
 
-The standalone `camel-kit` launcher continues to support Java 17 or later, supplies its own parser and does not require a Camel host to parse commands.
+The standalone `camel-kit` launcher and source-built Knowledge also require Java 21 or later.
+Standalone Kit supplies its own parser and does not require a Camel host to parse commands.
 The existing JLine/TamboUI rendering remains in place. The host pin `camel.cli.version` is independent of
 `camel.main.version`, so upgrading the CLI host does not change the defaults or supported versions of generated
 integrations. All pins live in `distribution.properties`.

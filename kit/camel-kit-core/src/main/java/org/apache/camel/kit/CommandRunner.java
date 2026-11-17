@@ -2,11 +2,13 @@ package org.apache.camel.kit;
 
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.nio.charset.Charset;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
 
 import org.aesh.command.AeshCommandRuntimeBuilder;
 import org.aesh.command.Command;
@@ -20,6 +22,7 @@ import org.aesh.command.impl.registry.AeshCommandRegistryBuilder;
 import org.aesh.command.impl.shell.StdoutShell;
 import org.aesh.command.invocation.CommandInvocation;
 import org.aesh.command.parser.CommandLineParserException;
+import org.aesh.command.parser.OptionParserException;
 import org.aesh.command.parser.RequiredOptionException;
 import org.aesh.command.validator.CommandValidatorException;
 import org.aesh.command.validator.OptionValidatorException;
@@ -28,8 +31,8 @@ import org.aesh.command.validator.OptionValidatorException;
 public final class CommandRunner {
     private final Command<CommandInvocation> command;
     private final Map<String, CommandRunner> children = new LinkedHashMap<>();
-    private PrintWriter out = new PrintWriter(System.out, true, java.nio.charset.Charset.defaultCharset());
-    private PrintWriter err = new PrintWriter(System.err, true, java.nio.charset.Charset.defaultCharset());
+    private PrintWriter out = new PrintWriter(System.out, true, Charset.defaultCharset());
+    private PrintWriter err = new PrintWriter(System.err, true, Charset.defaultCharset());
     private boolean argumentFiles;
     private CommandLineParser<CommandInvocation> parser;
     private CommandContainer<CommandInvocation> container;
@@ -186,11 +189,12 @@ public final class CommandRunner {
 
     // Root information flags excuse unknown tokens and omitted required arguments, but never malformed options.
     private static boolean onlyInformationalErrors(CommandLineParser<?> parser) {
+        // Kit parsers give malformed options a distinct type. Other parsers may use the generic type for them.
+        boolean kitOptions = parser.getProcessedCommand().getOptions().stream()
+                .allMatch(option -> option.parser() instanceof KitOptionParser);
         for (var error : parser.getProcessedCommand().parserExceptions()) {
             if (!(error instanceof RequiredOptionException)
-                    && !(error.getMessage().startsWith("The option ") && error.getMessage().contains(" is unknown."))
-                    && !error.getMessage().startsWith("Unknown argument ")
-                    && !error.getMessage().startsWith("Unexpected argument ")) {
+                    && !(kitOptions && error.getClass() == OptionParserException.class)) {
                 return false;
             }
         }

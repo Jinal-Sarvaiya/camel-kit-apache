@@ -3,11 +3,13 @@ package org.apache.camel.kit;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 
+@Tag("cli-compat")
 class ArgumentFilesTest {
     @TempDir
     Path directory;

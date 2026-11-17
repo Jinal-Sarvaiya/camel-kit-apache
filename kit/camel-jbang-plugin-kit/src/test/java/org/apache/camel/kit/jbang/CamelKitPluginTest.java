@@ -7,18 +7,23 @@ import java.util.List;
 
 import org.apache.camel.dsl.jbang.core.commands.CamelJBangMain;
 import org.apache.camel.dsl.jbang.core.common.CommandTree;
+import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.CommandRunner;
+import org.apache.camel.kit.command.InitCommand;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.command.pipeline.NextIdCommand;
 import org.apache.camel.kit.command.ship.ShipCommand;
+import org.apache.camel.kit.output.SystemPrinter;
 import org.apache.camel.kit.ship.context.ShipContext;
 
 import org.aesh.command.impl.parser.ArgfileExpander;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("cli-compat")
 class CamelKitPluginTest {
 
     @TempDir
@@ -26,7 +31,7 @@ class CamelKitPluginTest {
 
     @Test
     void kitInitDefaultsToBob2WhenAgentOptionIsOmitted() throws Exception {
-        KitInitCommand command = new KitInitCommand(new CamelJBangMain());
+        InitCommand command = new InitCommand(new CamelKitMain(new SystemPrinter()));
 
         new CommandRunner(command).parse("orders");
 
@@ -35,7 +40,7 @@ class CamelKitPluginTest {
 
     @Test
     void kitInitAcceptsCodexAndShowsItInHelp() throws Exception {
-        KitInitCommand command = new KitInitCommand(new CamelJBangMain());
+        InitCommand command = new InitCommand(new CamelKitMain(new SystemPrinter()));
         CommandRunner commandLine = new CommandRunner(command);
 
         commandLine.parse("orders", "--ai", "codex");
@@ -74,13 +79,15 @@ class CamelKitPluginTest {
         assertEquals("camel kit ship", ship.getQualifiedName());
         assertEquals(List.of(new ShipContext.TextInput(literal)),
                 inputs(parseShip(main, "kit", "ship", "--text", "@" + literal)));
-        assertEquals(List.of(new ShipContext.DocumentInput(Path.of(literal))),
-                inputs(parseShip(main, "kit", "ship", "--document", "@" + literal)));
+        assertEquals(List.of(new ShipContext.DocumentInput(Path.of("@notes.md"))),
+                inputs(parseShip(main, "kit", "ship", "--document", "@@notes.md")));
         assertEquals(List.of(new ShipContext.TextInput(literal)),
                 inputs(parseShip(main, "kit", "--version=true", "ship", "--text", "@" + literal)));
+        assertEquals(List.of(new ShipContext.DocumentInput(context.toAbsolutePath())),
+                inputs(parseShip(main, "kit", "ship", "--document", context.toAbsolutePath().toString())));
         root.parse(ArgfileExpander.expand(new String[]{"@" + arguments.toAbsolutePath()}));
-        KitInitCommand init
-                = (KitInitCommand) root.getSubcommands().get("kit").getSubcommands().get("init").getCommand();
+        InitCommand init
+                = (InitCommand) root.getSubcommands().get("kit").getSubcommands().get("init").getCommand();
         assertEquals("orders", init.projectName);
         assertEquals("codex", init.ai);
 

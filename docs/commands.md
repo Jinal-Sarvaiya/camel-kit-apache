@@ -1205,4 +1205,7 @@ Development builds use Aesh. The plugin targets the Camel host selected by `came
 See the [installation guide](modules/ROOT/pages/getting-started.adoc#cli-host).
 Standalone Ship preserves literal `@` values. The new plugin follows Camel's argument-file policy: use
 `--text @@literal` or `--text=@literal` to pass `@literal`; shell quotes alone do not prevent expansion.
-Use `-h`/`--help` for help and root `-V`/`--version` for the Kit artifact version.
+An unescaped missing file produces `Argument file not found` and exit code 2 before Kit runs.
+Development Kit and Knowledge require Java 21 or later.
+Use `-h`/`--help` on the root, `init`, `doctor` or `ship`, and the `help` subcommand for `doc`, `graph` and `plan`.
+Use root `-V`/`--version` for the Kit artifact version.

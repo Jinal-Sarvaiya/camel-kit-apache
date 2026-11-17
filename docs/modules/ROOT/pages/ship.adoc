@@ -63,7 +63,8 @@ With the Aesh-based development plugin, the Camel host expands `@file` before Ki
 `camel kit ship --text '@@note'` or `camel kit ship --text=@note` to pass the same literal text.
 For a document whose filename starts with `@`, use `--document '@@notes.md'` or `--document=@notes.md`.
 To pass two leading `@` characters as a separate plugin value, supply three. Quoting preserves shell tokens
-but does not suppress the host's argument-file processing. Other Camel commands retain the host's normal policy.
+but does not suppress the host's argument-file processing. An unescaped `@missing-file` fails with
+`Argument file not found` and exit code 2 before Kit runs, including when supplied as Ship context. Other Camel commands retain the host's normal policy.
 
 [cols="1,1,3"]
 |===

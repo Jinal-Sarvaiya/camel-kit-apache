@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.StreamTokenizer;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -32,7 +33,7 @@ final class ArgumentFiles {
             if (!file.canRead()) {
                 expanded.add(argument);
             } else if (visited.add(file.getAbsolutePath())) {
-                try (var reader = new FileReader(file, java.nio.charset.Charset.defaultCharset())) {
+                try (var reader = new FileReader(file, Charset.defaultCharset())) {
                     var tokenizer = new StreamTokenizer(reader);
                     tokenizer.resetSyntax();
                     tokenizer.wordChars(' ', 255);

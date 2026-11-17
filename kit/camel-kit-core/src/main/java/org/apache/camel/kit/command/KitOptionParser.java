@@ -11,13 +11,13 @@ public class KitOptionParser implements OptionParser {
     public void parse(ParsedLineIterator iterator, ProcessedOption option) throws OptionParserException {
         String token = iterator.pollWord();
         if (!option.hasMultipleValues() && !option.getValues().isEmpty()) {
-            throw new OptionParserException("Option --" + option.name() + " may only be specified once");
+            throw new MalformedOptionException("Option --" + option.name() + " may only be specified once");
         }
         String attached = token.substring(option.isLongNameUsed() ? option.name().length() + 2 : 2);
         if (!option.hasValue()) {
             String value = attached.isEmpty() ? "true" : attached.startsWith("=") ? attached.substring(1) : attached;
             if (!value.equalsIgnoreCase("true") && !value.equalsIgnoreCase("false")) {
-                throw new OptionParserException("Option --" + option.name() + " requires true or false");
+                throw new MalformedOptionException("Option --" + option.name() + " requires true or false");
             }
             option.addValue(value);
             return;
@@ -26,7 +26,7 @@ public class KitOptionParser implements OptionParser {
             option.addValue(attached.startsWith("=") ? attached.substring(1) : attached);
         } else {
             if (!hasValue(iterator, option)) {
-                throw new OptionParserException("Option --" + option.name() + " requires a value");
+                throw new MalformedOptionException("Option --" + option.name() + " requires a value");
             }
             option.addValue(iterator.pollWord());
         }
@@ -40,5 +40,12 @@ public class KitOptionParser implements OptionParser {
     private static boolean hasValue(ParsedLineIterator iterator, ProcessedOption option) {
         return iterator.hasNextWord() && !"--".equals(iterator.peekWord())
                 && option.parent().searchAllOptions(iterator.peekWord()) == null;
+    }
+
+    /** Distinguishes malformed known options from Aesh's unknown/excess token errors. */
+    public static final class MalformedOptionException extends OptionParserException {
+        public MalformedOptionException(String message) {
+            super(message);
+        }
     }
 }

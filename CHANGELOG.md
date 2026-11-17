@@ -12,10 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Migrate the standalone CLI and Camel JBang plugin from Picocli to Aesh (#171), retaining one-shot execution,
   ordered Ship context, validation before side effects, and machine-readable output. The plugin now requires
-  the Aesh-based Camel 4.24.0 line and Java 21+ (currently tested with 4.24.0-SNAPSHOT); standalone Kit remains
-  compatible with Java 17+, and generated integration version defaults
-  are unchanged. For literal leading `@` values in the plugin, use `@@value` or `--text=@value`, following the
-  host's argument-file policy. Standalone Ship continues to accept literal `@value`.
+  the Aesh-based Camel 4.24.0 line (currently tested with 4.24.0-SNAPSHOT). Kit, its plugin, and Knowledge
+  now require Java 21+. Generated integration version defaults are unchanged. For literal leading `@` values in the plugin, use `@@value` or `--text=@value`, following the
+  host's argument-file policy; an unescaped missing file fails before the plugin runs. Standalone Ship continues to accept literal `@value`.
 
 ### Monorepo migration
 

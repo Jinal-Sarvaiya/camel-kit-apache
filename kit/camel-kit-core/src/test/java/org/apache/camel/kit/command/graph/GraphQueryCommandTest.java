@@ -7,6 +7,7 @@ import java.nio.file.Path;
 
 import org.apache.camel.kit.CommandRunner;
 
+import org.aesh.command.CommandDefinition;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -17,7 +18,7 @@ class GraphQueryCommandTest {
     @TempDir
     Path tempDir;
 
-    @org.aesh.command.CommandDefinition(name = "test-query", description = "Test query")
+    @CommandDefinition(name = "test-query", description = "Test query")
     static class TestQueryCommand extends GraphQueryCommand {
         @Override
         protected String execute(org.apache.camel.kit.graph.ProjectGraph graph) {

@@ -9,11 +9,12 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.HelpAwareCommand;
 import org.apache.camel.kit.command.InformationOptionParser;
 import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.command.PathConverter;
@@ -31,6 +32,7 @@ import org.aesh.command.converter.ConverterInvocation;
 import org.aesh.command.impl.internal.ProcessedOption;
 import org.aesh.command.option.Option;
 import org.aesh.command.option.OptionList;
+import org.aesh.command.option.OptionVisibility;
 import org.aesh.command.parser.OptionParserException;
 import org.aesh.command.validator.OptionValidatorException;
 import org.aesh.parser.ParsedLineIterator;
@@ -44,12 +46,7 @@ import org.aesh.parser.ParsedLineIterator;
                    generateHelp = true,
                    description = "Technology Preview: start, inspect, resume, or abort a local Camel Ship run",
                    footer = "Camel Ship is still being stabilized, may change, and is not recommended for production use.")
-public final class ShipCommand extends CliCommand {
-    @org.aesh.command.option.Option(name = "help", shortName = 'h', hasValue = false, overrideRequired = true,
-                                    parser = InformationOptionParser.class,
-                                    description = "Display help and exit")
-    protected boolean helpRequested;
-
+public final class ShipCommand extends HelpAwareCommand {
     private ShipController controller;
     private WorkflowLauncher launcher;
 
@@ -92,7 +89,7 @@ public final class ShipCommand extends CliCommand {
     Oversight oversight;
 
     @Option(parser = KitOptionParser.class, name = "project-dir", defaultValue = ".",
-            visibility = org.aesh.command.option.OptionVisibility.HIDDEN,
+            visibility = OptionVisibility.HIDDEN,
             converter = PathConverter.class)
     Path projectDirectory;
 
@@ -295,7 +292,7 @@ public final class ShipCommand extends CliCommand {
 
     private void validateArguments() {
         long operations
-                = Stream.of(submit, resume, startFrom, status, abort).filter(java.util.Objects::nonNull).count();
+                = Stream.of(submit, resume, startFrom, status, abort).filter(Objects::nonNull).count();
         if (operations > 1) {
             throw new UsageException("--submit, --resume, --start-from, --status and --abort are mutually exclusive");
         }

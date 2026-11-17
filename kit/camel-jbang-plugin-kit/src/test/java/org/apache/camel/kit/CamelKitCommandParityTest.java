@@ -7,11 +7,15 @@ import java.util.List;
 import java.util.Properties;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.function.ToIntFunction;
+import java.util.stream.Collectors;
 
 import org.apache.camel.dsl.jbang.core.commands.CamelJBangMain;
 import org.apache.camel.dsl.jbang.core.common.CommandTree;
 import org.apache.camel.kit.jbang.CamelKitPlugin;
+import org.apache.camel.kit.output.SystemPrinter;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -30,9 +34,10 @@ class CamelKitCommandParityTest {
     @TempDir
     Path tempDir;
 
+    @Tag("cli-compat")
     @Test
     void bob2InitAndRegenerationExposeTheSamePublicSkills() throws Exception {
-        CamelKitMain standaloneMain = new CamelKitMain();
+        CamelKitMain standaloneMain = new CamelKitMain(new SystemPrinter());
         standaloneMain.disableTui();
         CommandRunner standalone = CamelKitMain.commandLine(standaloneMain);
         CamelJBangMain main = new CamelJBangMain();
@@ -55,9 +60,10 @@ class CamelKitCommandParityTest {
         }
     }
 
+    @Tag("cli-compat")
     @Test
     void pluginForwardsWithCitrusMcpOption() throws Exception {
-        CamelKitMain standaloneMain = new CamelKitMain();
+        CamelKitMain standaloneMain = new CamelKitMain(new SystemPrinter());
         standaloneMain.disableTui();
         CommandRunner standalone = CamelKitMain.commandLine(standaloneMain);
         CamelJBangMain main = new CamelJBangMain();
@@ -96,7 +102,7 @@ class CamelKitCommandParityTest {
 
     @Test
     void pluginForwardsTheExistingProjectOptions() throws Exception {
-        CamelKitMain standaloneMain = new CamelKitMain();
+        CamelKitMain standaloneMain = new CamelKitMain(new SystemPrinter());
         standaloneMain.disableTui();
         CommandRunner standalone = CamelKitMain.commandLine(standaloneMain);
         CamelJBangMain main = new CamelJBangMain();
@@ -235,6 +241,7 @@ class CamelKitCommandParityTest {
         return config;
     }
 
+    @Tag("cli-compat")
     @ParameterizedTest
     @CsvSource({"false,bob2", "true,bob2", "false,copilot", "true,copilot", "false,claude", "true,claude"})
     void nativeInitAndRegenerationDetectThePrefixInSeparateProcesses(boolean plugin, String agent) throws Exception {
@@ -292,7 +299,7 @@ class CamelKitCommandParityTest {
 
     public static class InitProcess {
         public static void main(String[] args) {
-            java.util.function.ToIntFunction<String[]> execute;
+            ToIntFunction<String[]> execute;
             boolean plugin = Boolean.parseBoolean(args[0]);
             var invocation
                     = new ArrayList<>(List.of("init", args[1], "--ai", args[2], "--silent", "--no-fetch", "--force"));
@@ -304,7 +311,9 @@ class CamelKitCommandParityTest {
                 invocation.add(0, "kit");
             } else {
                 CamelKitMain main = new CamelKitMain();
-                main.disableTui();
+                if (System.console() == null && (main.getTerminal() != null || main.isTuiEnabled())) {
+                    throw new AssertionError("Redirected CLI must not acquire an interactive terminal");
+                }
                 var command = CamelKitMain.commandLine(main);
                 execute = command::execute;
             }
@@ -319,14 +328,16 @@ class CamelKitCommandParityTest {
         return command;
     }
 
+    @Tag("cli-compat")
     @Test
     void pluginRegistersStandaloneCommandSurface() {
         CamelJBangMain main = new CamelJBangMain();
         CommandTree pluginRoot = new CommandTree(main);
         new CamelKitPlugin().customize(pluginRoot, main);
 
-        assertEquals(CamelKitMain.commandLine(new CamelKitMain()).parser().getAllChildParsers().stream()
-                .map(p -> p.getProcessedCommand().name()).collect(java.util.stream.Collectors.toSet()),
+        assertEquals(
+                CamelKitMain.commandLine(new CamelKitMain(new SystemPrinter())).parser().getAllChildParsers().stream()
+                        .map(p -> p.getProcessedCommand().name()).collect(Collectors.toSet()),
                 pluginRoot.getSubcommands().get("kit").getSubcommands().keySet());
     }
 }

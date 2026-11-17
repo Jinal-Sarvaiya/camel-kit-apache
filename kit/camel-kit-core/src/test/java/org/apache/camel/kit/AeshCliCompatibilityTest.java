@@ -4,11 +4,15 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Stream;
 
 import org.apache.camel.kit.command.InitCommand;
 import org.apache.camel.kit.command.ship.ShipCommand;
+import org.apache.camel.kit.output.SystemPrinter;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -16,6 +20,7 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+@Tag("cli-compat")
 class AeshCliCompatibilityTest {
     @TempDir
     Path directory;
@@ -28,9 +33,9 @@ class AeshCliCompatibilityTest {
     void rejectsMalformedShipOptionsBeforeExecution(String arguments) {
         var error = new StringWriter();
         assertEquals(2, new CommandRunner(new ShipCommand()).setErr(new PrintWriter(error))
-                .execute(java.util.stream.Stream
-                        .concat(java.util.stream.Stream.of("--project-dir", directory.toString()),
-                                java.util.Arrays.stream(arguments.split(" ")))
+                .execute(Stream
+                        .concat(Stream.of("--project-dir", directory.toString()),
+                                Arrays.stream(arguments.split(" ")))
                         .toArray(String[]::new)),
                 error.toString());
         assertFalse(Files.exists(directory.resolve(".camel-kit")));
@@ -38,8 +43,45 @@ class AeshCliCompatibilityTest {
     }
 
     @Test
+    void informationFlagsKeepMalformedOptionsStrictAcrossTheCommandTree() {
+        var main = new CamelKitMain(new SystemPrinter());
+        var output = new StringWriter();
+        var error = new StringWriter();
+        var runner = CamelKitMain.commandLine(main).setOut(new PrintWriter(output)).setErr(new PrintWriter(error));
+        for (String[] arguments : List.of(
+                new String[]{"--help", "init", "--ai"},
+                new String[]{"--version", "init", "--ai", "codex", "--ai", "claude"},
+                new String[]{"--help", "ship", "--json=bad"},
+                new String[]{"--help", "ship", "--text"},
+                new String[]{"--help", "--help"},
+                new String[]{"--help", "-hV"},
+                new String[]{"--help", "init", "--silent", "--silent"},
+                new String[]{"--help", "-hX"},
+                new String[]{"--version", "graph", "migration-context", "route", "--depth", "invalid"},
+                new String[]{"--help", "init", "--config", "bad\u0000path"})) {
+            assertEquals(2, runner.execute(arguments), List.of(arguments).toString());
+        }
+        assertEquals(0, runner.execute("--help", "graph", "neighbors"));
+        assertEquals(0, runner.execute("--version", "init", "--unknown"));
+        assertEquals(0, runner.execute("--help", "init", "one", "two"));
+    }
+
+    @Test
+    void sharesHelpOnlyAcrossCommandsThatAlreadyExposeIt() {
+        var parser = CamelKitMain.commandLine(new CamelKitMain(new SystemPrinter())).parser();
+        assertNotNull(parser.getProcessedCommand().findLongOptionNoActivatorCheck("help"));
+        for (String name : List.of("init", "doctor", "ship")) {
+            assertNotNull(parser.getChildParser(name).getProcessedCommand().findLongOptionNoActivatorCheck("help"),
+                    name);
+        }
+        for (String name : List.of("graph", "doc", "plan", "nextId")) {
+            assertNull(parser.getChildParser(name).getProcessedCommand().findLongOptionNoActivatorCheck("help"), name);
+        }
+    }
+
+    @Test
     void parentHelpAndVersionNeverExecuteChildren() {
-        CamelKitMain main = new CamelKitMain();
+        CamelKitMain main = new CamelKitMain(new SystemPrinter());
         try {
             var output = new StringWriter();
             var error = new StringWriter();
@@ -70,7 +112,7 @@ class AeshCliCompatibilityTest {
 
     @Test
     void preservesTokenizedValuesCollectionArityAndResetsDefaults() throws Exception {
-        CamelKitMain main = new CamelKitMain();
+        CamelKitMain main = new CamelKitMain(new SystemPrinter());
         try {
             InitCommand init = new InitCommand(main);
             CommandRunner runner = new CommandRunner(init);
@@ -96,7 +138,7 @@ class AeshCliCompatibilityTest {
 
     @Test
     void rejectsDuplicateOptionsAndInvalidPathsBeforeWriting() {
-        CamelKitMain main = new CamelKitMain();
+        CamelKitMain main = new CamelKitMain(new SystemPrinter());
         try {
             var error = new StringWriter();
             var runner = CamelKitMain.commandLine(main).setErr(new PrintWriter(error));
@@ -113,7 +155,7 @@ class AeshCliCompatibilityTest {
 
     @Test
     void nestedHelpAndBothVersionSpellingsStayOnStdout() {
-        CamelKitMain main = new CamelKitMain();
+        CamelKitMain main = new CamelKitMain(new SystemPrinter());
         try {
             var output = new StringWriter();
             var error = new StringWriter();

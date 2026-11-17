@@ -337,7 +337,7 @@ a report against `0.0.2` is triaged on what that release documents.
 
 ## 4.5 Assumptions about the environment
 
-- **Host.** Java 17+ and JBang *(documented — README "Prerequisites")*; Camel JBang and its test plugin for the
+- **Host.** Java 21+ and JBang *(documented — README "Prerequisites")*; Camel JBang and its test plugin for the
   execution and verification loops; Docker only for container-backed checks. Ship requires Linux *(documented —
   README, `docs/commands.md`)* and a filesystem that exposes Unix mode and link-count attributes and stable file keys
   *(documented — `ShipSecureFilesystem` Javadoc: "Internal bounded read policy for Ship trees"; unsupported

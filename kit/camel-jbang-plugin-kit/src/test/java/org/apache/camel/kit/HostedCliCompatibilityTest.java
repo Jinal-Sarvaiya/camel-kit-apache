@@ -10,14 +10,17 @@ import java.util.jar.JarOutputStream;
 
 import org.apache.camel.dsl.jbang.core.commands.CamelJBangMain;
 import org.apache.camel.kit.jbang.CamelKitPlugin;
+import org.apache.camel.kit.jbang.KitVersionProvider;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /** Real Camel startup, including plugin discovery, argument files and redirected process output. */
+@Tag("cli-compat")
 class HostedCliCompatibilityTest {
     @TempDir
     Path directory;
@@ -26,7 +29,7 @@ class HostedCliCompatibilityTest {
     void discoversPluginAndKeepsMachineOutputClean() throws Exception {
         Result version = run("kit", "--version");
         assertEquals(0, version.exit, version.err);
-        assertEquals(new org.apache.camel.kit.jbang.KitVersionProvider().getVersion()[0], version.out.strip());
+        assertEquals(new KitVersionProvider().getVersion()[0], version.out.strip());
         Result help = run("kit", "ship", "--help");
         assertEquals(0, help.exit, help.err);
         assertTrue(help.out.contains("Usage: camel kit ship"), help.out);
@@ -64,10 +67,33 @@ class HostedCliCompatibilityTest {
         Result camel = run("@" + camelArguments);
         assertEquals(0, camel.exit, camel.err);
         assertFalse(camel.out.isBlank());
-        assertNotEquals(new org.apache.camel.kit.jbang.KitVersionProvider().getVersion()[0], camel.out.strip());
+        assertNotEquals(new KitVersionProvider().getVersion()[0], camel.out.strip());
+    }
+
+    @Test
+    void redirectedStandaloneBannerIsPlainEvenWithAnImageCapableEnvironment() throws Exception {
+        Result banner = run(CamelKitMain.class);
+        assertEquals(0, banner.exit, banner.err);
+        assertTrue(banner.err.isBlank(), banner.err);
+        assertTrue(banner.out.contains("Design Apache Camel Integrations with AI"), banner.out);
+        assertTrue(banner.out.contains("Usage: camel-kit"), banner.out);
+        assertFalse(banner.out.contains("\u001b"), "Redirected output contains terminal control sequences");
+    }
+
+    @Test
+    void missingUnescapedContextFileFailsBeforeKitExecutes() throws Exception {
+        Result missing = run("kit", "ship", "--text", "@missing-context", "--project-dir", directory.toString());
+        assertEquals(2, missing.exit, missing.err);
+        assertTrue(missing.out.isBlank(), missing.out);
+        assertTrue(missing.err.contains("Argument file not found"), missing.err);
+        assertFalse(Files.exists(directory.resolve(".camel-kit")));
     }
 
     private Result run(String... arguments) throws Exception {
+        return run(HostProcess.class, arguments);
+    }
+
+    private Result run(Class<?> entryPoint, String... arguments) throws Exception {
         String classpath = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
         Path classes = Path.of(CamelKitPlugin.class.getProtectionDomain().getCodeSource().getLocation().toURI());
         Path jar = directory.resolve("camel-jbang-plugin-kit.jar");
@@ -87,7 +113,7 @@ class HostedCliCompatibilityTest {
         classpath = classpath.replace(classes.toString(), jar.toString());
         Path javaArguments = directory.resolve("java.args");
         Files.writeString(javaArguments, "--class-path\n" + quote(classpath) + "\n"
-                                         + quote("-Duser.home=" + directory) + "\n" + HostProcess.class.getName()
+                                         + quote("-Duser.home=" + directory) + "\n" + entryPoint.getName()
                                          + "\n");
         List<String> command = new ArrayList<>(
                 List.of(Path.of(System.getProperty("java.home"), "bin", "java").toString(),
@@ -96,6 +122,10 @@ class HostedCliCompatibilityTest {
         Path out = directory.resolve("stdout"), err = directory.resolve("stderr");
         var builder = new ProcessBuilder(command).directory(directory.toFile())
                 .redirectOutput(out.toFile()).redirectError(err.toFile());
+        if (entryPoint == CamelKitMain.class) {
+            builder.environment().put("TERM", "xterm-kitty");
+            builder.environment().put("KITTY_WINDOW_ID", "185");
+        }
         builder.environment().put("CAMEL_CLI_PLUGIN_CONFIG", directory.resolve("plugins.json").toString());
         Process process = builder.start();
         process.getOutputStream().close();

@@ -48,10 +48,10 @@ jobs:
           [[ "$(git rev-parse "refs/tags/${RELEASE_TAG}^{commit}")" == "$EXPECTED_SHA" ]]
           python3 tools/release_target.py "$RELEASE_TARGET" --tag "$RELEASE_TAG" --check-published-parent
 
-      - name: Set up JDK 17 and Maven Central settings
+      - name: Set up JDK 21 and Maven Central settings
         uses: actions/setup-java@v5.2.0
         with:
-          java-version: '17'
+          java-version: '21'
           distribution: temurin
           cache: maven
           server-id: central

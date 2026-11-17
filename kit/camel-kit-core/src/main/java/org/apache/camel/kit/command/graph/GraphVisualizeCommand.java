@@ -13,6 +13,8 @@ import org.apache.camel.kit.graph.GraphVisualizer;
 import org.apache.camel.kit.graph.ProjectGraph;
 
 import org.aesh.command.CommandDefinition;
+import org.aesh.command.completer.CompleterInvocation;
+import org.aesh.command.completer.OptionCompleter;
 import org.aesh.command.option.Option;
 
 @CommandDefinition(name = "visualize", description = "Generate interactive HTML graph visualization")
@@ -31,8 +33,8 @@ public class GraphVisualizeCommand extends CliCommand {
     String library;
 
     public static class LibCandidates
-            implements org.aesh.command.completer.OptionCompleter<org.aesh.command.completer.CompleterInvocation> {
-        public void complete(org.aesh.command.completer.CompleterInvocation invocation) {
+            implements OptionCompleter<CompleterInvocation> {
+        public void complete(CompleterInvocation invocation) {
             invocation.addAllCompleterValues(List.of("cytoscape", "d3", "vis-network", "antv-g6"));
         }
     }

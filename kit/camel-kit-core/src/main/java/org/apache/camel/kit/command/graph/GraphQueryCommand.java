@@ -11,13 +11,14 @@ import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ProjectGraph;
 
 import org.aesh.command.option.Option;
+import org.aesh.command.option.OptionVisibility;
 
 public abstract class GraphQueryCommand extends CliCommand {
 
     @Option(parser = KitOptionParser.class, name = "graph-file",
             description = "Path to project graph JSON",
             defaultValue = ".camel-kit/project-graph.json",
-            visibility = org.aesh.command.option.OptionVisibility.HIDDEN,
+            visibility = OptionVisibility.HIDDEN,
             converter = PathConverter.class)
     protected Path graphFile;
 

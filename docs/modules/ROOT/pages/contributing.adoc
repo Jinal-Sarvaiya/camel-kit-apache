@@ -10,8 +10,8 @@ https://www.apache.org/foundation/policies/conduct.html[ASF code of conduct].
 [[build]]
 == Building
 
-You need Java 21 or later for the full reactor, JBang, and Git; Maven comes with the wrapper.
-Standalone Kit and Knowledge retain Java 17 support; omit `kit/camel-jbang-plugin-kit` when building on Java 17. Always build with the wrapper, from the
+You need Java 21 or later for Kit and Knowledge, JBang, and Git; Maven comes with the wrapper.
+Always build with the wrapper, from the
 repository root.
 
 [source,bash]
@@ -98,7 +98,9 @@ tests read, and `docs/user-guide.md`; keep them in step with these pages when be
 == Releasing
 
 The shared parent, Kit and Knowledge have independent versions and release schedules.
-A product release references a published, released shared parent. Use the corresponding
+A product release references a published, released shared parent. All release jobs use Java 21.
+Kit release validation also requires a released `camel.cli.version` and a synchronized Maven mirror;
+snapshot and prerelease host pins cannot be staged. Verify the released Aesh-based host with the CLI compatibility suite. Use the corresponding
 POM (`pom.xml` with `-N`, `kit/pom.xml`, or `knowledge/pom.xml`) when preparing or staging a
 release; never deploy the root reactor to release one product.
 

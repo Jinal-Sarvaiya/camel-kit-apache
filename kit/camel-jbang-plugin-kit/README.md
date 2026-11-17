@@ -4,8 +4,11 @@ A Camel JBang plugin that exposes Camel-Kit commands under `camel kit`.
 
 ## Requirements
 
-- Apache Camel JBang 4.18.0 or higher
-- JDK 17 or higher
+- Development/source builds: Aesh-based Camel JBang 4.24.0 (`4.24.0-SNAPSHOT` while under development) and JDK 21 or higher.
+- Released `0.4.1`: Camel JBang 4.18.0 or higher and JDK 17 or higher.
+
+The Aesh plugin cannot load in older Picocli hosts. Kit releases reject a snapshot host pin;
+verify the released Camel host before publishing. Standalone Kit and source-built Knowledge also require Java 21+.
 
 ## Release Channels
 

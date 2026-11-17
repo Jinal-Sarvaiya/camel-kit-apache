@@ -12,7 +12,7 @@ This file contains build, test, format, and code-style expectations for the came
 
 ## Code Style
 
-- Java 17+ for standalone Kit and Knowledge; Java 21+ for the Camel plugin and full-reactor builds
+- Java 21+ for Kit, the Camel plugin, Knowledge, and all builds
 - Max line length: 120 characters
 - Follow standard Java conventions
 - Prefer composition over inheritance

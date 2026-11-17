@@ -1,6 +1,6 @@
 ///usr/bin/env jbang "$0" "$@" ; exit $?
 
-//JAVA 17+
+//JAVA 21+
 
 //REPOS central=https://repo1.maven.org/maven2/,apache_snap=https://repository.apache.org/snapshots
 //REPOS central_snap=https://central.sonatype.com/repository/maven-snapshots/

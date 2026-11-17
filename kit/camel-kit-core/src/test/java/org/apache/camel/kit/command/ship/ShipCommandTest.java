@@ -10,11 +10,13 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
 import org.apache.camel.kit.CommandRunner;
+import org.apache.camel.kit.command.CliCommand;
 import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.ship.ShipDigest;
 import org.apache.camel.kit.ship.context.ShipContext;
@@ -24,6 +26,7 @@ import org.apache.camel.kit.ship.controller.ShipControllerTestSupport;
 import org.apache.camel.kit.ship.controller.ShipCoordinator;
 import org.apache.camel.kit.ship.controller.ShipRun;
 
+import org.aesh.command.CommandDefinition;
 import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
@@ -1329,22 +1332,22 @@ class ShipCommandTest {
         return new RunResult(exitCode, output.toString(), error.toString());
     }
 
-    @org.aesh.command.CommandDefinition(name = "camel", description = "Test host")
-    static class CamelRoot extends org.apache.camel.kit.command.CliCommand {
+    @CommandDefinition(name = "camel", description = "Test host")
+    static class CamelRoot extends CliCommand {
         public Integer call() {
             return 0;
         }
     }
 
-    @org.aesh.command.CommandDefinition(name = "kit", description = "Test plugin")
-    static class KitRoot extends org.apache.camel.kit.command.CliCommand {
+    @CommandDefinition(name = "kit", description = "Test plugin")
+    static class KitRoot extends CliCommand {
         public Integer call() {
             return 0;
         }
     }
 
-    @org.aesh.command.CommandDefinition(name = "camel-kit", description = "Test standalone")
-    static class StandaloneRoot extends org.apache.camel.kit.command.CliCommand {
+    @CommandDefinition(name = "camel-kit", description = "Test standalone")
+    static class StandaloneRoot extends CliCommand {
         public Integer call() {
             return 0;
         }
@@ -1407,7 +1410,7 @@ class ShipCommandTest {
             Path stamp,
             Path publication) {
         String stampDigest = ShipDigest.sha256("stamp".getBytes(StandardCharsets.UTF_8));
-        List<ShipRun.StageRecord> stages = java.util.Arrays.stream(ShipRun.Stage.values())
+        List<ShipRun.StageRecord> stages = Arrays.stream(ShipRun.Stage.values())
                 .map(stage -> {
                     boolean validation = stage == ShipRun.Stage.VALIDATE;
                     return new ShipRun.StageRecord(

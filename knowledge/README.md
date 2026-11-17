@@ -20,7 +20,7 @@ its original download URL and does not support the new release-discovery or pinn
 
 ## Prerequisites
 
-- Java 17+
+- Java 21+
 - Use the Maven wrapper at the repository root. All commands below run from that root.
 
 No Docker. No Docling. No external tokens.

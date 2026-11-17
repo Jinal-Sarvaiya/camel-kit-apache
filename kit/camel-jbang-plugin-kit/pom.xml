@@ -13,8 +13,6 @@
     <description>JBang plugin for Camel Kit - Design Apache Camel Integrations with AI</description>
 
     <properties>
-        <!-- The Aesh-based Camel host requires Java 21; standalone Kit stays on Java 17. -->
-        <maven.compiler.release>21</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
     </properties>

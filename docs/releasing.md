@@ -17,6 +17,12 @@ Kit's server pin automatically.
 
 ## Prepare a Maven release
 
+Use JDK 21 or later for every release target; the release and snapshot workflows use JDK 21.
+Kit release validation rejects snapshot, timestamped snapshot, and prerelease Camel CLI host pins.
+Set `camel.cli.version` in `distribution.properties` to a tested released Aesh-based Camel host
+(4.24.0 or later), synchronize the Maven mirror, and run the hosted compatibility suite before staging.
+Development builds may use the snapshot host. Generated integration pins are independent.
+
 1. Start from reviewed source on a release branch. Change only the selected product
    POM version and its child parent versions (or only the root version for a parent
    release). Set its SCM tag. Keep the other product's version unchanged.

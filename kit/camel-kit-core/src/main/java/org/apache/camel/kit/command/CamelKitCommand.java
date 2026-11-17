@@ -7,12 +7,7 @@ import org.apache.camel.kit.util.AnsiColors;
 /**
  * Base class for all Camel-Kit commands (following Camel JBang CamelCommand pattern).
  */
-public abstract class CamelKitCommand extends CliCommand {
-    @org.aesh.command.option.Option(name = "help", shortName = 'h', hasValue = false, overrideRequired = true,
-                                    parser = InformationOptionParser.class,
-                                    description = "Display help and exit")
-    protected boolean helpRequested;
-
+public abstract class CamelKitCommand extends HelpAwareCommand {
     protected final CamelKitMain main;
 
     protected CamelKitCommand(CamelKitMain main) {

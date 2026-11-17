@@ -38,7 +38,7 @@ class ParserSourceReadingContractTest {
 
     @ParameterizedTest
     @EnumSource(ParserCase.class)
-    // Public JFR APIs observe process and class loading on the supported JDKs (17, 21, and 25).
+    // Public JFR APIs observe process and class loading on the supported JDKs (21 and 25).
     @SuppressForbidden
     void parsingDoesNotRunProjectActionsOrResolveRuntimeValues(ParserCase parserCase) throws Exception {
         Path project = Files.createDirectory(tempDir.resolve("project"));

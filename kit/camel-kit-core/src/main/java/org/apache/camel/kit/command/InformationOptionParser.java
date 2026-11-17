@@ -14,7 +14,7 @@ public final class InformationOptionParser extends KitOptionParser {
             for (char name : token.substring(1).toCharArray()) {
                 ProcessedOption flag = option.parent().findOption(String.valueOf(name));
                 if (flag == null || !flag.getValues().isEmpty()) {
-                    throw new OptionParserException("Invalid or repeated option -" + name);
+                    throw new MalformedOptionException("Invalid or repeated option -" + name);
                 }
                 flag.addValue("true");
             }

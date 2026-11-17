@@ -9,6 +9,17 @@ CLI, "Use the `/camel-start` skill" in GitHub Copilot CLI, `/skill:camel-start` 
 [[cli]]
 == CLI commands
 
+Development builds use Aesh for one-shot execution. Use `-h`/`--help` on the root, `init`, `doctor` or `ship`,
+and the `help` subcommand for `doc`, `graph` and `plan`. Use `-V`/`--version`
+at the CLI root for the Kit version. See xref:getting-started.adoc#cli-host[development host compatibility].
+`init -p one=1 two=2` accepts several property values; Ship's `-p` consumes one value per occurrence.
+Commas in property values are preserved.
+
+Argument files are supported by standalone commands except direct `camel-kit ship` invocations, where `@` values
+are literal. The Camel plugin host expands argument files before loading Kit: use `@@literal` to pass `@literal`,
+or an attached value such as `--text=@literal`. Shell quoting alone does not disable argument-file expansion.
+This is a plugin syntax change in the development version; see xref:ship.adoc#literal-context[Ship literal context].
+
 [[init]]
 === init
 

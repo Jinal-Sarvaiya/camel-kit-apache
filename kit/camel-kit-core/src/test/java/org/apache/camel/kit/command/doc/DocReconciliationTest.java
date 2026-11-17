@@ -8,12 +8,13 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.apache.camel.kit.CommandRunner;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -34,7 +35,7 @@ class DocReconciliationTest {
     private Result runAt(Path root, String... args) {
         var out = new StringWriter();
         var err = new StringWriter();
-        var cli = new CommandLine(new DocCommand());
+        var cli = new CommandRunner(new DocCommand());
         cli.setOut(new PrintWriter(out));
         cli.setErr(new PrintWriter(err));
         var arguments = new ArrayList<>(List.of(args));
@@ -146,7 +147,7 @@ class DocReconciliationTest {
         String original = Files.readString(project.resolve("docs/current.md"));
         write("docs/current.md", "Different description.\n");
         check("stale");
-        new CommandLine(new DocUnstaleCommand()).execute(project.resolve("docs/current.md").toString());
+        new CommandRunner(new DocUnstaleCommand()).execute(project.resolve("docs/current.md").toString());
         check("stale");
         write("docs/current.md", original);
         check("unchanged");

@@ -4,35 +4,36 @@ import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 import org.apache.camel.kit.doc.GeneratedInfo;
 import org.apache.camel.kit.doc.StalenessInfo;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "init", description = "Initialize document with frontmatter metadata")
-public class DocInitCommand implements Callable<Integer> {
+@CommandDefinition(name = "init", description = "Initialize document with frontmatter metadata")
+public class DocInitCommand extends CliCommand {
 
-    @Parameters(index = "0", description = "Path to the document to initialize")
+    @Argument(required = true, index = "0", description = "Path to the document to initialize",
+              converter = PathConverter.class)
     Path file;
 
-    @Option(names = "--by", required = true, description = "Skill that generated this artifact")
+    @Option(parser = KitOptionParser.class, name = "by", required = true,
+            description = "Skill that generated this artifact")
     String by;
 
-    @Option(names = "--from", description = "Source artifact this was generated from (omit for root artifacts)")
+    @Option(parser = KitOptionParser.class, name = "from",
+            description = "Source artifact this was generated from (omit for root artifacts)")
     String from;
-
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
 
     @Override
     public Integer call() {
-        PrintWriter err = spec.commandLine().getErr();
+        PrintWriter err = this.err;
 
         if (!Files.exists(file)) {
             err.println("Error: file not found: " + file);

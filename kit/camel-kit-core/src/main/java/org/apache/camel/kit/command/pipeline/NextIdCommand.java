@@ -8,20 +8,28 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+import org.apache.camel.kit.command.CliCommand;
 
-@Command(name = "nextId", description = "Generate next sequential pipeline ID and create directory")
-public class NextIdCommand implements Runnable {
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+
+@CommandDefinition(name = "nextId", description = "Generate next sequential pipeline ID and create directory")
+public class NextIdCommand extends CliCommand implements Runnable {
 
     private static final Pattern ID_PATTERN = Pattern.compile("^(\\d+)-.*$");
     private static final Pattern SLUG_PATTERN = Pattern.compile("^[a-z0-9]+(-[a-z0-9]+)*$");
 
-    @Parameters(index = "0",
-                description = "Pipeline slug (lowercase alphanumeric with hyphens, e.g. 'order-processing')")
+    @Argument(required = true, index = "0",
+              description = "Pipeline slug (lowercase alphanumeric with hyphens, e.g. 'order-processing')")
     String slug;
 
     Path baseDir = Path.of(".");
+
+    @Override
+    public Integer call() {
+        run();
+        return 0;
+    }
 
     @Override
     public void run() {

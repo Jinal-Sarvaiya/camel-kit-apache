@@ -3,24 +3,25 @@ package org.apache.camel.kit.command.graph;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 
+import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.EdgeType;
 import org.apache.camel.kit.graph.query.GraphQuery;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "neighbors", description = "BFS traversal from a node")
+@CommandDefinition(name = "neighbors", description = "BFS traversal from a node")
 public class GraphNeighborsCommand extends GraphQueryCommand {
-    @Parameters(index = "0", description = "Node ID")
+    @Argument(required = true, index = "0", description = "Node ID")
     String nodeId;
-    @Option(names = {"--direction"}, defaultValue = "both")
+    @Option(parser = KitOptionParser.class, name = "direction", defaultValue = "both")
     String direction;
-    @Option(names = {"--edge-type"})
+    @Option(parser = KitOptionParser.class, name = "edge-type")
     String edgeType;
-    @Option(names = {"--depth"}, defaultValue = "1")
+    @Option(parser = KitOptionParser.class, name = "depth", defaultValue = "1")
     int depth;
 
     @Override

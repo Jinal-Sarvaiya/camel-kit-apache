@@ -12,23 +12,26 @@ import org.apache.camel.kit.service.DoctorService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Option;
 
 /**
  * Validate a generated Camel-Kit workspace.
  */
-@Command(name = "doctor", description = "Validate a generated Camel-Kit workspace")
+@CommandDefinition(name = "doctor", description = "Validate a generated Camel-Kit workspace", generateHelp = true)
 public class DoctorCommand extends CamelKitCommand {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private final DoctorService doctorService;
 
-    @Option(names = {"--project-dir"}, description = "Workspace directory to validate", defaultValue = ".")
+    @Option(parser = KitOptionParser.class, name = "project-dir",
+            description = "Workspace directory to validate", defaultValue = ".",
+            converter = PathConverter.class)
     Path projectDir;
 
-    @Option(names = {"--json"}, description = "Print machine-readable JSON output")
+    @Option(parser = KitOptionParser.class, name = "json",
+            description = "Print machine-readable JSON output", hasValue = false)
     boolean json;
 
     public DoctorCommand(CamelKitMain main) {

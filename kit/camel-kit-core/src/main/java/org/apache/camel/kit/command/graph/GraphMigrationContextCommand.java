@@ -6,6 +6,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
+import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.GraphEdge;
 import org.apache.camel.kit.graph.model.GraphNode;
@@ -14,18 +15,19 @@ import org.apache.camel.kit.graph.query.GraphQuery;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "migration-context",
-         description = "Structured migration context for a route — components, services, artifacts, properties, warnings")
+@CommandDefinition(name = "migration-context",
+                   description = "Structured migration context for a route — components, services, artifacts, properties, warnings")
 public class GraphMigrationContextCommand extends GraphQueryCommand {
 
-    @Parameters(index = "0", description = "Route ID (without route: prefix)")
+    @Argument(required = true, index = "0", description = "Route ID (without route: prefix)")
     String routeId;
 
-    @Option(names = {"--depth"}, defaultValue = "3", description = "BFS expansion depth (default: 3)")
+    @Option(parser = KitOptionParser.class, name = "depth", defaultValue = "3",
+            description = "BFS expansion depth (default: 3)")
     int depth;
 
     @Override

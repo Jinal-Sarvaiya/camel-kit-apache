@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Locale;
 
 import org.apache.camel.kit.CamelKitMain;
+import org.apache.camel.kit.CommandRunner;
 import org.apache.camel.kit.config.AgentConfig;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.generator.AgentGeneratorFactory;
@@ -18,7 +19,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -198,7 +198,7 @@ class DoctorCommandTest {
         CamelKitMain main = new CamelKitMain();
         main.setOut(printer);
         DoctorCommand command = new DoctorCommand(main);
-        int exitCode = new CommandLine(command).execute(args);
+        int exitCode = new CommandRunner(command).execute(args);
         return new RunResult(exitCode, printer.output());
     }
 

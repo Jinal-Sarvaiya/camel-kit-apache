@@ -10,7 +10,8 @@ https://www.apache.org/foundation/policies/conduct.html[ASF code of conduct].
 [[build]]
 == Building
 
-You need Java 17 or later, JBang, and Git; Maven comes with the wrapper. Always build with the wrapper, from the
+You need Java 21 or later for the full reactor, JBang, and Git; Maven comes with the wrapper.
+Standalone Kit and Knowledge retain Java 17 support; omit `kit/camel-jbang-plugin-kit` when building on Java 17. Always build with the wrapper, from the
 repository root.
 
 [source,bash]
@@ -44,6 +45,13 @@ All Java packages use `org.apache.camel.kit`, and Maven modules use `org.apache.
 `distribution.properties` at the repository root is the single source of truth for every version pin; it is
 copied into the JAR and never duplicated by hand. `tools/sync_distribution_mirrors.py` copies the few literals
 Maven needs into `kit/pom.xml` and checks them with `--check`.
+
+The CLI uses Aesh's tokenized, one-shot argv API. Keep option binding in commands and business logic in
+services/controllers; preserve usage-error exit code 2 and stdout/stderr separation. `KitOptionParser` preserves
+strict scalar options and token-based list values; Ship additionally records context order. The standalone runner
+does not acquire an Aesh interactive terminal. JLine/TamboUI still own standalone rendering, while the plugin uses
+the host's terminal. `camel.cli.version` and `aesh.version` pin the CLI host/parser separately from
+`camel.main.version`, which controls generated integration defaults. See xref:getting-started.adoc#cli-host[host compatibility].
 
 [[done]]
 == Definition of done

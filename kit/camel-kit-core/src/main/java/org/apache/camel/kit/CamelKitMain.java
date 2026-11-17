@@ -3,9 +3,10 @@ package org.apache.camel.kit;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
 import org.apache.camel.kit.command.DoctorCommand;
+import org.apache.camel.kit.command.InformationOptionParser;
 import org.apache.camel.kit.command.InitCommand;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.command.graph.GraphCommand;
@@ -20,22 +21,25 @@ import org.apache.camel.kit.util.AnsiColors;
 import org.apache.camel.kit.util.LogoRenderer;
 import org.apache.camel.kit.util.TemplateUtils;
 
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Option;
 import org.jline.terminal.Terminal;
 import org.jline.terminal.TerminalBuilder;
 import org.jline.utils.AttributedString;
 import org.jline.utils.AttributedStyle;
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
 
 /**
  * Camel-Kit CLI - Design Apache Camel integrations with AI coding assistants.
  */
-@Command(
-         name = "camel-kit",
-         mixinStandardHelpOptions = true,
-         versionProvider = VersionProvider.class,
-         description = "Design Apache Camel integrations with AI coding assistants")
-public class CamelKitMain implements Callable<Integer> {
+@CommandDefinition(
+                   name = "camel-kit",
+                   generateHelp = true,
+                   description = "Design Apache Camel integrations with AI coding assistants")
+public class CamelKitMain extends CliCommand {
+    @org.aesh.command.option.Option(name = "help", shortName = 'h', hasValue = false, overrideRequired = true,
+                                    parser = InformationOptionParser.class,
+                                    description = "Display help and exit")
+    protected boolean helpRequested;
 
     private static DistributionConfig DISTRIBUTION = loadDistribution();
 
@@ -48,6 +52,10 @@ public class CamelKitMain implements Callable<Integer> {
     public static String KNOWLEDGE_MCP_REPOS = DISTRIBUTION.knowledgeMcpRepos();
     public static String CITRUS_MCP_REPOS = DISTRIBUTION.citrusMcpRepos();
     public static String CAMEL_CATALOG_REPOS = DISTRIBUTION.camelCatalogRepos();
+    @Option(parser = InformationOptionParser.class, overrideRequired = true,
+            name = "version", shortName = 'V', hasValue = false, description = "Print version information and exit")
+    boolean versionRequested;
+
     private Terminal terminal;
     private Printer printer;
     private boolean tuiEnabled = true;
@@ -64,6 +72,12 @@ public class CamelKitMain implements Callable<Integer> {
             // Fallback to system printer
             this.printer = new SystemPrinter();
         }
+    }
+
+    /** A host owns its terminal; Kit only needs its output adapter. */
+    public CamelKitMain(Printer printer) {
+        this.printer = printer;
+        this.tuiEnabled = false;
     }
 
     public Printer getOut() {
@@ -147,31 +161,38 @@ public class CamelKitMain implements Callable<Integer> {
     }
 
     public static void run(CamelKitMain main, String... args) {
-        int exitCode = commandLine(main, args).execute(args);
+        int exitCode;
+        try {
+            exitCode = commandLine(main, args).execute(args);
+        } finally {
+            main.closeTerminal();
+        }
         System.exit(exitCode);
     }
 
-    static CommandLine commandLine(CamelKitMain main, String... args) {
-        CommandLine commandLine = new CommandLine(main)
+    public static CommandRunner commandLine(CamelKitMain main, String... args) {
+        CommandRunner commandLine = new CommandRunner(main)
                 .addSubcommand("init", new InitCommand(main))
                 .addSubcommand("doctor", new DoctorCommand(main))
-                .addSubcommand("doc", new CommandLine(new DocCommand()))
-                .addSubcommand("graph", new CommandLine(new GraphCommand()))
-                .addSubcommand("plan", new CommandLine(new PlanCommand()))
+                .addSubcommand("doc", new DocCommand())
+                .addSubcommand("graph", new GraphCommand())
+                .addSubcommand("plan", new PlanCommand())
                 .addSubcommand("nextId", new NextIdCommand())
-                .addSubcommand("ship", new CommandLine(new ShipCommand()));
+                .addSubcommand("ship", new ShipCommand());
 
-        // Picocli expands @files at the root before dispatching; only direct Ship invocations need literals.
-        if (args.length > 0 && "ship".equals(args[0])) {
-            commandLine.setExpandAtFiles(false);
-        }
-        return commandLine;
+        return commandLine.argumentFiles(args.length == 0 || !"ship".equals(args[0]));
     }
 
     @Override
-    public Integer call() {
+    public Integer call() throws Exception {
+        if (versionRequested) {
+            for (String version : new VersionProvider().getVersion()) {
+                out.println(version);
+            }
+            return 0;
+        }
         printBanner();
-        CommandLine.usage(this, System.out);
+        out.print(invocation.getHelpInfo());
         return 0;
     }
 

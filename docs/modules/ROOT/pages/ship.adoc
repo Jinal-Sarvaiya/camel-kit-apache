@@ -54,6 +54,17 @@ camel-kit ship --submit RUN_ID --result PATH [--json]
 Context is optional: a bare `camel-kit ship` starts a short discovery conversation. Text and documents are added to
 the discovery input before any question, and open points come back as grouped unresolved questions.
 
+[[literal-context]]
+=== Literal context and argument files
+
+Text and document occurrences keep their original order, including mixed repeated options.
+Standalone `camel-kit ship --text '@note'` passes `@note` literally and never expands argument files.
+With the Aesh-based development plugin, the Camel host expands `@file` before Kit runs. Write
+`camel kit ship --text '@@note'` or `camel kit ship --text=@note` to pass the same literal text.
+For a document whose filename starts with `@`, use `--document '@@notes.md'` or `--document=@notes.md`.
+To pass two leading `@` characters as a separate plugin value, supply three. Quoting preserves shell tokens
+but does not suppress the host's argument-file processing. Other Camel commands retain the host's normal policy.
+
 [cols="1,1,3"]
 |===
 | Option | Default | Description

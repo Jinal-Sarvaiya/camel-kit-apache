@@ -11,17 +11,17 @@ import org.apache.camel.kit.graph.query.RouteFlowTracer;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
 
-@Command(name = "route-context", description = "Map route topology for test planning (composite)")
+@CommandDefinition(name = "route-context", description = "Map route topology for test planning (composite)")
 public class GraphRouteContextCommand extends GraphQueryCommand {
 
     private static final Set<String> INTERNAL = Set.of("direct", "seda", "direct-vm");
     private static final Set<String> INFRA = Set.of("kafka", "jms", "amqp", "activemq", "sql", "jdbc", "mongodb", "ftp",
             "sftp", "aws-s3", "aws-sqs", "aws-sns", "minio");
 
-    @Parameters(index = "0", description = "Route ID")
+    @Argument(required = true, index = "0", description = "Route ID")
     String routeId;
 
     @Override

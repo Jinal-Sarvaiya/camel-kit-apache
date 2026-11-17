@@ -8,9 +8,9 @@ import org.apache.camel.kit.graph.query.RouteTopology;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
+import org.aesh.command.CommandDefinition;
 
-@Command(name = "route-topology", description = "Show route connectivity map")
+@CommandDefinition(name = "route-topology", description = "Show route connectivity map")
 public class GraphRouteTopologyCommand extends GraphQueryCommand {
 
     @Override

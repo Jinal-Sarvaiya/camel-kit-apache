@@ -5,6 +5,7 @@ import java.io.StringWriter;
 import java.nio.file.Path;
 import java.util.Map;
 
+import org.apache.camel.kit.CommandRunner;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.EdgeType;
 import org.apache.camel.kit.graph.model.GraphEdge;
@@ -16,7 +17,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -89,7 +89,7 @@ class GraphRouteContextCommandTest {
 
     private String runWithGraph(Path gf, String routeId) {
         StringWriter out = new StringWriter(), err = new StringWriter();
-        CommandLine cl = new CommandLine(new GraphRouteContextCommand());
+        CommandRunner cl = new CommandRunner(new GraphRouteContextCommand());
         cl.setOut(new PrintWriter(out));
         cl.setErr(new PrintWriter(err));
         assertEquals(0, cl.execute("--graph-file", gf.toString(), routeId));

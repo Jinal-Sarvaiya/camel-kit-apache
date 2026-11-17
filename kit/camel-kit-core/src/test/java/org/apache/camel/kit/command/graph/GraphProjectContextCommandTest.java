@@ -4,12 +4,13 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Path;
 
+import org.apache.camel.kit.CommandRunner;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -53,7 +54,7 @@ class GraphProjectContextCommandTest {
 
     private String run() {
         StringWriter out = new StringWriter(), err = new StringWriter();
-        CommandLine cl = new CommandLine(new GraphProjectContextCommand());
+        CommandRunner cl = new CommandRunner(new GraphProjectContextCommand());
         cl.setOut(new PrintWriter(out));
         cl.setErr(new PrintWriter(err));
         assertEquals(0, cl.execute("--graph-file", graphFile.toString()));

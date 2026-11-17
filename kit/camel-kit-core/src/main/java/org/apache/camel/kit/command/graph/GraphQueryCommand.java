@@ -3,22 +3,23 @@ package org.apache.camel.kit.command.graph;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ProjectGraph;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Option;
+import org.aesh.command.option.Option;
 
-public abstract class GraphQueryCommand implements Callable<Integer> {
+public abstract class GraphQueryCommand extends CliCommand {
 
-    @Option(names = {"--graph-file"}, description = "Path to project graph JSON",
-            defaultValue = ".camel-kit/project-graph.json", hidden = true)
+    @Option(parser = KitOptionParser.class, name = "graph-file",
+            description = "Path to project graph JSON",
+            defaultValue = ".camel-kit/project-graph.json",
+            visibility = org.aesh.command.option.OptionVisibility.HIDDEN,
+            converter = PathConverter.class)
     protected Path graphFile;
-
-    @CommandLine.Spec
-    protected CommandLine.Model.CommandSpec spec;
 
     @Override
     public Integer call() {
@@ -39,13 +40,13 @@ public abstract class GraphQueryCommand implements Callable<Integer> {
     protected abstract String execute(ProjectGraph graph) throws Exception;
 
     protected void out(String message) {
-        PrintWriter w = spec.commandLine().getOut();
+        PrintWriter w = this.out;
         w.println(message);
         w.flush();
     }
 
     protected void err(String message) {
-        PrintWriter w = spec.commandLine().getErr();
+        PrintWriter w = this.err;
         w.println(message);
         w.flush();
     }

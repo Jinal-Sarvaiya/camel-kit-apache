@@ -3,21 +3,23 @@ package org.apache.camel.kit.command.plan;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.plan.PlanAnalyzer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
 
-@Command(name = "analyze", description = "Analyze plan for parallel execution waves")
-public class PlanAnalyzeCommand implements Callable<Integer> {
+@CommandDefinition(name = "analyze", description = "Analyze plan for parallel execution waves")
+public class PlanAnalyzeCommand extends CliCommand {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
-    @Parameters(index = "0", description = "Path to plan markdown",
-                defaultValue = "docs/implementation-plan.md")
+    @Argument(index = "0", description = "Path to plan markdown",
+              defaultValue = "docs/implementation-plan.md",
+              converter = PathConverter.class)
     Path planFile;
 
     @Override

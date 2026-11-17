@@ -9,35 +9,36 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.Set;
-import java.util.concurrent.Callable;
 import java.util.stream.Stream;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 import org.apache.camel.kit.doc.GeneratedInfo;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "stale", description = "Mark a document as stale")
-public class DocStaleCommand implements Callable<Integer> {
+@CommandDefinition(name = "stale", description = "Mark a document as stale")
+public class DocStaleCommand extends CliCommand {
 
-    @Parameters(index = "0", description = "Path to the document to mark stale")
+    @Argument(required = true, index = "0", description = "Path to the document to mark stale",
+              converter = PathConverter.class)
     Path file;
 
-    @Option(names = "--reason", required = true, description = "Reason for staleness")
+    @Option(parser = KitOptionParser.class, name = "reason", required = true,
+            description = "Reason for staleness")
     String reason;
 
-    @Option(names = "--cascade", description = "Propagate staleness to downstream artifacts")
+    @Option(parser = KitOptionParser.class, name = "cascade",
+            description = "Propagate staleness to downstream artifacts", hasValue = false)
     boolean cascade;
-
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
 
     @Override
     public Integer call() {
-        PrintWriter err = spec.commandLine().getErr();
+        PrintWriter err = this.err;
 
         if (!Files.exists(file)) {
             err.println("Error: file not found: " + file);

@@ -3,31 +3,34 @@ package org.apache.camel.kit.command.graph;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ParserDiagnostic;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Option;
 
-@Command(name = "generate", description = "Generate or rebuild the project graph from source files")
-public class GraphGenerateCommand implements Callable<Integer> {
-    @Option(names = {"-o", "--output"}, defaultValue = ".camel-kit/project-graph.json")
+@CommandDefinition(name = "generate", description = "Generate or rebuild the project graph from source files")
+public class GraphGenerateCommand extends CliCommand {
+    @Option(parser = KitOptionParser.class, name = "output", shortName = 'o',
+            defaultValue = ".camel-kit/project-graph.json",
+            converter = PathConverter.class)
     Path output;
-    @Option(names = {"--project-dir"}, defaultValue = ".", hidden = true)
+    @Option(parser = KitOptionParser.class, name = "project-dir", defaultValue = ".",
+            visibility = org.aesh.command.option.OptionVisibility.HIDDEN,
+            converter = PathConverter.class)
     Path projectDir;
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
 
     @Override
     public Integer call() {
         try {
             Path root = projectDir.toAbsolutePath().normalize();
-            PrintWriter err = spec.commandLine().getErr();
+            PrintWriter err = this.err;
             GraphBuildResult result = new GraphBuilder().buildWithDiagnostics(root);
             for (ParserDiagnostic diagnostic : result.warningDiagnostics()) {
                 err.println("Warning: " + diagnostic.summary());
@@ -52,8 +55,8 @@ public class GraphGenerateCommand implements Callable<Integer> {
             err.flush();
             return 0;
         } catch (Exception e) {
-            spec.commandLine().getErr().println("Error: " + e.getMessage());
-            spec.commandLine().getErr().flush();
+            this.err.println("Error: " + e.getMessage());
+            this.err.flush();
             return 1;
         }
     }

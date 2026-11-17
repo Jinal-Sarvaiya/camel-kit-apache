@@ -10,9 +10,9 @@ import org.apache.camel.kit.graph.query.GraphQuery;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
+import org.aesh.command.CommandDefinition;
 
-@Command(name = "project-context", description = "Extract project conventions for implementation (composite)")
+@CommandDefinition(name = "project-context", description = "Extract project conventions for implementation (composite)")
 public class GraphProjectContextCommand extends GraphQueryCommand {
 
     @Override

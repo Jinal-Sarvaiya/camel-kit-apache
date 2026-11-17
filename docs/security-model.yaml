@@ -55,7 +55,7 @@ roles:
 
 component_families:
   - id: A
-    name: Kit workspace CLI
+    name: Kit workspace CLI (Aesh)
     paths: ["kit/camel-kit-core (command, service, generator, catalog, config)", kit/camel-kit-main, kit/camel-jbang-plugin-kit]
     entry_points: [init, doctor, doc, nextId, plan analyze, graph]
     in_model: true

@@ -12,12 +12,12 @@ This file contains build, test, format, and code-style expectations for the came
 
 ## Code Style
 
-- Java 17+
+- Java 17+ for standalone Kit and Knowledge; Java 21+ for the Camel plugin and full-reactor builds
 - Max line length: 120 characters
 - Follow standard Java conventions
 - Prefer composition over inheritance
 - Follow SOLID principles
-- Picocli annotations for CLI commands
+- Aesh annotations for CLI commands; use the tokenized argv API and preserve usage-error exit code 2
 - Formatter config: `camel-kit-formatter-config.xml`
 
 ## Version

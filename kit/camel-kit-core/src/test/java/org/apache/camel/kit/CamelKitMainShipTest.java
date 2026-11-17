@@ -4,13 +4,15 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
+
+import org.apache.camel.kit.command.ship.ShipCommand;
+import org.apache.camel.kit.ship.context.ShipContext;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,14 +25,12 @@ class CamelKitMainShipTest {
     void registersShipWithQualifiedHelp() {
         CamelKitMain main = new CamelKitMain();
         try {
-            CommandLine root = CamelKitMain.commandLine(main, "ship", "--help");
-            CommandLine ship = root.getSubcommands().get("ship");
+            CommandRunner root = CamelKitMain.commandLine(main, "ship", "--help");
+            var ship = root.parser().getChildParser("ship");
             StringWriter output = new StringWriter();
             root.setOut(new PrintWriter(output, true));
 
             assertNotNull(ship);
-            assertEquals("camel-kit ship", ship.getCommandSpec().qualifiedName());
-            assertFalse(root.isExpandAtFiles());
             assertEquals(0, root.execute("ship", "--help"));
             assertTrue(output.toString().contains("Usage: camel-kit ship"), output.toString());
             assertTrue(output.toString().contains("-c, --config"), output.toString());
@@ -46,13 +46,13 @@ class CamelKitMainShipTest {
         String literal = "@" + arguments.toAbsolutePath();
         CamelKitMain main = new CamelKitMain();
         try {
-            CommandLine root = CamelKitMain.commandLine(main, "ship", "--text", literal);
+            CommandRunner root = CamelKitMain.commandLine(main, "ship", "--text", literal);
 
-            CommandLine.ParseResult parsed = root.parseArgs("ship", "--text", literal);
+            root.parse("ship", "--text", literal);
+            assertEquals(List.of(new ShipContext.TextInput(literal)), inputs(root));
+            root.parse("ship", "--document", literal);
+            assertEquals(List.of(new ShipContext.DocumentInput(Path.of(literal))), inputs(root));
 
-            assertEquals(literal, parsed.subcommand().matchedOptionValue("--text", null));
-            CommandLine.ParseResult document = root.parseArgs("ship", "--document", literal);
-            assertEquals(Path.of(literal), document.subcommand().matchedOptionValue("--document", null));
         } finally {
             main.closeTerminal();
         }
@@ -63,12 +63,16 @@ class CamelKitMainShipTest {
         Path arguments = Files.writeString(tempDir.resolve("root-arguments"), "--version\n");
         CamelKitMain main = new CamelKitMain();
         try {
-            CommandLine root = CamelKitMain.commandLine(main, "@" + arguments.toAbsolutePath());
+            CommandRunner root = CamelKitMain.commandLine(main, "@" + arguments.toAbsolutePath());
 
-            assertTrue(root.isExpandAtFiles());
-            assertTrue(root.parseArgs("@" + arguments.toAbsolutePath()).isVersionHelpRequested());
+            root.parse("@" + arguments.toAbsolutePath());
+            assertTrue(main.versionRequested);
         } finally {
             main.closeTerminal();
         }
+    }
+
+    private static List<ShipContext.Input> inputs(CommandRunner root) {
+        return ((ShipCommand) root.parser().getChildParser("ship").getCommand()).inputs();
     }
 }

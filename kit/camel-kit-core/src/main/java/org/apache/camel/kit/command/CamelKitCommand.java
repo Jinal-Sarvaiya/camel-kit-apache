@@ -1,21 +1,17 @@
 package org.apache.camel.kit.command;
 
-import java.util.concurrent.Callable;
-
 import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.output.Printer;
 import org.apache.camel.kit.util.AnsiColors;
 
-import picocli.CommandLine;
-
 /**
  * Base class for all Camel-Kit commands (following Camel JBang CamelCommand pattern).
  */
-public abstract class CamelKitCommand implements Callable<Integer> {
-
-    @CommandLine.Option(names = {"-h", "--help"}, usageHelp = true,
-                        description = "Display help")
-    boolean helpRequested;
+public abstract class CamelKitCommand extends CliCommand {
+    @org.aesh.command.option.Option(name = "help", shortName = 'h', hasValue = false, overrideRequired = true,
+                                    parser = InformationOptionParser.class,
+                                    description = "Display help and exit")
+    protected boolean helpRequested;
 
     protected final CamelKitMain main;
 

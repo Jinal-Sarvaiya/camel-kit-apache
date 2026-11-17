@@ -3,39 +3,43 @@ package org.apache.camel.kit.command.graph;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.GraphVisualizer;
 import org.apache.camel.kit.graph.ProjectGraph;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Option;
 
-@Command(name = "visualize", description = "Generate interactive HTML graph visualization")
-public class GraphVisualizeCommand implements Callable<Integer> {
-    @Option(names = {"-i", "--input"}, defaultValue = ".camel-kit/project-graph.json")
+@CommandDefinition(name = "visualize", description = "Generate interactive HTML graph visualization")
+public class GraphVisualizeCommand extends CliCommand {
+    @Option(parser = KitOptionParser.class, name = "input", shortName = 'i',
+            defaultValue = ".camel-kit/project-graph.json",
+            converter = PathConverter.class)
     Path input;
-    @Option(names = {"-o", "--output"}, defaultValue = ".camel-kit/project-graph.html")
+    @Option(parser = KitOptionParser.class, name = "output", shortName = 'o',
+            defaultValue = ".camel-kit/project-graph.html",
+            converter = PathConverter.class)
     Path output;
-    @Option(names = {"-l", "--library"}, description = "Visualization library: ${COMPLETION-CANDIDATES}",
-            defaultValue = "cytoscape", completionCandidates = LibCandidates.class)
+    @Option(parser = KitOptionParser.class, name = "library", shortName = 'l',
+            description = "Visualization library: cytoscape, d3, vis-network, antv-g6",
+            defaultValue = "cytoscape", completer = LibCandidates.class)
     String library;
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
 
-    static class LibCandidates extends ArrayList<String> {
-        LibCandidates() {
-            super(List.of("cytoscape", "d3", "vis-network", "antv-g6"));
+    public static class LibCandidates
+            implements org.aesh.command.completer.OptionCompleter<org.aesh.command.completer.CompleterInvocation> {
+        public void complete(org.aesh.command.completer.CompleterInvocation invocation) {
+            invocation.addAllCompleterValues(List.of("cytoscape", "d3", "vis-network", "antv-g6"));
         }
     }
 
     @Override
     public Integer call() {
-        PrintWriter err = spec.commandLine().getErr();
+        PrintWriter err = this.err;
         if (!Files.exists(input)) {
             err.println("Graph not found: " + input + ". Run 'graph generate' first.");
             err.flush();

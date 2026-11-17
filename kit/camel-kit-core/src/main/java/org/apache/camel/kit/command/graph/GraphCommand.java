@@ -1,26 +1,27 @@
 package org.apache.camel.kit.command.graph;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.HelpCommand;
 
-@Command(name = "graph",
-         description = "Project graph analysis, generation, and visualization",
-         subcommands = {
-                 GraphStatsCommand.class, GraphFindCommand.class, GraphNeighborsCommand.class,
-                 GraphPathCommand.class, GraphSubgraphCommand.class, GraphRouteFlowCommand.class,
-                 GraphImpactCommand.class, GraphRouteTopologyCommand.class, GraphDeadCodeCommand.class,
-                 GraphProjectNormsCommand.class, GraphProjectContextCommand.class, GraphRouteContextCommand.class,
-                 GraphMigrationContextCommand.class,
-                 GraphGenerateCommand.class, GraphVisualizeCommand.class,
-                 CommandLine.HelpCommand.class
-         })
-public class GraphCommand implements Runnable {
+import org.aesh.command.CommandDefinition;
 
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
+@CommandDefinition(name = "graph",
+                   description = "Project graph analysis, generation, and visualization",
+                   groupCommands = {
+                           GraphStatsCommand.class, GraphFindCommand.class, GraphNeighborsCommand.class,
+                           GraphPathCommand.class, GraphSubgraphCommand.class, GraphRouteFlowCommand.class,
+                           GraphImpactCommand.class, GraphRouteTopologyCommand.class, GraphDeadCodeCommand.class,
+                           GraphProjectNormsCommand.class, GraphProjectContextCommand.class,
+                           GraphRouteContextCommand.class,
+                           GraphMigrationContextCommand.class,
+                           GraphGenerateCommand.class, GraphVisualizeCommand.class,
+                           HelpCommand.class
+                   })
+public class GraphCommand extends CliCommand {
 
     @Override
-    public void run() {
-        spec.commandLine().usage(spec.commandLine().getOut());
+    public Integer call() {
+        out.print(invocation.getHelpInfo());
+        return 0;
     }
 }

@@ -4,9 +4,9 @@ import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.query.DeadCodeAnalyzer;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
+import org.aesh.command.CommandDefinition;
 
-@Command(name = "dead-code", description = "Report graph-covered structural retirement candidates")
+@CommandDefinition(name = "dead-code", description = "Report graph-covered structural retirement candidates")
 public class GraphDeadCodeCommand extends GraphQueryCommand {
 
     @Override

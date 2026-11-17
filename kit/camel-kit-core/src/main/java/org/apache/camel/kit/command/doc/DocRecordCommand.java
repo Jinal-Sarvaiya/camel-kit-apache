@@ -1,44 +1,50 @@
 package org.apache.camel.kit.command.doc;
 
 import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.doc.DocumentationEvidence;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "record",
-         description = "Record a completed, partial or failed documentation review; does not perform the review")
-public class DocRecordCommand implements Callable<Integer> {
-    @Parameters(index = "0", description = "Document path, relative to project")
+@CommandDefinition(name = "record",
+                   description = "Record a completed, partial or failed documentation review; does not perform the review")
+public class DocRecordCommand extends CliCommand {
+    @Argument(required = true, index = "0", description = "Document path, relative to project",
+              converter = PathConverter.class)
     Path file;
 
-    @Option(names = "--project", required = true, description = "Project root")
+    @Option(parser = KitOptionParser.class, name = "project", required = true,
+            description = "Project root",
+            converter = PathConverter.class)
     Path project;
 
-    @Option(names = "--snapshot", required = true, description = "JSON from doc snapshot, relative to project")
+    @Option(parser = KitOptionParser.class, name = "snapshot", required = true,
+            description = "JSON from doc snapshot, relative to project",
+            converter = PathConverter.class)
     Path snapshot;
 
-    @Option(names = "--evidence", required = true, description = "Review report path, relative to project")
+    @Option(parser = KitOptionParser.class, name = "evidence", required = true,
+            description = "Review report path, relative to project",
+            converter = PathConverter.class)
     Path evidence;
 
-    @Option(names = "--result", required = true, description = "complete, partial or failed")
+    @Option(parser = KitOptionParser.class, name = "result", required = true,
+            description = "complete, partial or failed")
     String result;
-
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
 
     @Override
     public Integer call() {
         try {
             DocumentationEvidence.record(project, file, snapshot, evidence, result);
-            spec.commandLine().getOut().println("Recorded documentation review: " + file + " (" + result + ")");
+            this.out.println("Recorded documentation review: " + file + " (" + result + ")");
             return 0;
         } catch (Exception e) {
-            spec.commandLine().getErr().println("Error recording review: " + e.getMessage());
+            this.err.println("Error recording review: " + e.getMessage());
             return 1;
         }
     }

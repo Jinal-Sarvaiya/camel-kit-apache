@@ -13,9 +13,9 @@ import org.apache.camel.kit.graph.query.RouteFlowTracer;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
+import org.aesh.command.CommandDefinition;
 
-@Command(name = "project-norms", description = "Compute project norms for validation (composite)")
+@CommandDefinition(name = "project-norms", description = "Compute project norms for validation (composite)")
 public class GraphProjectNormsCommand extends GraphQueryCommand {
 
     private static final Pattern KEBAB = Pattern.compile("^[a-z][a-z0-9]*(-[a-z][a-z0-9]*)+$");

@@ -1197,3 +1197,12 @@ camel-kit init my-project --ai claude
 # Debug (ad-hoc troubleshooting)
 /camel-debug                             # Diagnose and fix a broken route
 ```
+
+### Development CLI parser and host compatibility
+
+Development builds use Aesh. The plugin targets the Camel host selected by `camel.cli.version` in
+`distribution.properties` (the Aesh-based 4.24.0 line, requiring Java 21+); `camel.main.version` still controls generated integrations.
+See the [installation guide](modules/ROOT/pages/getting-started.adoc#cli-host).
+Standalone Ship preserves literal `@` values. The new plugin follows Camel's argument-file policy: use
+`--text @@literal` or `--text=@literal` to pass `@literal`; shell quotes alone do not prevent expansion.
+Use `-h`/`--help` for help and root `-V`/`--version` for the Kit artifact version.

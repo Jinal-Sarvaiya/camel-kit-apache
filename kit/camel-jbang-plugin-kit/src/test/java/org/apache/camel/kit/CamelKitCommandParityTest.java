@@ -9,13 +9,13 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.camel.dsl.jbang.core.commands.CamelJBangMain;
+import org.apache.camel.dsl.jbang.core.common.CommandTree;
 import org.apache.camel.kit.jbang.CamelKitPlugin;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -34,17 +34,15 @@ class CamelKitCommandParityTest {
     void bob2InitAndRegenerationExposeTheSamePublicSkills() throws Exception {
         CamelKitMain standaloneMain = new CamelKitMain();
         standaloneMain.disableTui();
-        CommandLine standalone = CamelKitMain.commandLine(standaloneMain);
+        CommandRunner standalone = CamelKitMain.commandLine(standaloneMain);
         CamelJBangMain main = new CamelJBangMain();
-        CommandLine plugin = new CommandLine(main);
-        new CamelKitPlugin().customize(plugin, main);
         Path standaloneDir = tempDir.resolve("standalone");
         Path pluginDir = tempDir.resolve("plugin");
 
         for (int initialization = 0; initialization < 2; initialization++) {
             assertEquals(0, standalone.execute("init", standaloneDir.toString(), "--ai", "bob2",
                     "--silent", "--no-fetch", "--force"));
-            assertEquals(0, plugin.execute("kit", "init", pluginDir.toString(), "--ai", "bob2",
+            assertEquals(0, main.run(pluginCommands(main), "kit", "init", pluginDir.toString(), "--ai", "bob2",
                     "--silent", "--no-fetch", "--force"));
             for (String name : PUBLIC_SKILLS) {
                 String relative = ".bob/skills/" + name + "/SKILL.md";
@@ -61,10 +59,8 @@ class CamelKitCommandParityTest {
     void pluginForwardsWithCitrusMcpOption() throws Exception {
         CamelKitMain standaloneMain = new CamelKitMain();
         standaloneMain.disableTui();
-        CommandLine standalone = CamelKitMain.commandLine(standaloneMain);
+        CommandRunner standalone = CamelKitMain.commandLine(standaloneMain);
         CamelJBangMain main = new CamelJBangMain();
-        CommandLine plugin = new CommandLine(main);
-        new CamelKitPlugin().customize(plugin, main);
 
         Path standaloneDefault = tempDir.resolve("standalone-default");
         Path pluginDefault = tempDir.resolve("plugin-default");
@@ -73,11 +69,11 @@ class CamelKitCommandParityTest {
 
         assertEquals(0, standalone.execute("init", standaloneDefault.toString(), "--ai", "bob2",
                 "--silent", "--no-fetch"));
-        assertEquals(0, plugin.execute("kit", "init", pluginDefault.toString(), "--ai", "bob2",
+        assertEquals(0, main.run(pluginCommands(main), "kit", "init", pluginDefault.toString(), "--ai", "bob2",
                 "--silent", "--no-fetch"));
         assertEquals(0, standalone.execute("init", standaloneCitrus.toString(), "--ai", "bob2",
                 "--silent", "--no-fetch", "--with-citrus-mcp"));
-        assertEquals(0, plugin.execute("kit", "init", pluginCitrus.toString(), "--ai", "bob2",
+        assertEquals(0, main.run(pluginCommands(main), "kit", "init", pluginCitrus.toString(), "--ai", "bob2",
                 "--silent", "--no-fetch", "--with-citrus-mcp"));
 
         Properties defaultProps = loadConfig(standaloneDefault);
@@ -102,16 +98,16 @@ class CamelKitCommandParityTest {
     void pluginForwardsTheExistingProjectOptions() throws Exception {
         CamelKitMain standaloneMain = new CamelKitMain();
         standaloneMain.disableTui();
-        CommandLine standalone = CamelKitMain.commandLine(standaloneMain);
+        CommandRunner standalone = CamelKitMain.commandLine(standaloneMain);
         CamelJBangMain main = new CamelJBangMain();
-        CommandLine plugin = new CommandLine(main);
-        new CamelKitPlugin().customize(plugin, main);
 
         // --dry-run: nothing is written
         for (String[] entry : new String[][]{{"standalone-dry"}, {"plugin-dry"}}) {
             Path dir = existingProject(entry[0], "#!/bin/sh\nexit 0\n");
             int exit = entry[0].startsWith("plugin")
-                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                    ? main.run(pluginCommands(main), "kit", "init", dir.toString(), "--ai", "bob2", "--silent",
+                            "--no-fetch",
+                            "--force",
                             "--dry-run")
                     : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
                             "--dry-run");
@@ -134,7 +130,9 @@ class CamelKitCommandParityTest {
                     exit 0
                     """);
             int exit = name.startsWith("plugin")
-                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                    ? main.run(pluginCommands(main), "kit", "init", dir.toString(), "--ai", "bob2", "--silent",
+                            "--no-fetch",
+                            "--force",
                             "--record-baseline")
                     : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
                             "--record-baseline");
@@ -147,7 +145,9 @@ class CamelKitCommandParityTest {
         for (String name : new String[]{"standalone-no-reports", "plugin-no-reports"}) {
             Path dir = existingProject(name, "#!/bin/sh\ntouch mvnw-was-run\nexit 0\n");
             int exit = name.startsWith("plugin")
-                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                    ? main.run(pluginCommands(main), "kit", "init", dir.toString(), "--ai", "bob2", "--silent",
+                            "--no-fetch",
+                            "--force",
                             "--record-baseline")
                     : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
                             "--record-baseline");
@@ -161,7 +161,8 @@ class CamelKitCommandParityTest {
             Path dir = existingProject(name, "#!/bin/sh\n# ORIGINAL\n");
             Files.writeString(dir.resolve("mvnw.cmd"), "@REM keep this wrapper\r\n");
             int exit = name.startsWith("plugin")
-                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch",
+                    ? main.run(pluginCommands(main), "kit", "init", dir.toString(), "--ai", "bob2", "--silent",
+                            "--no-fetch",
                             "--force", "--replace", "mvnw")
                     : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch",
                             "--force", "--replace", "mvnw");
@@ -174,7 +175,9 @@ class CamelKitCommandParityTest {
         for (String name : new String[]{"standalone-keep", "plugin-keep"}) {
             Path dir = existingProject(name, "#!/bin/sh\n# ORIGINAL\n");
             int exit = name.startsWith("plugin")
-                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force")
+                    ? main.run(pluginCommands(main), "kit", "init", dir.toString(), "--ai", "bob2", "--silent",
+                            "--no-fetch",
+                            "--force")
                     : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force");
             assertEquals(0, exit, name);
             assertTrue(Files.readString(dir.resolve("mvnw")).contains("ORIGINAL"), name);
@@ -182,7 +185,9 @@ class CamelKitCommandParityTest {
         for (String name : new String[]{"standalone-replace", "plugin-replace"}) {
             Path dir = existingProject(name, "#!/bin/sh\n# ORIGINAL\n");
             int exit = name.startsWith("plugin")
-                    ? plugin.execute("kit", "init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
+                    ? main.run(pluginCommands(main), "kit", "init", dir.toString(), "--ai", "bob2", "--silent",
+                            "--no-fetch",
+                            "--force",
                             "--replace-wrapper")
                     : standalone.execute("init", dir.toString(), "--ai", "bob2", "--silent", "--no-fetch", "--force",
                             "--replace-wrapper");
@@ -287,31 +292,41 @@ class CamelKitCommandParityTest {
 
     public static class InitProcess {
         public static void main(String[] args) {
-            CommandLine command;
+            java.util.function.ToIntFunction<String[]> execute;
             boolean plugin = Boolean.parseBoolean(args[0]);
             var invocation
                     = new ArrayList<>(List.of("init", args[1], "--ai", args[2], "--silent", "--no-fetch", "--force"));
             if (plugin) {
                 CamelJBangMain main = new CamelJBangMain();
-                command = new CommandLine(main);
+                var command = new CommandTree(main);
                 new CamelKitPlugin().customize(command, main);
+                execute = argv -> main.run(command, argv);
                 invocation.add(0, "kit");
             } else {
                 CamelKitMain main = new CamelKitMain();
                 main.disableTui();
-                command = CamelKitMain.commandLine(main);
+                var command = CamelKitMain.commandLine(main);
+                execute = command::execute;
             }
-            System.exit(command.execute(invocation.toArray(String[]::new)));
+            System.exit(execute.applyAsInt(invocation.toArray(String[]::new)));
         }
+    }
+
+    // The Camel host creates fresh commands for each CLI invocation, including nested runs.
+    private static CommandTree pluginCommands(CamelJBangMain main) {
+        var command = new CommandTree(main);
+        new CamelKitPlugin().customize(command, main);
+        return command;
     }
 
     @Test
     void pluginRegistersStandaloneCommandSurface() {
         CamelJBangMain main = new CamelJBangMain();
-        CommandLine pluginRoot = new CommandLine(main);
+        CommandTree pluginRoot = new CommandTree(main);
         new CamelKitPlugin().customize(pluginRoot, main);
 
-        assertEquals(CamelKitMain.commandLine(new CamelKitMain()).getSubcommands().keySet(),
+        assertEquals(CamelKitMain.commandLine(new CamelKitMain()).parser().getAllChildParsers().stream()
+                .map(p -> p.getProcessedCommand().name()).collect(java.util.stream.Collectors.toSet()),
                 pluginRoot.getSubcommands().get("kit").getSubcommands().keySet());
     }
 }

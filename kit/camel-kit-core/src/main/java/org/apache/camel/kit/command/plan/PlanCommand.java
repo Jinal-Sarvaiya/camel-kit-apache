@@ -1,18 +1,18 @@
 package org.apache.camel.kit.command.plan;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.HelpCommand;
 
-@Command(name = "plan",
-         description = "Implementation plan analysis",
-         subcommands = {PlanAnalyzeCommand.class, CommandLine.HelpCommand.class})
-public class PlanCommand implements Runnable {
+import org.aesh.command.CommandDefinition;
 
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
+@CommandDefinition(name = "plan",
+                   description = "Implementation plan analysis",
+                   groupCommands = {PlanAnalyzeCommand.class, HelpCommand.class})
+public class PlanCommand extends CliCommand {
 
     @Override
-    public void run() {
-        spec.commandLine().usage(spec.commandLine().getOut());
+    public Integer call() {
+        out.print(invocation.getHelpInfo());
+        return 0;
     }
 }

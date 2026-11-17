@@ -5,6 +5,7 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.apache.camel.kit.CommandRunner;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 import org.apache.camel.kit.doc.GeneratedInfo;
 import org.apache.camel.kit.doc.StalenessInfo;
@@ -13,7 +14,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -33,7 +33,7 @@ class DocCommandsTest {
     private String runCheck(String... args) {
         StringWriter out = new StringWriter();
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new DocCheckCommand());
+        CommandRunner cl = new CommandRunner(new DocCheckCommand());
         cl.setOut(new PrintWriter(out));
         cl.setErr(new PrintWriter(err));
         int code = cl.execute(args);
@@ -44,7 +44,7 @@ class DocCommandsTest {
     private int runCheckExpectError(String... args) {
         StringWriter out = new StringWriter();
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new DocCheckCommand());
+        CommandRunner cl = new CommandRunner(new DocCheckCommand());
         cl.setOut(new PrintWriter(out));
         cl.setErr(new PrintWriter(err));
         return cl.execute(args);
@@ -53,7 +53,7 @@ class DocCommandsTest {
     private int runStale(String... args) {
         StringWriter out = new StringWriter();
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new DocStaleCommand());
+        CommandRunner cl = new CommandRunner(new DocStaleCommand());
         cl.setOut(new PrintWriter(out));
         cl.setErr(new PrintWriter(err));
         return cl.execute(args);
@@ -62,7 +62,7 @@ class DocCommandsTest {
     private int runUnstale(String... args) {
         StringWriter out = new StringWriter();
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new DocUnstaleCommand());
+        CommandRunner cl = new CommandRunner(new DocUnstaleCommand());
         cl.setOut(new PrintWriter(out));
         cl.setErr(new PrintWriter(err));
         return cl.execute(args);
@@ -128,7 +128,7 @@ class DocCommandsTest {
     void staleRequiresReason() {
         StringWriter out = new StringWriter();
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new DocStaleCommand());
+        CommandRunner cl = new CommandRunner(new DocStaleCommand());
         cl.setOut(new PrintWriter(out));
         cl.setErr(new PrintWriter(err));
         int code = cl.execute(tempDir.resolve("any.md").toString());
@@ -327,7 +327,7 @@ class DocCommandsTest {
     private int runInit(String... args) {
         StringWriter out = new StringWriter();
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new DocInitCommand());
+        CommandRunner cl = new CommandRunner(new DocInitCommand());
         cl.setOut(new PrintWriter(out));
         cl.setErr(new PrintWriter(err));
         return cl.execute(args);

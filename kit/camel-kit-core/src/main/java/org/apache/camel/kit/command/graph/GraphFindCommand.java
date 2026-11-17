@@ -4,20 +4,23 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.GraphNode;
 import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.graph.query.GraphQuery;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Option;
 
-@Command(name = "find", description = "Find nodes by type and name pattern")
+@CommandDefinition(name = "find", description = "Find nodes by type and name pattern")
 public class GraphFindCommand extends GraphQueryCommand {
-    @Option(names = {"--type"}, description = "Node type filter")
+    @Option(parser = KitOptionParser.class, name = "type",
+            description = "Node type filter")
     String type;
-    @Option(names = {"--name"}, description = "Name pattern (regex)", defaultValue = ".*")
+    @Option(parser = KitOptionParser.class, name = "name",
+            description = "Name pattern (regex)", defaultValue = ".*")
     String namePattern;
 
     @Override

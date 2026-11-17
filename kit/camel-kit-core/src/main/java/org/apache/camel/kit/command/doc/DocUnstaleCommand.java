@@ -3,26 +3,24 @@ package org.apache.camel.kit.command.doc;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
 
-@Command(name = "unstale", description = "Clear staleness from a document")
-public class DocUnstaleCommand implements Callable<Integer> {
+@CommandDefinition(name = "unstale", description = "Clear staleness from a document")
+public class DocUnstaleCommand extends CliCommand {
 
-    @Parameters(index = "0", description = "Path to the document to clear")
+    @Argument(required = true, index = "0", description = "Path to the document to clear",
+              converter = PathConverter.class)
     Path file;
-
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
 
     @Override
     public Integer call() {
-        PrintWriter err = spec.commandLine().getErr();
+        PrintWriter err = this.err;
 
         if (!Files.exists(file)) {
             err.println("Error: file not found: " + file);

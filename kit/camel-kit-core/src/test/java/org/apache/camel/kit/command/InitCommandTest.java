@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.camel.kit.CamelKitMain;
+import org.apache.camel.kit.CommandRunner;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.generator.InvalidAgentConfigurationException;
 import org.apache.camel.kit.output.Printer;
@@ -13,17 +14,16 @@ import org.apache.camel.kit.service.InitService;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class InitCommandTest {
 
     @Test
-    void defaultsToBob2WhenAgentOptionIsOmitted() {
+    void defaultsToBob2WhenAgentOptionIsOmitted() throws Exception {
         InitCommand command = new InitCommand(new CamelKitMain());
 
-        new CommandLine(command).parseArgs("orders");
+        new CommandRunner(command).parse("orders");
 
         assertEquals("bob2", command.ai);
     }
@@ -97,14 +97,14 @@ class InitCommandTest {
     }
 
     @Test
-    void codexOptionIsAcceptedAndShownInHelp() {
+    void codexOptionIsAcceptedAndShownInHelp() throws Exception {
         InitCommand command = new InitCommand(new CamelKitMain());
-        CommandLine commandLine = new CommandLine(command);
+        CommandRunner commandLine = new CommandRunner(command);
 
-        commandLine.parseArgs("orders", "--ai", "codex");
+        commandLine.parse("orders", "--ai", "codex");
 
         assertEquals("codex", command.ai);
-        assertTrue(commandLine.getUsageMessage().contains("codex"));
+        assertTrue(commandLine.parser().printHelp().contains("codex"));
     }
 
     @Test

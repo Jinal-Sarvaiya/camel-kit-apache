@@ -2,20 +2,21 @@ package org.apache.camel.kit.command.graph;
 
 import java.util.*;
 
+import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.GraphNode;
 import org.apache.camel.kit.graph.query.GraphQuery;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "impact", description = "Transitive closure — upstream/downstream of a node")
+@CommandDefinition(name = "impact", description = "Transitive closure — upstream/downstream of a node")
 public class GraphImpactCommand extends GraphQueryCommand {
-    @Parameters(index = "0")
+    @Argument(required = true, index = "0")
     String nodeId;
-    @Option(names = {"--direction"}, defaultValue = "both")
+    @Option(parser = KitOptionParser.class, name = "direction", defaultValue = "both")
     String direction;
 
     @Override

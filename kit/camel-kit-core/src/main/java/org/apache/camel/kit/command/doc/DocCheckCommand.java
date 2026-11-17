@@ -3,35 +3,35 @@ package org.apache.camel.kit.command.doc;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.doc.DocumentationEvidence;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "check", description = "Check document staleness status")
-public class DocCheckCommand implements Callable<Integer> {
+@CommandDefinition(name = "check", description = "Check document staleness status")
+public class DocCheckCommand extends CliCommand {
 
-    @Parameters(index = "0", description = "Path to the document to check")
+    @Argument(required = true, index = "0", description = "Path to the document to check",
+              converter = PathConverter.class)
     Path file;
 
-    @Option(names = "--project",
-            description = "Also check recorded review inputs against this project; paths are project-relative")
+    @Option(parser = KitOptionParser.class, name = "project",
+            description = "Also check recorded review inputs against this project; paths are project-relative",
+            converter = PathConverter.class)
     Path project;
-
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
 
     @Override
     public Integer call() {
-        PrintWriter out = spec.commandLine().getOut();
-        PrintWriter err = spec.commandLine().getErr();
+        PrintWriter out = this.out;
+        PrintWriter err = this.err;
 
         try {
             Path document = project == null ? file : DocumentationEvidence.resolve(project, file);

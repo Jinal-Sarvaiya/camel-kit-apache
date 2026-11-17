@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Stream;
 
+import org.apache.camel.kit.CommandRunner;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.config.AgentConfig;
 import org.apache.camel.kit.config.AgentRegistry;
@@ -19,7 +20,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -86,7 +86,7 @@ class DocumentationLifecycleGuidanceTest {
                 arguments.set(root + 1, project.toString());
                 var output = new StringWriter();
                 var error = new StringWriter();
-                var cli = new CommandLine(new DocCommand());
+                var cli = new CommandRunner(new DocCommand());
                 cli.setOut(new PrintWriter(output));
                 cli.setErr(new PrintWriter(error));
                 assertEquals(0, cli.execute(arguments.toArray(String[]::new)), error.toString());

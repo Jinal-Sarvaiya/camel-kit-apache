@@ -22,72 +22,82 @@ import org.apache.camel.kit.tui.TaskTracker;
 import org.apache.camel.kit.util.PrerequisiteChecker;
 
 import dev.tamboui.image.capability.TerminalImageCapabilities;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
+import org.aesh.command.option.OptionList;
 
 /**
  * Initialize a new Camel-Kit project.
  */
-@Command(name = "init", description = "Initialize a new Camel-Kit project")
+@CommandDefinition(name = "init", description = "Initialize a new Camel-Kit project", generateHelp = true)
 public class InitCommand extends CamelKitCommand {
 
-    @Parameters(index = "0", description = "Project name", arity = "0..1")
+    @Argument(index = "0", description = "Project name", arity = "0..1")
     public String projectName;
 
-    @Option(names = {"-a", "--ai"},
+    @Option(parser = KitOptionParser.class, name = "ai", shortName = 'a',
             description = "AI agent: bob2 (IBM Bob 2, default), antigravity, "
                           + "claude, codex, copilot, pi, qwen, opencode",
             defaultValue = "bob2")
     public String ai;
 
-    @Option(names = {"--here"}, description = "Initialize in current directory")
+    @Option(parser = KitOptionParser.class, name = "here",
+            description = "Initialize in current directory", hasValue = false)
     public boolean here;
 
-    @Option(names = {"--citrus-version"},
+    @Option(parser = KitOptionParser.class, name = "citrus-version",
             description = "Citrus version for test schemas",
             defaultValue = "default")
     public String citrusVersion;
 
-    @Option(names = {"--with-citrus-mcp"},
-            description = "Include the Citrus MCP server in agent configuration (default: off)")
+    @Option(parser = KitOptionParser.class, name = "with-citrus-mcp",
+            description = "Include the Citrus MCP server in agent configuration (default: off)", hasValue = false)
     public boolean withCitrusMcp;
 
-    @Option(names = {"--no-fetch"}, description = "Skip external catalog fetching")
+    @Option(parser = KitOptionParser.class, name = "no-fetch",
+            description = "Skip external catalog fetching", hasValue = false)
     public boolean noFetch;
 
-    @Option(names = {"--force"},
-            description = "Reinitialize a project that already has .camel-kit/. Files you changed are preserved")
+    @Option(parser = KitOptionParser.class, name = "force",
+            description = "Reinitialize a project that already has .camel-kit/. Files you changed are preserved",
+            hasValue = false)
     public boolean force;
 
-    @Option(names = {"--dry-run"},
-            description = "Show what init would do to files the project may already own, without writing anything")
+    @Option(parser = KitOptionParser.class, name = "dry-run",
+            description = "Show what init would do to files the project may already own, without writing anything",
+            hasValue = false)
     public boolean dryRun;
 
-    @Option(names = {"--replace"}, paramLabel = "<path>",
-            description = "Replace this existing shared file (for example AGENTS.md or mvnw) instead of "
-                          + "preserving it (repeatable)")
+    @OptionList(parser = KitOptionParser.class, name = "replace",
+                description = "Replace this existing shared file (for example AGENTS.md or mvnw) instead of "
+                              + "preserving it (repeatable)",
+                valueSeparator = OptionList.NO_SEPARATOR)
     public List<String> replace;
-    @Option(names = {"--replace-wrapper"}, description = "Replace Maven wrapper even if it exists")
+    @Option(parser = KitOptionParser.class, name = "replace-wrapper",
+            description = "Replace Maven wrapper even if it exists", hasValue = false)
     public boolean replaceWrapper;
 
-    @Option(names = {"--record-baseline"},
+    @Option(parser = KitOptionParser.class, name = "record-baseline",
             description = "For an existing project, run its tests once to record a baseline result "
-                          + "(executes the project's build and tests; may take several minutes)")
+                          + "(executes the project's build and tests; may take several minutes)",
+            hasValue = false)
     public boolean recordBaseline;
 
-    @Option(names = {"--silent"}, description = "Suppress all output (no banner, no progress, no summary)")
+    @Option(parser = KitOptionParser.class, name = "silent",
+            description = "Suppress all output (no banner, no progress, no summary)", hasValue = false)
     public boolean silent;
 
-    @Option(names = {"-c", "--config"},
-            description = "Path to config properties file (default: ~/.camel-kit/config.properties)")
+    @Option(parser = KitOptionParser.class, name = "config", shortName = 'c',
+            description = "Path to config properties file (default: ~/.camel-kit/config.properties)",
+            converter = PathConverter.class)
     public Path configFile;
 
-    @Option(names = {"-p", "--property"}, arity = "1..*",
-            description = "Override config property: -p key=value (repeatable)")
+    @OptionList(parser = KitOptionParser.class, name = "property", shortName = 'p',
+                description = "Override config property: -p key=value (repeatable)", valueSeparator = ' ')
     public List<String> properties;
 
-    @Option(names = {"--source-platform"},
+    @Option(parser = KitOptionParser.class, name = "source-platform",
             description = "Source platform for migration graph analysis: mulesoft, camel, biztalk, auto (default: auto)")
     public String sourcePlatform;
 

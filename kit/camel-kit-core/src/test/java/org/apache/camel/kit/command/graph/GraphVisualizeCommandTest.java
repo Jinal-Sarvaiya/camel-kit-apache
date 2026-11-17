@@ -5,10 +5,11 @@ import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.apache.camel.kit.CommandRunner;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,7 +27,7 @@ class GraphVisualizeCommandTest {
     void generatesHtmlWithDefaultLibrary() throws Exception {
         Path out = tempDir.resolve("graph.html");
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new GraphVisualizeCommand());
+        CommandRunner cl = new CommandRunner(new GraphVisualizeCommand());
         cl.setErr(new PrintWriter(err));
         assertEquals(0, cl.execute("-i", graphFile.toString(), "-o", out.toString()));
         assertTrue(Files.exists(out));
@@ -39,7 +40,7 @@ class GraphVisualizeCommandTest {
     void generatesHtmlWithD3() throws Exception {
         Path out = tempDir.resolve("d3.html");
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new GraphVisualizeCommand());
+        CommandRunner cl = new CommandRunner(new GraphVisualizeCommand());
         cl.setErr(new PrintWriter(err));
         assertEquals(0, cl.execute("-i", graphFile.toString(), "-o", out.toString(), "-l", "d3"));
         assertTrue(Files.readString(out).contains("d3.forceSimulation"));
@@ -48,7 +49,7 @@ class GraphVisualizeCommandTest {
     @Test
     void missingInputReturnsError() {
         StringWriter err = new StringWriter();
-        CommandLine cl = new CommandLine(new GraphVisualizeCommand());
+        CommandRunner cl = new CommandRunner(new GraphVisualizeCommand());
         cl.setErr(new PrintWriter(err));
         assertEquals(1, cl.execute("-i", tempDir.resolve("none.json").toString()));
         assertTrue(err.toString().contains("Graph not found"));

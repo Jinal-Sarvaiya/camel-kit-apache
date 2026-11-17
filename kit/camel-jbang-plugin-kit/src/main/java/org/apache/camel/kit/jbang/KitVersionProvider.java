@@ -3,14 +3,11 @@ package org.apache.camel.kit.jbang;
 import java.io.InputStream;
 import java.util.Properties;
 
-import picocli.CommandLine.IVersionProvider;
-
-public class KitVersionProvider implements IVersionProvider {
+public class KitVersionProvider {
 
     private static final String POM_PROPERTIES
             = "META-INF/maven/org.apache.camel/camel-jbang-plugin-kit/pom.properties";
 
-    @Override
     public String[] getVersion() throws Exception {
         Properties props = new Properties();
         try (InputStream is = KitVersionProvider.class.getResourceAsStream("/" + POM_PROPERTIES)) {

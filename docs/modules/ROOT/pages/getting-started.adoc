@@ -125,7 +125,7 @@ cd camel-kit
 jbang app install --name camel-kit --force \
   kit/camel-kit-main/src/main/jbang/main/CamelKit.java
 
-# Or install the matching Camel JBang plugin from the local Maven repository
+# With an Aesh-based Camel host, install the matching plugin from the local Maven repository
 camel plugin add kit \
   --gav org.apache.camel:camel-jbang-plugin-kit:{camel-kit-snapshot-version} \
   --description "Design Apache Camel Integrations with AI"
@@ -154,6 +154,19 @@ NOTE: The released {camel-kit-version} artifacts are published under the JBang c
 the Maven coordinate `io.github.luigidemasi:camel-jbang-plugin-kit`. Development snapshots built from
 `apache/camel-kit` use the `org.apache.camel` group. The first release from the Apache repository will change the
 release coordinates; this page is updated with it.
+
+[[cli-host]]
+== Development CLI host compatibility
+
+The development CLI uses Aesh in both entry points. The plugin requires the Aesh-based Camel 4.24.0 line;
+the current build is tested against `{camel-cli-version}`. This host requires Java 21 or later. Use that development host for source/snapshot testing.
+A released Camel 4.24.0 host must be verified before releasing this Kit version. Older Picocli-based hosts cannot
+load the new plugin. These requirements do not change the released {camel-kit-version} plugin.
+
+The standalone `camel-kit` launcher continues to support Java 17 or later, supplies its own parser and does not require a Camel host to parse commands.
+The existing JLine/TamboUI rendering remains in place. The host pin `camel.cli.version` is independent of
+`camel.main.version`, so upgrading the CLI host does not change the defaults or supported versions of generated
+integrations. All pins live in `distribution.properties`.
 
 [[upgrading]]
 == Upgrading

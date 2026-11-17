@@ -6,9 +6,9 @@ import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.query.GraphQuery;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
+import org.aesh.command.CommandDefinition;
 
-@Command(name = "stats", description = "Show node and edge counts by type")
+@CommandDefinition(name = "stats", description = "Show node and edge counts by type")
 public class GraphStatsCommand extends GraphQueryCommand {
 
     @Override

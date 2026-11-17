@@ -1,34 +1,32 @@
 package org.apache.camel.kit.jbang;
 
-import org.apache.camel.dsl.jbang.core.commands.CamelCommand;
-import org.apache.camel.dsl.jbang.core.commands.CamelJBangMain;
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.InformationOptionParser;
+import org.apache.camel.kit.command.KitOptionParser;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Option;
 
-/**
- * Base command for `camel kit` - displays usage information
- */
-@Command(name = "kit", versionProvider = KitVersionProvider.class,
-         description = "Design Apache Camel Integrations with AI")
-public class KitCommand extends CamelCommand {
+@CommandDefinition(name = "kit", description = "Design Apache Camel Integrations with AI", generateHelp = true)
+public class KitCommand extends CliCommand {
+    @org.aesh.command.option.Option(name = "help", shortName = 'h', hasValue = false, overrideRequired = true,
+                                    parser = InformationOptionParser.class,
+                                    description = "Display help and exit")
+    protected boolean helpRequested;
 
-    @CommandLine.Option(names = {"-V", "--version"}, description = "Print version information")
+    @Option(parser = KitOptionParser.class, name = "version", shortName = 'V',
+            hasValue = false, description = "Print version information")
     private boolean versionRequested;
 
-    public KitCommand(CamelJBangMain main) {
-        super(main);
-    }
-
     @Override
-    public Integer doCall() throws Exception {
+    public Integer call() throws Exception {
         if (versionRequested) {
-            for (String v : new KitVersionProvider().getVersion()) {
-                System.out.println(v);
+            for (String version : new KitVersionProvider().getVersion()) {
+                out.println(version);
             }
-            return 0;
+        } else {
+            out.print(invocation.getHelpInfo());
         }
-        new CommandLine(this).usage(System.out);
         return 0;
     }
 }

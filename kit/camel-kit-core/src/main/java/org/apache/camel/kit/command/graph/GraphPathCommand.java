@@ -2,22 +2,23 @@ package org.apache.camel.kit.command.graph;
 
 import java.util.List;
 
+import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.GraphNode;
 import org.apache.camel.kit.graph.query.GraphQuery;
 
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "path", description = "Find shortest path between two nodes")
+@CommandDefinition(name = "path", description = "Find shortest path between two nodes")
 public class GraphPathCommand extends GraphQueryCommand {
-    @Parameters(index = "0")
+    @Argument(required = true, index = "0")
     String fromId;
-    @Parameters(index = "1")
+    @Argument(required = true, index = "1")
     String toId;
-    @Option(names = {"--max-depth"}, defaultValue = "5")
+    @Option(parser = KitOptionParser.class, name = "max-depth", defaultValue = "5")
     int maxDepth;
 
     @Override

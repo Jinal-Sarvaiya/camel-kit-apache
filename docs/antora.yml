@@ -29,6 +29,7 @@ asciidoc:
     camel-kit-snapshot-version: 0.4.2-SNAPSHOT
     camel-kit-knowledge-version: 0.0.2
     camel-version: 4.22.1
+    camel-cli-version: 4.24.0-SNAPSHOT
     camel-quarkus-version: 4.18.3
     quarkus-platform-version: 3.33.3.2
     forage-version: 1.6.1

@@ -27,7 +27,7 @@ This project follows the [Apache Software Foundation Code of Conduct](https://ww
 
 ### Prerequisites
 
-- Java 17 or higher
+- Java 21 or higher for the full reactor (standalone Kit and Knowledge also support Java 17)
 - [JBang](https://www.jbang.dev/) (for running the CLI)
 - Maven 3.9+ (included via Maven Wrapper)
 - Git
@@ -77,8 +77,14 @@ jbang app install --force camel-kit@./
 
 For IntelliJ IDEA or Eclipse:
 1. Import as Maven project
-2. Enable annotation processing for Picocli
-3. Set JDK 17 or higher as project SDK
+2. Use Aesh command annotations; no annotation processor is required
+3. Set JDK 21 or higher as project SDK
+
+CLI commands use Aesh's one-shot argv runtime. Keep error output on stderr, return 2 for invalid usage before
+performing side effects, and keep service/controller logic independent of parsing. `camel.cli.version` pins
+the Camel JBang plugin host; `camel.main.version` continues to select the generated integration runtime.
+The current plugin build targets the Aesh-based Camel 4.24.0 development line and requires Java 21 or later.
+Standalone Kit retains Java 17 support; the Java 17 CI lane excludes the host plugin. It cannot load in older Picocli hosts.
 
 ## Project Structure
 
@@ -190,24 +196,26 @@ Before opening an issue:
 ```java
 package org.apache.camel.kit.command;
 
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.apache.camel.kit.command.CliCommand;
+import org.aesh.command.option.Argument;
 
 /**
  * Command to process a route specification.
  */
-@Command(
+@CommandDefinition(
     name = "route",
     description = "Process a route specification"
 )
-public class RouteCommand implements Runnable {
+public class RouteCommand extends CliCommand {
 
-    @Parameters(index = "0", description = "Name of the route")
+    @Argument(index = "0", required = true, description = "Name of the route")
     private String routeName;
 
     @Override
-    public void run() {
+    public Integer call() {
         // Implementation here
+        return 0;
     }
 }
 ```

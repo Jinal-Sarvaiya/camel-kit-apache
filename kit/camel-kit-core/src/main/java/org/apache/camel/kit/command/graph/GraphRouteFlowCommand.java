@@ -2,20 +2,22 @@ package org.apache.camel.kit.command.graph;
 
 import java.util.List;
 
+import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.query.RouteFlowTracer;
 
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.Parameters;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Argument;
+import org.aesh.command.option.Option;
 
-@Command(name = "route-flow", description = "Trace message path through a route")
+@CommandDefinition(name = "route-flow", description = "Trace message path through a route")
 public class GraphRouteFlowCommand extends GraphQueryCommand {
-    @Parameters(index = "0")
+    @Argument(required = true, index = "0")
     String routeId;
-    @Option(names = {"--from-endpoint"}, defaultValue = "false")
+    @Option(parser = KitOptionParser.class, name = "from-endpoint", defaultValue = "false",
+            hasValue = false)
     boolean fromEndpoint;
 
     @Override

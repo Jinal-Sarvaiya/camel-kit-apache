@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 
+import org.apache.camel.kit.CommandRunner;
 import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.ship.ShipDigest;
 import org.apache.camel.kit.ship.context.ShipContext;
@@ -28,7 +29,6 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -1039,7 +1039,7 @@ class ShipCommandTest {
                 new String[]{"--status", id, "--config", "/tmp/config"},
                 new String[]{"--abort", id, "--property", "camel.main.version=9.9.9"})) {
             RunResult result = run(controller, RecordingLauncher.passThrough(controller), arguments);
-            assertEquals(CommandLine.ExitCode.USAGE, result.exitCode());
+            assertEquals(2, result.exitCode());
             assertTrue(result.error().contains(
                     "only valid when starting or resuming a run"), result.error());
         }
@@ -1069,7 +1069,7 @@ class ShipCommandTest {
                     controller,
                     RecordingLauncher.passThrough(controller),
                     "--stage-timeout", timeout);
-            assertEquals(CommandLine.ExitCode.USAGE, result.exitCode(), timeout);
+            assertEquals(2, result.exitCode(), timeout);
             assertTrue(result.error().contains("expected a duration like 90s, 10m, or 1h"),
                     result.error());
         }
@@ -1103,7 +1103,7 @@ class ShipCommandTest {
                 launcher,
                 "--project-dir", project.toString(),
                 "--start-from", "unknown");
-        assertEquals(CommandLine.ExitCode.USAGE, unknown.exitCode());
+        assertEquals(2, unknown.exitCode());
         assertTrue(unknown.error().contains(
                 "expected discovery, design, or plan"), unknown.error());
 
@@ -1129,24 +1129,24 @@ class ShipCommandTest {
         String id = "ship-0123456789abcdef0123456789abcdef";
 
         RunResult exclusive = run(controller, rejectingLauncher(), "--resume", id, "--status", id);
-        assertEquals(CommandLine.ExitCode.USAGE, exclusive.exitCode());
+        assertEquals(2, exclusive.exitCode());
         assertTrue(exclusive.error().contains("mutually exclusive"), exclusive.error());
 
         RunResult context = run(controller, rejectingLauncher(), "--status", id, "--text", "not allowed");
-        assertEquals(CommandLine.ExitCode.USAGE, context.exitCode());
+        assertEquals(2, context.exitCode());
         assertTrue(context.error().contains(
                 "--text and --document are only valid when starting or resuming a run"),
                 context.error());
 
         RunResult oversight = run(controller, rejectingLauncher(), "--abort", id, "--ask", "never");
-        assertEquals(CommandLine.ExitCode.USAGE, oversight.exitCode());
+        assertEquals(2, oversight.exitCode());
         assertTrue(oversight.error().contains(
                 "--ask is only valid when starting a run"),
                 oversight.error());
 
         RunResult resumedOversight = run(
                 controller, rejectingLauncher(), "--resume", id, "--ask", "always");
-        assertEquals(CommandLine.ExitCode.USAGE, resumedOversight.exitCode());
+        assertEquals(2, resumedOversight.exitCode());
         assertTrue(resumedOversight.error().contains(
                 "--ask is only valid when starting a run"), resumedOversight.error());
     }
@@ -1158,8 +1158,9 @@ class ShipCommandTest {
 
         RunResult result = run(controller, rejectingLauncher(), "@" + arguments);
 
-        assertEquals(CommandLine.ExitCode.USAGE, result.exitCode());
-        assertTrue(result.error().contains("Unmatched argument"), result.error());
+        assertEquals(2, result.exitCode());
+        assertTrue(result.error().contains("Unknown argument"), result.error());
+        assertTrue(result.error().contains("@" + arguments), result.error());
     }
 
     @Test
@@ -1272,7 +1273,8 @@ class ShipCommandTest {
     }
 
     private void assertDocumentFailure(
-            ShipController controller, Path project, Path document, String expectedCode) {
+            ShipController controller, Path project, Path document, String expectedCode)
+            throws Exception {
         RunResult result = run(
                 controller,
                 RecordingLauncher.passThrough(controller),
@@ -1308,13 +1310,44 @@ class ShipCommandTest {
             String... args) {
         StringWriter output = new StringWriter();
         StringWriter error = new StringWriter();
-        CommandLine commandLine = new CommandLine(new ShipCommand(controller, launcher));
-        commandLine.setCommandName(commandName);
-        commandLine.setExpandAtFiles(false);
+        CommandRunner ship = new CommandRunner(new ShipCommand(controller, launcher));
+        CommandRunner commandLine;
+        List<String> invocation = new ArrayList<>();
+        if (commandName.equals("camel kit ship")) {
+            commandLine = new CommandRunner(new CamelRoot()).addSubcommand("kit",
+                    new CommandRunner(new KitRoot()).addSubcommand("ship", ship));
+            invocation.add("kit");
+        } else {
+            commandLine = new CommandRunner(new StandaloneRoot()).addSubcommand("ship", ship);
+        }
+        invocation.add("ship");
+        invocation.addAll(List.of(args));
+        commandLine.argumentFiles(false);
         commandLine.setOut(new PrintWriter(output, true));
         commandLine.setErr(new PrintWriter(error, true));
-        int exitCode = commandLine.execute(args);
+        int exitCode = commandLine.execute(invocation.toArray(String[]::new));
         return new RunResult(exitCode, output.toString(), error.toString());
+    }
+
+    @org.aesh.command.CommandDefinition(name = "camel", description = "Test host")
+    static class CamelRoot extends org.apache.camel.kit.command.CliCommand {
+        public Integer call() {
+            return 0;
+        }
+    }
+
+    @org.aesh.command.CommandDefinition(name = "kit", description = "Test plugin")
+    static class KitRoot extends org.apache.camel.kit.command.CliCommand {
+        public Integer call() {
+            return 0;
+        }
+    }
+
+    @org.aesh.command.CommandDefinition(name = "camel-kit", description = "Test standalone")
+    static class StandaloneRoot extends org.apache.camel.kit.command.CliCommand {
+        public Integer call() {
+            return 0;
+        }
     }
 
     private static Path writeExecutable(Path path, String script) throws IOException {

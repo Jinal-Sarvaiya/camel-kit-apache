@@ -1,22 +1,22 @@
 package org.apache.camel.kit.command.doc;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.HelpCommand;
 
-@Command(name = "doc",
-         description = "Document staleness and source-bound review evidence",
-         subcommands = {
-                 DocCheckCommand.class, DocInitCommand.class, DocStaleCommand.class, DocUnstaleCommand.class,
-                 DocSnapshotCommand.class, DocRecordCommand.class,
-                 CommandLine.HelpCommand.class
-         })
-public class DocCommand implements Runnable {
+import org.aesh.command.CommandDefinition;
 
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
+@CommandDefinition(name = "doc",
+                   description = "Document staleness and source-bound review evidence",
+                   groupCommands = {
+                           DocCheckCommand.class, DocInitCommand.class, DocStaleCommand.class, DocUnstaleCommand.class,
+                           DocSnapshotCommand.class, DocRecordCommand.class,
+                           HelpCommand.class
+                   })
+public class DocCommand extends CliCommand {
 
     @Override
-    public void run() {
-        spec.commandLine().usage(spec.commandLine().getOut());
+    public Integer call() {
+        out.print(invocation.getHelpInfo());
+        return 0;
     }
 }

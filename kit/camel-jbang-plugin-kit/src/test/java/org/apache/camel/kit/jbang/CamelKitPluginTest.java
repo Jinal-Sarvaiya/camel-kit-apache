@@ -1,18 +1,21 @@
 package org.apache.camel.kit.jbang;
 
-import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import org.apache.camel.dsl.jbang.core.commands.CamelJBangMain;
+import org.apache.camel.dsl.jbang.core.common.CommandTree;
+import org.apache.camel.kit.CommandRunner;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.command.pipeline.NextIdCommand;
 import org.apache.camel.kit.command.ship.ShipCommand;
+import org.apache.camel.kit.ship.context.ShipContext;
 
+import org.aesh.command.impl.parser.ArgfileExpander;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
-import picocli.CommandLine;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -22,72 +25,77 @@ class CamelKitPluginTest {
     Path tempDir;
 
     @Test
-    void kitInitDefaultsToBob2WhenAgentOptionIsOmitted() {
+    void kitInitDefaultsToBob2WhenAgentOptionIsOmitted() throws Exception {
         KitInitCommand command = new KitInitCommand(new CamelJBangMain());
 
-        new CommandLine(command).parseArgs("orders");
+        new CommandRunner(command).parse("orders");
 
         assertEquals("bob2", command.ai);
     }
 
     @Test
-    void kitInitAcceptsCodexAndShowsItInHelp() {
+    void kitInitAcceptsCodexAndShowsItInHelp() throws Exception {
         KitInitCommand command = new KitInitCommand(new CamelJBangMain());
-        CommandLine commandLine = new CommandLine(command);
+        CommandRunner commandLine = new CommandRunner(command);
 
-        commandLine.parseArgs("orders", "--ai", "codex");
+        commandLine.parse("orders", "--ai", "codex");
 
         assertEquals("codex", command.ai);
-        assertTrue(commandLine.getUsageMessage().contains("codex"));
+        assertTrue(commandLine.parser().printHelp().contains("codex"));
     }
 
     @Test
     void registersDocAndNextIdUnderKitCommand() {
         CamelJBangMain main = new CamelJBangMain();
-        CommandLine root = new CommandLine(main);
+        CommandTree root = new CommandTree(main);
 
         new CamelKitPlugin().customize(root, main);
 
-        CommandLine kit = root.getSubcommands().get("kit");
+        CommandTree kit = root.getSubcommands().get("kit");
         assertNotNull(kit);
         assertInstanceOf(DocCommand.class, kit.getSubcommands().get("doc").getCommand());
         assertInstanceOf(NextIdCommand.class, kit.getSubcommands().get("nextId").getCommand());
     }
 
     @Test
-    void preservesLiteralShipContextAndCamelArgumentFiles() throws Exception {
+    void acceptsHostEscapedLiteralShipContextAndCamelArgumentFiles() throws Exception {
         Path context = Files.writeString(tempDir.resolve("ship-context"), "EXPANDED VALUE");
         Path arguments = Files.writeString(
                 tempDir.resolve("kit-arguments"), "kit init orders --ai codex");
         String literal = "@" + context.toAbsolutePath();
         CamelJBangMain main = new CamelJBangMain();
-        CommandLine root = new CommandLine(main);
+        CommandTree root = new CommandTree(main);
         new CamelKitPlugin().customize(root, main);
-        CommandLine ship = root.getSubcommands().get("kit").getSubcommands().get("ship");
+        CommandTree ship = root.getSubcommands().get("kit").getSubcommands().get("ship");
         StringWriter output = new StringWriter();
-        root.setOut(new PrintWriter(output, true));
+        root.setOutput(output::write);
 
         assertInstanceOf(ShipCommand.class, ship.getCommand());
-        assertEquals("camel kit ship", ship.getCommandSpec().qualifiedName());
-        CommandLine.ParseResult parsed = root.parseArgs("kit", "ship", "--text", literal);
-        assertEquals(literal,
-                parsed.subcommand().subcommand().matchedOptionValue("--text", null));
-        CommandLine.ParseResult document = root.parseArgs("kit", "ship", "--document", literal);
-        assertEquals(Path.of(literal),
-                document.subcommand().subcommand().matchedOptionValue("--document", null));
-        CommandLine.ParseResult escaped = root.parseArgs("kit", "ship", "--text", "@" + literal);
-        assertEquals(literal,
-                escaped.subcommand().subcommand().matchedOptionValue("--text", null));
-        CommandLine.ParseResult parentOption = root.parseArgs("kit", "--version=true", "ship", "--text", literal);
-        assertEquals(literal,
-                parentOption.subcommand().subcommand().matchedOptionValue("--text", null));
+        assertEquals("camel kit ship", ship.getQualifiedName());
+        assertEquals(List.of(new ShipContext.TextInput(literal)),
+                inputs(parseShip(main, "kit", "ship", "--text", "@" + literal)));
+        assertEquals(List.of(new ShipContext.DocumentInput(Path.of(literal))),
+                inputs(parseShip(main, "kit", "ship", "--document", "@" + literal)));
+        assertEquals(List.of(new ShipContext.TextInput(literal)),
+                inputs(parseShip(main, "kit", "--version=true", "ship", "--text", "@" + literal)));
+        root.parse(ArgfileExpander.expand(new String[]{"@" + arguments.toAbsolutePath()}));
+        KitInitCommand init
+                = (KitInitCommand) root.getSubcommands().get("kit").getSubcommands().get("init").getCommand();
+        assertEquals("orders", init.projectName);
+        assertEquals("codex", init.ai);
 
-        CommandLine.ParseResult expanded = root.parseArgs("@" + arguments.toAbsolutePath());
-        CommandLine.ParseResult init = expanded.subcommand().subcommand();
-        assertEquals("orders", init.matchedPositionalValue(0, null));
-        assertEquals("codex", init.matchedOptionValue("--ai", null));
-
-        assertEquals(0, root.execute("kit", "ship", "--help"));
+        assertEquals(0, root.execute("kit", "ship", "--help").getResultValue());
         assertTrue(output.toString().contains("Usage: camel kit ship"), output.toString());
+    }
+
+    private static CommandTree parseShip(CamelJBangMain main, String... args) throws Exception {
+        var root = new CommandTree(main);
+        new CamelKitPlugin().customize(root, main);
+        root.parse(ArgfileExpander.expand(args));
+        return root.getSubcommands().get("kit").getSubcommands().get("ship");
+    }
+
+    private static List<ShipContext.Input> inputs(CommandTree ship) {
+        return ((ShipCommand) ship.getCommand()).inputs();
     }
 }

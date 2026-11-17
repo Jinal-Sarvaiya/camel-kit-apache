@@ -2,34 +2,36 @@ package org.apache.camel.kit.command.doc;
 
 import java.nio.file.Path;
 import java.util.List;
-import java.util.concurrent.Callable;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.doc.DocumentationEvidence;
 
-import picocli.CommandLine;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.Option;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.option.Option;
+import org.aesh.command.option.OptionList;
 
-@Command(name = "snapshot", description = "Capture source inventory before a documentation review (JSON)")
-public class DocSnapshotCommand implements Callable<Integer> {
-    @Option(names = "--project", required = true, description = "Project root")
+@CommandDefinition(name = "snapshot", description = "Capture source inventory before a documentation review (JSON)")
+public class DocSnapshotCommand extends CliCommand {
+    @Option(parser = KitOptionParser.class, name = "project", required = true,
+            description = "Project root",
+            converter = PathConverter.class)
     Path project;
 
-    @Option(names = "--source", required = true,
-            description = "Source file or directory, relative to project; repeatable")
+    @OptionList(parser = KitOptionParser.class, name = "source", required = true,
+                description = "Source file or directory, relative to project; repeatable",
+                valueSeparator = OptionList.NO_SEPARATOR)
     List<String> sources;
-
-    @CommandLine.Spec
-    CommandLine.Model.CommandSpec spec;
 
     @Override
     public Integer call() {
         try {
-            spec.commandLine().getOut()
+            this.out
                     .println(DocumentationEvidence.json(DocumentationEvidence.snapshot(project, sources)));
             return 0;
         } catch (Exception e) {
-            spec.commandLine().getErr().println("Error capturing sources: " + e.getMessage());
+            this.err.println("Error capturing sources: " + e.getMessage());
             return 1;
         }
     }

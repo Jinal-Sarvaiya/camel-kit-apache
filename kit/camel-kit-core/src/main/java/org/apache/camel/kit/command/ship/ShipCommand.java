@@ -6,12 +6,17 @@ import java.nio.channels.ClosedByInterruptException;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
+import org.apache.camel.kit.command.CliCommand;
+import org.apache.camel.kit.command.InformationOptionParser;
+import org.apache.camel.kit.command.KitOptionParser;
+import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.ship.context.ShipContext;
 import org.apache.camel.kit.ship.controller.ShipController;
 import org.apache.camel.kit.ship.controller.ShipNativeWorker;
@@ -20,100 +25,136 @@ import org.apache.camel.kit.ship.controller.ShipRun.Oversight;
 import org.apache.camel.kit.ship.controller.ShipRun.Stage;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import picocli.CommandLine;
-import picocli.CommandLine.ArgGroup;
-import picocli.CommandLine.Command;
-import picocli.CommandLine.ITypeConverter;
-import picocli.CommandLine.Option;
-import picocli.CommandLine.ParameterException;
-import picocli.CommandLine.Spec;
-import picocli.CommandLine.TypeConversionException;
+import org.aesh.command.CommandDefinition;
+import org.aesh.command.converter.Converter;
+import org.aesh.command.converter.ConverterInvocation;
+import org.aesh.command.impl.internal.ProcessedOption;
+import org.aesh.command.option.Option;
+import org.aesh.command.option.OptionList;
+import org.aesh.command.parser.OptionParserException;
+import org.aesh.command.validator.OptionValidatorException;
+import org.aesh.parser.ParsedLineIterator;
 
 /**
  * Local Ship command. Starting or resuming a run drives the authoritative coordinator workflow; status and abort remain
  * pure controller operations.
  */
-@Command(
-         name = "ship",
-         mixinStandardHelpOptions = true,
-         description = "Technology Preview: start, inspect, resume, or abort a local Camel Ship run",
-         footer = "Camel Ship is still being stabilized, may change, and is not recommended for production use.")
-public final class ShipCommand implements Callable<Integer> {
+@CommandDefinition(
+                   name = "ship",
+                   generateHelp = true,
+                   description = "Technology Preview: start, inspect, resume, or abort a local Camel Ship run",
+                   footer = "Camel Ship is still being stabilized, may change, and is not recommended for production use.")
+public final class ShipCommand extends CliCommand {
+    @org.aesh.command.option.Option(name = "help", shortName = 'h', hasValue = false, overrideRequired = true,
+                                    parser = InformationOptionParser.class,
+                                    description = "Display help and exit")
+    protected boolean helpRequested;
 
     private ShipController controller;
     private WorkflowLauncher launcher;
 
-    @Spec
-    CommandLine.Model.CommandSpec spec;
-
-    @ArgGroup(exclusive = true, multiplicity = "0..1")
     Operation operation;
 
-    @ArgGroup(exclusive = true, multiplicity = "0..*")
-    List<ContextArgument> contextArguments = new ArrayList<>();
+    @Option(name = "version", shortName = 'V', hasValue = false, overrideRequired = true,
+            parser = InformationOptionParser.class,
+            description = "Print version information and exit")
+    boolean versionRequested;
 
-    @Option(
-            names = "--ask",
-            paramLabel = "POLICY",
+    @Option(parser = KitOptionParser.class, name = "submit", argument = "RUN_ID",
+            description = "Submit a native subagent result")
+    String submit;
+    @Option(parser = KitOptionParser.class, name = "resume", argument = "RUN_ID",
+            description = "Resume an existing run")
+    String resume;
+    @Option(parser = KitOptionParser.class, name = "start-from", argument = "STAGE",
+            converter = StageConverter.class,
+            description = "Start at discovery, design, or plan")
+    Stage startFrom;
+    @Option(parser = KitOptionParser.class, name = "status", argument = "RUN_ID",
+            description = "Show an existing run")
+    String status;
+    @Option(parser = KitOptionParser.class, name = "abort", argument = "RUN_ID",
+            description = "Abort an existing run")
+    String abort;
+
+    @OptionList(name = "text", description = "Add text context", valueSeparator = OptionList.NO_SEPARATOR,
+                parser = ContextParser.class, converter = ContextConverter.class)
+    List<ContextArgument> texts = new ArrayList<>();
+    @OptionList(name = "document", description = "Add document context", valueSeparator = OptionList.NO_SEPARATOR,
+                parser = ContextParser.class, converter = ContextConverter.class)
+    List<ContextArgument> documents = new ArrayList<>();
+
+    @Option(parser = KitOptionParser.class,
+            name = "ask",
+            argument = "POLICY",
             converter = OversightConverter.class,
             description = "Oversight policy: always, smart, or never")
     Oversight oversight;
 
-    @Option(names = "--project-dir", defaultValue = ".", hidden = true)
+    @Option(parser = KitOptionParser.class, name = "project-dir", defaultValue = ".",
+            visibility = org.aesh.command.option.OptionVisibility.HIDDEN,
+            converter = PathConverter.class)
     Path projectDirectory;
 
-    @Option(names = "--backend", converter = ExecutionModeConverter.class,
+    @Option(parser = KitOptionParser.class, name = "backend",
+            converter = ExecutionModeConverter.class,
             description = "Execution backend for a new run: pi (default), bob2-native, copilot-native,"
                           + " claude-native, antigravity-native, qwen-native, codex-native or opencode-native")
     ShipRun.ExecutionMode executionMode;
 
-    @Option(names = "--json", description = "Return structured run state and any pending native task")
+    @Option(parser = KitOptionParser.class, name = "json",
+            description = "Return structured run state and any pending native task", hasValue = false)
     boolean json;
 
-    @Option(names = "--result", paramLabel = "PATH", description = "Native result envelope for --submit")
+    @Option(parser = KitOptionParser.class, name = "result", argument = "PATH",
+            description = "Native result envelope for --submit",
+            converter = PathConverter.class)
     Path resultFile;
 
-    @Option(
-            names = "--pi",
-            paramLabel = "PATH",
-            description = "Pi executable (default: discovered on PATH)")
+    @Option(parser = KitOptionParser.class,
+            name = "pi",
+            argument = "PATH",
+            description = "Pi executable (default: discovered on PATH)",
+            converter = PathConverter.class)
     Path piExecutable;
 
-    @Option(
-            names = "--node",
-            paramLabel = "PATH",
-            description = "Node executable (default: discovered on PATH)")
+    @Option(parser = KitOptionParser.class,
+            name = "node",
+            argument = "PATH",
+            description = "Node executable (default: discovered on PATH)",
+            converter = PathConverter.class)
     Path nodeExecutable;
 
-    @Option(
-            names = "--maven-repository",
-            paramLabel = "PATH",
+    @Option(parser = KitOptionParser.class,
+            name = "maven-repository",
+            argument = "PATH",
             description = "Private Maven repository for validation catalogs"
-                          + " (default: under the ship state directory)")
+                          + " (default: under the ship state directory)",
+            converter = PathConverter.class)
     Path mavenRepository;
 
-    @Option(
-            names = "--stage-timeout",
-            paramLabel = "DURATION",
+    @Option(parser = KitOptionParser.class,
+            name = "stage-timeout",
+            argument = "DURATION",
             converter = StageTimeoutConverter.class,
             description = "Time limit for one stage attempt, like 90s, 10m, or 1h (default: 10m)")
     Duration stageTimeout;
 
-    @Option(
-            names = "--accept-experimental",
-            description = "Accept an experimental Pi or Node version after its warning")
+    @Option(parser = KitOptionParser.class,
+            name = "accept-experimental",
+            description = "Accept an experimental Pi or Node version after its warning", hasValue = false)
     Boolean acceptExperimental;
 
-    @Option(
-            names = {"-c", "--config"},
-            paramLabel = "PATH",
-            description = "Config properties file (default: ~/.camel-kit/config.properties)")
+    @Option(parser = KitOptionParser.class,
+            name = "config", shortName = 'c',
+            argument = "PATH",
+            description = "Config properties file (default: ~/.camel-kit/config.properties)",
+            converter = PathConverter.class)
     Path configFile;
 
-    @Option(
-            names = {"-p", "--property"},
-            paramLabel = "KEY=VALUE",
-            description = "Override a config property (repeatable)")
+    @OptionList(parser = KitOptionParser.class,
+                name = "property", shortName = 'p',
+                description = "Override a config property (repeatable)", valueSeparator = OptionList.NO_SEPARATOR)
     List<String> configProperties = new ArrayList<>();
 
     public ShipCommand() {
@@ -127,6 +168,9 @@ public final class ShipCommand implements Callable<Integer> {
 
     @Override
     public Integer call() {
+        if (versionRequested) {
+            return 0;
+        }
         validateArguments();
         try {
             ShipRun run = execute();
@@ -250,39 +294,39 @@ public final class ShipCommand implements Callable<Integer> {
     }
 
     private void validateArguments() {
+        long operations
+                = Stream.of(submit, resume, startFrom, status, abort).filter(java.util.Objects::nonNull).count();
+        if (operations > 1) {
+            throw new UsageException("--submit, --resume, --start-from, --status and --abort are mutually exclusive");
+        }
+        operation = operations == 0 ? null : new Operation(submit, resume, startFrom, status, abort);
         boolean submission = operation != null && operation.submit != null;
         if (submission != (resultFile != null)) {
-            throw new ParameterException(spec.commandLine(), "--submit and --result must be supplied together");
+            throw new UsageException("--submit and --result must be supplied together");
         }
-        if (submission && !contextArguments.isEmpty()) {
-            throw new ParameterException(spec.commandLine(), "--submit does not accept context additions");
+        if (submission && (!texts.isEmpty() || !documents.isEmpty())) {
+            throw new UsageException("--submit does not accept context additions");
         }
         if (operation != null && (operation.status != null || operation.abort != null) && executionMode != null) {
-            throw new ParameterException(spec.commandLine(), "--backend is only valid for workflow operations");
+            throw new UsageException("--backend is only valid for workflow operations");
         }
         if (executionMode != null && executionMode.isNative()
                 && (piExecutable != null || nodeExecutable != null || acceptExperimental != null)) {
-            throw new ParameterException(spec.commandLine(), "Pi/Node options cannot configure a native backend");
+            throw new UsageException("Pi/Node options cannot configure a native backend");
         }
 
         if (operation != null && operation.startFrom == null && oversight != null) {
-            throw new ParameterException(
-                    spec.commandLine(),
-                    "--ask is only valid when starting a run");
+            throw new UsageException("--ask is only valid when starting a run");
         }
         if (operation != null && (operation.status != null || operation.abort != null)
-                && !contextArguments.isEmpty()) {
-            throw new ParameterException(
-                    spec.commandLine(),
-                    "--text and --document are only valid when starting or resuming a run");
+                && (!texts.isEmpty() || !documents.isEmpty())) {
+            throw new UsageException("--text and --document are only valid when starting or resuming a run");
         }
         if (operation != null && (operation.status != null || operation.abort != null)
                 && (piExecutable != null || nodeExecutable != null || mavenRepository != null
                         || stageTimeout != null || acceptExperimental != null || configFile != null
                         || !configProperties.isEmpty())) {
-            throw new ParameterException(
-                    spec.commandLine(),
-                    "Runtime and config options are only valid when starting or resuming a run");
+            throw new UsageException("Runtime and config options are only valid when starting or resuming a run");
         }
     }
 
@@ -306,18 +350,20 @@ public final class ShipCommand implements Callable<Integer> {
         return oversight == null ? Oversight.SMART : oversight;
     }
 
-    private List<ShipContext.Input> inputs() {
-        return contextArguments.stream().map(ContextArgument::input).toList();
+    /** Bound context in the original command-line order. */
+    public List<ShipContext.Input> inputs() {
+        return Stream.concat(texts.stream(), documents.stream())
+                .sorted(Comparator.comparingInt(ContextArgument::position)).map(ContextArgument::input).toList();
     }
 
     private void printJson(ShipRun run) {
         try {
             ShipNativeWorker.Task task = controller().pendingTask(run);
-            spec.commandLine().getOut().println(new ObjectMapper().writeValueAsString(new JsonResponse(1, run, task)));
-            spec.commandLine().getOut().flush();
+            this.out.println(new ObjectMapper().writeValueAsString(new JsonResponse(1, run, task)));
+            this.out.flush();
             if (run.status() == ShipRun.RunStatus.COMPLETED) {
-                spec.commandLine().getErr().println(DOCUMENTATION_FOLLOW_UP);
-                spec.commandLine().getErr().flush();
+                this.err.println(DOCUMENTATION_FOLLOW_UP);
+                this.err.flush();
             }
         } catch (IOException e) {
             throw new CommandFailure("handoff-read-failed", "Could not read native task" + runReference(run.id()), e);
@@ -332,7 +378,7 @@ public final class ShipCommand implements Callable<Integer> {
               + "use /camel-start reconcile documentation. Ship completion does not certify current docs or ADRs.";
 
     private void printSummary(ShipRun run) {
-        PrintWriter writer = spec.commandLine().getOut();
+        PrintWriter writer = this.out;
         writer.println("Run: " + run.id());
         writer.println("Feature status: Technology Preview — still being stabilized; "
                        + "may change; not recommended for production use.");
@@ -387,11 +433,11 @@ public final class ShipCommand implements Callable<Integer> {
             if (pausedAfter(run) == Stage.VALIDATE) {
                 writer.println("Warning: Adding context restarts from DISCOVERY and discards the validation Stamp.");
             }
-            writer.println("Next: " + spec.qualifiedName() + " --resume " + run.id()
+            writer.println("Next: " + commandName() + " --resume " + run.id()
                            + projectDirectoryOption(run) + " [--text TEXT | --document PATH]");
         } else if (run.status() == ShipRun.RunStatus.RUNNING
                 || run.status() == ShipRun.RunStatus.FAILED) {
-            writer.println("Next: " + spec.qualifiedName() + " --resume " + run.id()
+            writer.println("Next: " + commandName() + " --resume " + run.id()
                            + projectDirectoryOption(run));
         }
         writer.flush();
@@ -443,7 +489,7 @@ public final class ShipCommand implements Callable<Integer> {
     }
 
     private Integer failure(String code, String message) {
-        PrintWriter writer = spec.commandLine().getErr();
+        PrintWriter writer = this.err;
         writer.println("Error [" + code + "]: "
                        + (message == null ? "[unprintable]" : safeDisplay(message, false)));
         writer.flush();
@@ -501,46 +547,43 @@ public final class ShipCommand implements Callable<Integer> {
         }
     }
 
-    static final class Operation {
-
-        @Option(names = "--submit", paramLabel = "RUN_ID", description = "Submit a native subagent result")
-        String submit;
-
-        @Option(names = "--resume", paramLabel = "RUN_ID", description = "Resume an existing run")
-        String resume;
-
-        @Option(
-                names = "--start-from",
-                paramLabel = "STAGE",
-                converter = StageConverter.class,
-                description = "Start at discovery, design, or plan")
-        Stage startFrom;
-
-        @Option(names = "--status", paramLabel = "RUN_ID", description = "Show an existing run")
-        String status;
-
-        @Option(names = "--abort", paramLabel = "RUN_ID", description = "Abort an existing run")
-        String abort;
+    private record Operation(String submit, String resume, Stage startFrom, String status, String abort) {
     }
 
-    static final class ContextArgument {
+    record ContextArgument(int position, ShipContext.Input input) {
+    }
 
-        @Option(names = "--text", paramLabel = "TEXT", description = "Add text context")
-        String text;
-
-        @Option(names = "--document", paramLabel = "PATH", description = "Add document context")
-        Path document;
-
-        ShipContext.Input input() {
-            return document == null
-                    ? new ShipContext.TextInput(text)
-                    : new ShipContext.DocumentInput(document);
+    public static final class ContextParser extends KitOptionParser {
+        @Override
+        public void parse(ParsedLineIterator iterator, ProcessedOption option) throws OptionParserException {
+            int position = iterator.peekParsedWord().lineIndex();
+            int previous = option.getValues().size();
+            super.parse(iterator, option);
+            // Aesh binds each option separately; carry the argv position through its string-only converter API.
+            for (int i = previous; i < option.getValues().size(); i++) {
+                option.getValues().set(i, position + ":" + option.name() + ":" + option.getValues().get(i));
+            }
         }
     }
 
-    static final class ExecutionModeConverter implements ITypeConverter<ShipRun.ExecutionMode> {
+    public static final class ContextConverter implements Converter<ContextArgument, ConverterInvocation> {
         @Override
-        public ShipRun.ExecutionMode convert(String value) {
+        public ContextArgument convert(ConverterInvocation invocation) throws OptionValidatorException {
+            String[] value = invocation.getInput().split(":", 3);
+            try {
+                ShipContext.Input input = value[1].equals("text")
+                        ? new ShipContext.TextInput(value[2]) : new ShipContext.DocumentInput(Path.of(value[2]));
+                return new ContextArgument(Integer.parseInt(value[0]), input);
+            } catch (IllegalArgumentException e) {
+                throw new OptionValidatorException(e.getMessage());
+            }
+        }
+    }
+
+    public static final class ExecutionModeConverter implements Converter<ShipRun.ExecutionMode, ConverterInvocation> {
+        @Override
+        public ShipRun.ExecutionMode convert(ConverterInvocation invocation) throws OptionValidatorException {
+            String value = invocation.getInput();
             return switch (value) {
                 case "pi" -> ShipRun.ExecutionMode.PI;
                 case "bob2-native" -> ShipRun.ExecutionMode.BOB2_NATIVE;
@@ -550,46 +593,49 @@ public final class ShipCommand implements Callable<Integer> {
                 case "antigravity-native" -> ShipRun.ExecutionMode.ANTIGRAVITY_NATIVE;
                 case "qwen-native" -> ShipRun.ExecutionMode.QWEN_NATIVE;
                 case "opencode-native" -> ShipRun.ExecutionMode.OPENCODE_NATIVE;
-                default -> throw new TypeConversionException(
+                default -> throw new OptionValidatorException(
                         "expected pi, bob2-native, copilot-native, claude-native, antigravity-native, qwen-native, codex-native or opencode-native");
             };
         }
     }
 
-    static final class OversightConverter implements ITypeConverter<Oversight> {
+    public static final class OversightConverter implements Converter<Oversight, ConverterInvocation> {
 
         @Override
-        public Oversight convert(String value) {
+        public Oversight convert(ConverterInvocation invocation) throws OptionValidatorException {
+            String value = invocation.getInput();
             try {
                 return Oversight.valueOf(value.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
-                throw new TypeConversionException("expected always, smart, or never");
+                throw new OptionValidatorException("expected always, smart, or never");
             }
         }
     }
 
-    static final class StageConverter implements ITypeConverter<Stage> {
+    public static final class StageConverter implements Converter<Stage, ConverterInvocation> {
 
         @Override
-        public Stage convert(String value) {
+        public Stage convert(ConverterInvocation invocation) throws OptionValidatorException {
+            String value = invocation.getInput();
             try {
                 return Stage.valueOf(value.toUpperCase(Locale.ROOT));
             } catch (IllegalArgumentException e) {
-                throw new TypeConversionException(
+                throw new OptionValidatorException(
                         "expected discovery, design, or plan");
             }
         }
     }
 
-    static final class StageTimeoutConverter implements ITypeConverter<Duration> {
+    public static final class StageTimeoutConverter implements Converter<Duration, ConverterInvocation> {
 
         private static final Pattern DURATION = Pattern.compile("([1-9][0-9]*)([smh])");
 
         @Override
-        public Duration convert(String value) {
+        public Duration convert(ConverterInvocation invocation) throws OptionValidatorException {
+            String value = invocation.getInput();
             Matcher matcher = DURATION.matcher(value);
             if (!matcher.matches()) {
-                throw new TypeConversionException("expected a duration like 90s, 10m, or 1h");
+                throw new OptionValidatorException("expected a duration like 90s, 10m, or 1h");
             }
             try {
                 long amount = Long.parseLong(matcher.group(1));
@@ -599,7 +645,7 @@ public final class ShipCommand implements Callable<Integer> {
                     default -> Duration.ofHours(amount);
                 };
             } catch (NumberFormatException | ArithmeticException e) {
-                throw new TypeConversionException("expected a duration like 90s, 10m, or 1h");
+                throw new OptionValidatorException("expected a duration like 90s, 10m, or 1h");
             }
         }
     }

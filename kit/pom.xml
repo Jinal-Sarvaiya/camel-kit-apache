@@ -16,7 +16,6 @@
     <name>Camel Kit</name>
     <description>Design Apache Camel Integrations with AI</description>
     <properties>
-        <picocli.version>4.7.7</picocli.version>
         <ascii-table.version>1.9.0</ascii-table.version>
         <jackson.version>${ship.evidence.jackson-yaml.version}</jackson.version>
         <jline.version>3.30.6</jline.version>
@@ -32,6 +31,9 @@
              can read that file. Run tools/sync_distribution_mirrors.py after
              changing the source; DistributionVersionMirrorTest prevents drift. -->
         <camel.main.version>4.22.1</camel.main.version>
+        <camel.cli.version>4.24.0-SNAPSHOT</camel.cli.version>
+        <camel.cli.jline.version>4.4.8</camel.cli.jline.version>
+        <aesh.version>3.19.1</aesh.version>
         <ship.evidence.jackson-yaml.version>2.19.2</ship.evidence.jackson-yaml.version>
         <maven.resolver.version>1.9.27</maven.resolver.version>
         <maven.provider.version>3.9.12</maven.provider.version>
@@ -58,9 +60,9 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>info.picocli</groupId>
-                <artifactId>picocli</artifactId>
-                <version>${picocli.version}</version>
+                <groupId>org.aesh</groupId>
+                <artifactId>aesh</artifactId>
+                <version>${aesh.version}</version>
             </dependency>
             <dependency>
                 <groupId>com.github.freva</groupId>

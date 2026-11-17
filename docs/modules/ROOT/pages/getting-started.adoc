@@ -260,8 +260,9 @@ the project. Known limits:
 
 What every target gets::
 * `AGENTS.md`, or the agent's equivalent entry file, with the routing table for the skills.
-* The agent-native skills and entry points, for example `.claude/commands/` and `.claude/skills/` for Claude Code,
-  or `.agents/skills/` for Codex.
+* The agent-native skills and entry points, for example `.claude/skills/` for Claude Code or
+  `.agents/skills/` for Codex. The released {camel-kit-version} also writes command stubs to `.claude/commands/`;
+  see xref:agents.adoc#claude-upgrade[upgrading a Claude Code workspace].
 * `docs/constitution.md`, the architecture rules every generated route must follow (see xref:constitution.adoc[]).
 * `docs/flows/`, `test/data/` and `schemas/`, empty scaffolds; pipeline artifacts use the selected runtime's paths.
 * `.camel-kit/` with the project configuration, cached catalogs and templates, and later the pipeline state.

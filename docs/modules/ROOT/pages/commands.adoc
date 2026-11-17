@@ -80,7 +80,8 @@ manifests, the registered workspace templates, the exposure of user-invocable co
 permission fields the runtime supports, graph availability, the command prefix, the prerequisites and common stale
 references in generated files. Target specifics: for Codex it parses `.codex/config.toml`, the exact MCP
 allowlists, the prompt approval modes and the required fields of every custom-agent file; for Bob 2 it fails each
-public skill hidden by `user-invocable: false`; for Qwen it checks `includeTools` and `trust`; for OpenCode it
+public skill hidden by `user-invocable: false`; for Claude Code it accepts the legacy
+`agent.folder=.claude/commands` of a workspace that has not been regenerated yet; for Qwen it checks `includeTools` and `trust`; for OpenCode it
 evaluates all configuration layers as one and names the file that defines each rule. Configurations that predate the
 current filter and permission fields produce upgrade warnings; malformed current ones fail. Internal skills must
 exist as skills but must not be exposed as command stubs.

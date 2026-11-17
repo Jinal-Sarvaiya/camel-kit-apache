@@ -245,7 +245,8 @@ error, including `stale-stage-input` or a permission denial, and wait for a new 
 == Entry points per agent
 
 * *Claude Code* and *GitHub Copilot CLI* expose `/camel-ship` through their skill directories and relay eligible runs
-  to their read-only worker; Claude Code's compatibility command stub only points at the skill.
+  to their read-only worker. Claude Code has no generated command file in the development snapshot; the
+  compatibility command stub of the released {camel-kit-version} only points at the skill.
 * *IBM Bob 2* exposes the native skill as `$camel-ship` in Bob Shell and `/camel-ship` in Bob IDE.
 * *OpenAI Codex CLI* exposes `$camel-ship` with no generated command file.
 * *Google Antigravity* exposes `/camel-ship` through its skills directory and relays eligible runs to its read-only

@@ -114,12 +114,19 @@ Manages the provenance and staleness of pipeline artifacts through YAML front ma
 
 ----
 camel-kit doc init --by <skill> [--from <source>] <file>
-camel-kit doc check <file>
+camel-kit doc check <file> [--project <root>]
+camel-kit doc snapshot --project <root> --source <path> [--source <path> ...]
+camel-kit doc record <file> --project <root> --snapshot <json> --evidence <report> --result <complete|partial|failed>
 camel-kit doc stale --reason "..." [--cascade] <file>
 camel-kit doc unstale <file>
 ----
 
-Each artifact carries two blocks: `generated` (when, by which skill, from which upstream artifact; written once by
+With `--project`, `doc check` also checks the source-bound review receipt and reports `unchanged`, `stale` or
+`unverified`. Without it, the legacy behavior below is preserved. `snapshot` captures review inputs; `record` binds a
+review result to unchanged sources, document and evidence without editing the document. They do not perform semantic
+review. See xref:documentation.adoc[the lifecycle and worked example] for scope, limits and status semantics.
+
+Each pipeline artifact carries two blocks: `generated` (when, by which skill, from which upstream artifact; written once by
 `doc init`, which is idempotent) and `staleness` (written by `doc stale` and `doc unstale`). `doc check` prints the
 state as JSON and exits 0 whether or not the file is stale; a file without front matter reports `stale: false`.
 Every subcommand exits 1 on a missing file, an I/O failure or invalid arguments such as a blank `--reason`.

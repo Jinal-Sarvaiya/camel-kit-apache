@@ -447,6 +447,23 @@ $ camel-kit nextId inventory-sync
 
 ### camel-kit doc
 
+Current-system review commands (legacy commands below remain compatible):
+
+```bash
+camel-kit doc snapshot --project . --source src --source pom.xml --source docs/adr > .camel-kit/doc-review-input.json
+camel-kit doc record docs/camel-kit/system-design.md --project . --snapshot .camel-kit/doc-review-input.json --evidence docs/camel-kit/documentation-review.md --result complete
+camel-kit doc check docs/camel-kit/system-design.md --project .
+```
+
+Capture before reviewing; check the exit status. Use existing project paths and keep the current document, report
+and snapshot outside the declared source roots. `record` takes `complete`, `partial` or `failed`, rejects source drift,
+and writes only `<file>.reconciliation.json`. It records the reviewer's conclusion, not an automatic semantic check.
+`check --project` returns `reconciliation.status`: `unchanged` for matching completed-review inputs, `stale` for changed
+inputs, `unverified` for missing/invalid/partial evidence. Exit 0 means the check ran; inspect JSON and any stale flag.
+No Git commit is needed to detect manual changes. Paths are project-relative/contained; symlinks and traversal are
+rejected. Limits: 10,000 entries, 64 MiB/file, 512 MiB source total, 1 MiB per metadata/report/document input to record.
+See [Current documentation and ADRs](modules/ROOT/pages/documentation.adoc) for coverage, ownership and examples.
+
 Pipeline document staleness management. Replaces the text-marker-based staleness system with deterministic YAML frontmatter operations.
 
 **Usage:**

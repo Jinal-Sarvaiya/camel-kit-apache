@@ -151,3 +151,8 @@ The plan stays valid while its design is unchanged. After a transient environmen
 rerun `/camel-execute <pipeline-id>`; execution restarts from the first task because there is no task-level resume.
 If the design changes, amend it with `/camel-brainstorm <pipeline-id>` and regenerate the stale plan before
 executing again.
+
+== Current documentation and decisions
+
+See xref:documentation.adoc[current system documentation and ADRs] for the shared lifecycle, stage ownership,
+documentation-only reconciliation, source-bound review evidence and verification limits.

@@ -513,3 +513,8 @@ The new route may have accidentally removed a shared bean. Review the execution 
 * xref:migration.adoc[Migrating from other platforms]
 * xref:camel-validate.adoc[Route validation]
 * xref:verification.adoc[Runtime verification]
+
+== Current documentation and decisions
+
+See xref:documentation.adoc[current system documentation and ADRs] for the shared lifecycle, stage ownership,
+documentation-only reconciliation, source-bound review evidence and verification limits.

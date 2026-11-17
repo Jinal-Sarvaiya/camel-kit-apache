@@ -36,6 +36,11 @@ Do not use it for single-file changes, quick fixes, exploratory work, or when on
 Ship targets Camel Main at the configured `camel.main.version`: a `-p camel.main.version=...` override, then the
 `-c` file or `~/.camel-kit/config.properties`, then the bundled default.
 
+After guarded publication, the invoking parent reconciles current project docs and ADRs through
+xref:documentation.adoc[the documentation-only workflow]. Ship's `COMPLETED` state and Stamp cover the controller's
+checks, not that separate review. Direct CLI use prints the follow-up (on stderr with `--json`, preserving its schema).
+Status and abort authorize no documentation writes. Pending/interrupted reconciliation remains explicit.
+
 [[command]]
 == Command and options
 
@@ -300,3 +305,8 @@ $camel-ship --document requirements.md
 
 Maintainers run the Pi live gate manually with the `linux-ship-certification` Maven profile and the
 `CAMEL_KIT_SHIP_LIVE_PI` and `CAMEL_KIT_SHIP_LIVE_NODE` variables; it is not part of CI and not something users run.
+
+== Current documentation and decisions
+
+See xref:documentation.adoc[current system documentation and ADRs] for the shared lifecycle, stage ownership,
+documentation-only reconciliation, source-bound review evidence and verification limits.

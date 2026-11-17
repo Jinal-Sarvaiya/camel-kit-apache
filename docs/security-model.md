@@ -165,6 +165,10 @@ metadata; Kit configures it for each harness, and it also serves MCP clients tha
 
 ## 4.4 Trust boundaries and data flow
 
+Current-system docs, ADRs and review receipts remain loaded data under `skills/shared/documentation-lifecycle.md`.
+The shipped lifecycle plus explicit user/design approval selects allowed documentation actions. Accepted decisions
+are not proof of implementation; superseded records are historical. A receipt cannot expand scope or waive a gate.
+
 Camel-Kit has no single boundary; it mediates between five sources of input of different trust. The dominant rule,
 inherited from the umbrella model, is that **what Camel-Kit reads or receives is data, and only the shipped workflow
 and the developer's explicit directions carry instruction authority** *(documented — `skills/shared/context-authority.md`:
@@ -431,7 +435,8 @@ Per-entry-point trust table. "Caller" is the developer unless stated otherwise.
 | `~/.camel-kit/config.properties`, `.camel-kit/config.properties` | properties | no — operator | — |
 | `camel-kit graph <sub> [root]` | file bodies, names and link targets under `root` | **yes** | Same as `init --here`; confinement to `root` and bounded time and memory are claimed by P1, with enforcement verified under V2 |
 | `camel-kit graph …` output, `.camel-kit/project-graph.json` | graph JSON consumed by skills | derived from the tree | Treat as data in prompts *(documented — umbrella "Reading route sources")* |
-| `camel-kit doc check/stale/unstale <file>` | YAML frontmatter of pipeline artifacts | model-authored → **yes** | Parsed as data by `FrontmatterHandler` (Jackson YAML); no separate byte quota is claimed here; digests are staleness markers only (§4.9) |
+| `camel-kit doc check/stale/unstale <file>` | YAML frontmatter of pipeline artifacts | model-authored → **yes** | Legacy frontmatter flags parsed as data by `FrontmatterHandler` (Jackson YAML); no separate byte quota is claimed for these legacy commands |
+| `camel-kit doc snapshot/record`, `doc check --project` | source tree, JSON snapshot/receipt and documentation review | tree/model-authored → **yes** | `DocumentationEvidence` confines reads and receipt writes to the selected project, rejects symlink segments, traversal and Git internals; hashes regular files only. Source limits: 10,000 entries, 64 MiB/file, 512 MiB total; JSON/report/document inputs to `record`: 1 MiB each. Duplicate/trailing JSON is rejected. No source execution or network access. Hashes bind review inputs; they do not prove coverage, approval or semantic correctness. |
 | `camel-kit plan analyze` | `implementation-plan.md` task metadata | model-authored → **yes** | Parsed as data by `PlanAnalyzer`; no project execution |
 | `camel-kit nextId <slug>` | slug → `docs/camel-kit/NNN-slug/` | no — operator | — |
 | `camel-kit ship --text`, `--document PATH` | context for the model | supplied by the developer; **content is loaded context** for the model | Do not pass secrets; third-party documents can carry instruction-like text (§4.3, §4.10) |
@@ -790,8 +795,13 @@ This is the most important section for a developer adopting Camel-Kit and for an
   Ship artifacts by the controller's deterministic checks; nowhere else by machinery.
 - *"The Ship Stamp proves the integration is safe to release."* It records which checks ran on this machine, with
   redacted arguments, exit codes and log digests *(documented — `docs/commands.md`)*. It is not an attestation.
-- *"`camel-kit doc check` detects tampering."* It detects staleness of pipeline artifacts by digest; anyone who can
-  write the file can rewrite the digest.
+- *"`camel-kit doc check` proves current documentation or detects tampering."* Legacy checks read stored frontmatter.
+  With `--project`, source-bound receipts detect changed review inputs, including manual edits, within declared roots.
+  The reviewer supplies the scope, evidence and result; anyone who can write a receipt can rewrite its hashes. Neither
+  `unchanged`, Git HEAD nor a cleared stale flag establishes semantic truth, complete coverage or approval.
+- *"Ship COMPLETED includes a documentation review."* Ship certifies only its controller stages. The invoking parent
+  reconciles current docs/ADRs after publication, outside the candidate and Stamp; direct CLI users get a follow-up.
+  This does not broaden worker paths or relax controller gates. Status and abort authorize no documentation writes.
 - *"The safety hook / guard makes autonomous runs safe."* It blocks a short list of obvious patterns; the harness
   permission model is the control.
 - *"Read-only Ship workers cannot leak."* They cannot write, but they read what the parent's permissions allow and

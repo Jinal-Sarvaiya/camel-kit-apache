@@ -4,9 +4,10 @@ import picocli.CommandLine;
 import picocli.CommandLine.Command;
 
 @Command(name = "doc",
-         description = "Pipeline document staleness management",
+         description = "Document staleness and source-bound review evidence",
          subcommands = {
                  DocCheckCommand.class, DocInitCommand.class, DocStaleCommand.class, DocUnstaleCommand.class,
+                 DocSnapshotCommand.class, DocRecordCommand.class,
                  CommandLine.HelpCommand.class
          })
 public class DocCommand implements Runnable {

@@ -761,7 +761,15 @@ class ShipCommandTest {
                 "  Question: Which runtime?",
                 "  Default applied: JBang",
                 "Stamp: " + stamp,
-                "Publication: " + publication), completed.output());
+                "Publication: " + publication,
+                "Documentation: requires a separate review of the published project; "
+                                               + "use /camel-start reconcile documentation. Ship completion does not certify current docs or ADRs."),
+                completed.output());
+        RunResult json = run(controller,
+                evidenceLauncher(controller, ShipRun.RunStatus.COMPLETED, stamp, publication), "--resume", id,
+                "--json");
+        assertEquals(0, json.exitCode(), json.error());
+        assertTrue(json.error().contains("Ship completion does not certify current docs or ADRs."));
     }
 
     @Test

@@ -232,3 +232,8 @@ reference, and run the generated Citrus test in isolation with `camel test run <
 `/camel-debug` in the agent for a structured diagnosis. If the cause is environmental, for example a missing
 database, record it in the verification section of `execution-report.md` before deciding how to proceed.
 ====
+
+== Current documentation and decisions
+
+See xref:documentation.adoc[current system documentation and ADRs] for the shared lifecycle, stage ownership,
+documentation-only reconciliation, source-bound review evidence and verification limits.

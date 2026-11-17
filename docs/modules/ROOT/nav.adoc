@@ -10,6 +10,7 @@
 *** xref:migration-camel-upgrade.adoc[Camel 2.x and 3.x]
 * Pipeline
 ** xref:pipeline.adoc[Stages, approval gate and Iron Laws]
+** xref:documentation.adoc[Current documentation and ADRs]
 ** xref:camel-start.adoc[camel-start]
 ** xref:camel-brainstorm.adoc[camel-brainstorm]
 ** xref:camel-plan.adoc[camel-plan]

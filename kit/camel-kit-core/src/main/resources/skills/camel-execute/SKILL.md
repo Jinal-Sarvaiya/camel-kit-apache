@@ -6,6 +6,10 @@ user_invocable: false
 
 # Camel Execute — Phase 3 Orchestrator
 
+**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
+completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
+
+
 Execute the ready implementation plan derived from the approved design with target-appropriate task execution, an adversarial pre-filter, and ordered spec and quality review after each task.
 
 **Announce at start:** "I'm using the camel-execute skill to implement the plan."
@@ -633,6 +637,14 @@ After the cross-cutting review, run the full verification loop in an isolated su
 
 **Re-plan trigger:** If verification failures persist after fix attempts within the verify loop, the verify loop may trigger `guides/re-plan-loop.md` to modify affected flow design sections and re-execute. See `camel-verify/guides/verify-loop.md` Phase 2 for trigger conditions.
 
+### Step 3.6: Reconcile Current Documentation
+
+The execute parent owns the current-system description and ADR status/link updates, following
+`shared/documentation-lifecycle.md`. After code verification, settle approved ADR metadata and draft coherent current
+docs from all affected applications and existing behavior. Record discrepancies and missing checks. Do not yet call
+the documentation current. In chained mode, finalize the review record after `camel-validate` returns; in standalone
+mode record partial evidence and the validation/documentation-only handoff before stopping.
+
 ### Step 4: Completion Summary
 
 ```
@@ -655,6 +667,9 @@ Review Results:
 
 Cross-Cutting Review: PASS/FAIL
 
+Documentation: COMPLETE/PARTIAL/FAILED/PENDING
+  [current docs, ADR links, review evidence, scope and unresolved discrepancies]
+
 Verification: PASS/PARTIAL/FAIL/NOT_RUN
   [Include the full verification report from Step 3.5]
 
@@ -669,7 +684,11 @@ Save the completion summary as `docs/camel-kit/<PIPELINE_ID>/execution-report.md
 
 **Post-completion transition (invocation mode dependent):**
 
-- **Chained mode:** auto-invoke `camel-validate` (the pipeline continues to Phase 4)
+- **Chained mode:** auto-invoke `camel-validate` (the pipeline continues to Phase 4). After its report returns, the
+  execute parent finishes documentation reconciliation and records its honest result using
+  `shared/documentation-lifecycle.md`. Capture a source snapshot before the final comparison; use the validation
+  report as evidence, not permission to change code or accepted decisions. Report documentation separately from
+  implementation/validation completion. Do not ask the validator to perform the parent's writes.
 - **Standalone mode:** print confirmation and STOP. Do NOT auto-invoke validate.
 
 ---

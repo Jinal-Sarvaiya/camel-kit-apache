@@ -6,6 +6,10 @@ user_invocable: false
 
 # Camel Brainstorm — Phase 1 Orchestrator
 
+**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
+completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
+
+
 Turn integration ideas into fully formed design specs through collaborative dialogue.
 
 **Announce at start:** "I'm using the camel-brainstorm skill to design your integration."

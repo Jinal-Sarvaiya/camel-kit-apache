@@ -102,3 +102,18 @@ unavailable, use `--resume --json`: the controller retains a pending task until 
 Show the failure message and wait for an explicit resume request before obtaining a fresh task.
 Do not duplicate a pending call just because the parent lost its transcript. Late, stale and conflicting envelopes are rejected.
 A failed native attempt stays with its recorded host on retry.
+
+## After Successful Publication
+
+For a new run, submission or explicit resume that actually completes publication, the parent owns the separate
+project documentation step in `shared/documentation-lifecycle.md` (installed under `{SKILLS_DIR}`). Run its
+documentation-only procedure against the published project, using the controller reports/Stamp as evidence and
+checking actual code. This is after the controller finishes; never edit candidates, run state, native proposals,
+imported artifacts or the Stamp to satisfy documentation requirements. Surface unresolved decisions instead of
+accepting them from worker prose. Preserve ADR history and existing documentation conventions.
+
+A status query or abort authorizes no documentation writes. A paused, failed or interrupted run remains pending;
+report that limit. For a non-JSON fallback, require the controller's successful COMPLETED publication output before
+finalizing. If completion cannot be established, report documentation pending and name
+`/camel-start reconcile documentation` as the follow-up. Ship's COMPLETED state covers its controller workflow;
+overall documentation completion additionally requires this recorded review. Do not repeat the review on status.

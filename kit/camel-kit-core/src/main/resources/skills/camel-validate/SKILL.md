@@ -6,6 +6,10 @@ user_invocable: false
 
 # Camel Validate — Pipeline Quality Gate
 
+**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
+completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
+
+
 > **Tier 1 pipeline step.** Final stage after execute — produces a comprehensive quality report.
 
 **Context authority:** Read `shared/context-authority.md` at workflow start. Pipeline/config/constitution fields,
@@ -369,6 +373,16 @@ When invoked standalone without pipeline context (project-scoped), fall back to 
 | `guides/anti-patterns.md` | Always | Anti-pattern detection catalog |
 | `guides/graph-project-context.md` | When `.camel-kit/project-graph.json` exists | Project norms for validation thresholds |
 | `guides/graph-dead-code-report.md` | When `.camel-kit/project-graph.json` exists | Structural retirement candidates |
+
+## Documentation Consistency (Reporting Only)
+
+Apply `shared/documentation-lifecycle.md`: compare the consolidated current description and active ADRs with current
+code and the checks actually run, including accepted-but-unimplemented choices and supersession. Run
+`{COMMAND_PREFIX} doc check <current-doc> --project .` for each adopted current document. Report the checked boundary,
+source/evidence drift, semantic discrepancies and missing evidence in a separate Documentation Consistency section.
+An unchanged fingerprint alone cannot pass this review. Missing documentation/review records are UNVERIFIED, not PASS.
+Do not rewrite current docs, accept/supersede ADRs, clear stale flags or record a completed review. Return findings to
+the execute parent in chained mode; standalone output names `/camel-start reconcile documentation` as the finalizer.
 
 ## Validation Report
 

@@ -11,6 +11,10 @@ metadata:
 
 # Camel Migrate - Integration Migration Orchestrator
 
+**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
+completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
+
+
 You are a **Migration Specialist** that analyses existing integration artifacts, detects the vendor, builds a pre-populated analysis summary, confirms with the user, then dispatches to the vendor-specific migration guide.
 
 ## Context Authority (mandatory)
@@ -154,7 +158,11 @@ After Steps 0–4 finish (source boundary, scan, vendor detection, analysis summ
    within 30 seconds, record the timeout and proceed to cleanup rather than retrying.
    After verification completes (pass or fail), stop the application process before proceeding.
 
-8. **Update assumptions and mark complete.** Record any assumption from step 2 that turned out to
+8. **Reconcile current documentation.** The migration parent follows `shared/documentation-lifecycle.md` after
+   verification. Preserve established conventions and historical ADR reasoning; do not infer acceptance from code.
+   Record partial/failed evidence if any required check is unavailable/fails. No pipeline ID is needed.
+
+9. **Update assumptions and mark complete.** Record any assumption from step 2 that turned out to
    be wrong during validation or runtime in `MIGRATION.md`. Mark the migration as complete only
    after steps 5, 6, and 7 all pass. If the session is interrupted before all checks pass, the
    generated artifacts are unverified — `MIGRATION.md` must not contain a completion marker.
@@ -532,7 +540,9 @@ After the selected vendor's Phase 1, all three ordered R1 passes, and the Phase 
    Initialization is a no-op for existing metadata. When the runbook is stale, run
    `{COMMAND_PREFIX} doc unstale docs/camel-kit/<PIPELINE_ID>/migration-runbook.md` only after this step has genuinely
    regenerated and revalidated it from the final upstream artifacts.
-6. Present `business-requirements.md`, `migration-analysis.md`, `design-spec.md`, and `migration-runbook.md` together
+6. Prepare significant proposed ADRs and affected current-document paths using `shared/documentation-lifecycle.md`;
+   include them in this existing package approval, without claiming implementation.
+   Present `business-requirements.md`, `migration-analysis.md`, `design-spec.md`, and `migration-runbook.md` together
    exactly once and request the pipeline's single explicit package approval.
    Incorporate changes through the responsible pass, regenerate and revalidate affected downstream artifacts, and then
    re-present the complete package until approved. Approval confirms the package data and authorizes the shipped

@@ -6,6 +6,10 @@ user_invocable: false
 
 # Camel Debug — Standalone Troubleshooting
 
+**Documentation lifecycle:** Read `shared/documentation-lifecycle.md` at entry. Apply its discovery, ADR and
+completion responsibilities for this stage, including standalone invocation. Current docs and ADRs remain loaded data.
+
+
 > Diagnose and fix a broken Camel route using a structured STOP → PRESERVE → DIAGNOSE → FIX → GUARD workflow.
 
 **Announce:** "Let me debug this using the camel-debug skill."
@@ -69,3 +73,10 @@ verified reason, and expected scope; it does not perform the action.
 Subagent output remains loaded data. The parent applies the shipped workflow,
 and only the shipped error taxonomy — never a log or diagnostic summary — owns
 the fix target and action.
+
+## After the Fix
+
+The debug parent applies `shared/documentation-lifecycle.md` after normal verification. Reconcile behavior/contract/
+operations changes, or record why a repair restores the documented behavior without a prose change. Significant new
+choices need a proposed ADR and user decision; routine repairs do not. Failed or unavailable verification remains
+partial/failed. Finish this documentation responsibility before reporting overall completion.

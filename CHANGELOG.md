@@ -39,6 +39,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Current documentation and ADR history (#182)** — shared lifecycle across design, execution, validation,
+  migration, debug and Ship; documentation-only reconciliation through `camel-start`; neutral-context ADR guidance
+  preserving accepted reasoning and supersession. Add source snapshots, review records and opt-in project-aware
+  `doc check` to detect manual changes without treating hashes as semantic proof. Existing document commands and
+  project-owned documentation remain compatible.
+
 - **Verified process inventory (#156)** — correct CLI/Ship/Knowledge host effects and clock assumptions, distinguish source evidence from runtime observations, and record the six verification outcomes.
 
 - **Knowledge runtime boundaries (#158)** — enforce offline CPU tokenizer initialization, cover query/cap/fallback and transport behavior, document native caches, and accept conventional CVE severity spellings.

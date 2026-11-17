@@ -139,7 +139,11 @@ entry_points:
   - entry: camel-kit doc check/stale/unstale
     input: YAML frontmatter of model-authored pipeline artifacts
     attacker_controllable: true
-    caller_must_enforce: Parsed as data; digests are staleness markers only.
+    caller_must_enforce: Legacy frontmatter flags are parsed as data; no semantic correctness guarantee.
+  - entry: camel-kit doc snapshot/record and doc check --project
+    input: source inventory, JSON snapshot/receipt, document and review report
+    attacker_controllable: true
+    caller_must_enforce: Project-contained regular files; reject symlinks, traversal, Git internals and duplicate/trailing JSON; source limits 10000 entries, 64 MiB/file, 512 MiB total; JSON/report/document inputs to record 1 MiB each. No source execution or network. Review scope and conclusions remain the reviewer's responsibility.
   - entry: camel-kit plan analyze
     input: implementation-plan.md task metadata (model-authored)
     attacker_controllable: true
@@ -396,8 +400,10 @@ false_friends:
     reality: Enforced on the model by instruction; by machinery only in Ship's deterministic checks.
   - claim: The Ship Stamp proves the integration is safe to release
     reality: It records which checks ran on this machine, with redacted arguments, exit codes and log digests.
-  - claim: camel-kit doc check detects tampering
-    reality: It detects staleness of pipeline artifacts by digest; anyone who can write the file can rewrite the digest.
+  - claim: camel-kit doc check proves current documentation or detects tampering
+    reality: Legacy checks read flags; --project detects changed inputs within declared roots. Editable receipts do not prove semantic truth, complete coverage or approval.
+  - claim: Ship COMPLETED includes a documentation review
+    reality: The parent reconciles docs and ADRs after publication; the candidate, native allowlist and Stamp stay controller-owned. Status and abort authorize no documentation writes.
   - claim: The safety hook / guard makes autonomous runs safe
     reality: It blocks a short list of obvious patterns; the harness permission model is the control.
   - claim: Read-only Ship workers cannot leak

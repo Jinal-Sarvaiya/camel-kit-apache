@@ -90,6 +90,9 @@ runtime verification and continues to validate. There is no second gate for the 
 A pipeline is a numbered directory created with `camel-kit nextId <slug>` (for example `001-order-processing`);
 `.camel-kit/pipeline.json` records the active one. Each stage reads its input from the previous artifact and writes
 its own next to it, with provenance metadata in the file's front matter maintained by `camel-kit doc`.
+Project-wide current docs and ADRs complement these per-change artifacts; the default paths are
+`docs/camel-kit/system-design.md` and `docs/adr/`. Reuse existing conventions. File existence alone does not prove
+approval, verification or current documentation; see xref:documentation.adoc[].
 
 Every stage can also be invoked standalone with a pipeline ID, for example `/camel-plan 001-order-processing`. It
 then reads its input from disk, checks that the input is not stale, writes its artifact and stops without invoking
@@ -150,3 +153,8 @@ personas inline.
 guard sequence (see xref:camel-debug.adoc[]). `/camel-knowledge` answers Apache Camel documentation questions through
 the Knowledge MCP server without changing the pipeline state (see xref:knowledge.adoc[]). Both can be used at any
 time.
+
+== Current documentation and decisions
+
+See xref:documentation.adoc[current system documentation and ADRs] for the shared lifecycle, stage ownership,
+documentation-only reconciliation, source-bound review evidence and verification limits.

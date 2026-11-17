@@ -48,7 +48,11 @@ validation because it was added by hand.
 Pipeline-scoped validation writes `docs/camel-kit/<pipeline-id>/validation-report.md`; project-scoped validation
 writes `docs/validation-report-YYYY-MM-DD_HH-mm.md`. The report records the project, runtime and Camel version, a
 summary table with pass, fail and warn counts per category, the findings, the constitution rule results, and the
-recommendations: priority fixes for the failures, suggested improvements for the warnings.
+recommendations: priority fixes for the failures, suggested improvements for the warnings. A separate Documentation
+Consistency section compares current docs and active ADRs with code and actual checks, including pending decisions,
+changed review inputs and unavailable evidence. An unchanged fingerprint alone is insufficient. Validation reports
+these findings to the execute parent; standalone output names documentation-only reconciliation as the finalizer.
+It never rewrites current docs or ADRs to make a check pass.
 
 [cols="1,1,1,1,1"]
 |===
@@ -65,3 +69,8 @@ recommendations: priority fixes for the failures, suggested improvements for the
 The report carries provenance metadata from `camel-kit doc init`, linked to the execution report when one exists.
 Fixing the findings is a separate step: edit the routes, or amend the design and rerun the affected stages, then
 validate again.
+
+== Current documentation and decisions
+
+See xref:documentation.adoc[current system documentation and ADRs] for the shared lifecycle, stage ownership,
+documentation-only reconciliation, source-bound review evidence and verification limits.

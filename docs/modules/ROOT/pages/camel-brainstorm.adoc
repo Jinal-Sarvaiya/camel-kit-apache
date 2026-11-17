@@ -152,3 +152,8 @@ to run it by hand.
 * *Fire-and-forget.* Accept with HTTP 202 and process in the background: two flows joined by an in-memory queue.
 * *Multi-system with compensation.* Parallel writes to several systems that must all succeed or be rolled back:
   several flows coordinated with the Saga pattern.
+
+== Current documentation and decisions
+
+See xref:documentation.adoc[current system documentation and ADRs] for the shared lifecycle, stage ownership,
+documentation-only reconciliation, source-bound review evidence and verification limits.

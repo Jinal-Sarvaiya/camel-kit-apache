@@ -315,6 +315,10 @@ public final class ShipCommand implements Callable<Integer> {
             ShipNativeWorker.Task task = controller().pendingTask(run);
             spec.commandLine().getOut().println(new ObjectMapper().writeValueAsString(new JsonResponse(1, run, task)));
             spec.commandLine().getOut().flush();
+            if (run.status() == ShipRun.RunStatus.COMPLETED) {
+                spec.commandLine().getErr().println(DOCUMENTATION_FOLLOW_UP);
+                spec.commandLine().getErr().flush();
+            }
         } catch (IOException e) {
             throw new CommandFailure("handoff-read-failed", "Could not read native task" + runReference(run.id()), e);
         }
@@ -322,6 +326,10 @@ public final class ShipCommand implements Callable<Integer> {
 
     private record JsonResponse(int schemaVersion, ShipRun run, ShipNativeWorker.Task task) {
     }
+
+    private static final String DOCUMENTATION_FOLLOW_UP
+            = "Documentation: requires a separate review of the published project; "
+              + "use /camel-start reconcile documentation. Ship completion does not certify current docs or ADRs.";
 
     private void printSummary(ShipRun run) {
         PrintWriter writer = spec.commandLine().getOut();
@@ -365,6 +373,9 @@ public final class ShipCommand implements Callable<Integer> {
         }
         if (run.publication() != null) {
             writer.println("Publication: " + safeDisplay(run.publication().path(), false));
+        }
+        if (run.status() == ShipRun.RunStatus.COMPLETED) {
+            writer.println(DOCUMENTATION_FOLLOW_UP);
         }
         if ((run.status() == ShipRun.RunStatus.PAUSED
                 || run.status() == ShipRun.RunStatus.RUNNING

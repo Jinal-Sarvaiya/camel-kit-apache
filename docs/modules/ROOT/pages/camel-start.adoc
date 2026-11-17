@@ -8,7 +8,11 @@ work. The invocation form depends on the agent: `$camel-start` in Bob Shell and 
 [[routing]]
 == Routing
 
-The router answers these questions in order; the first "yes" wins.
+Documentation-only requests are handled first: `/camel-start reconcile documentation` consolidates the current
+system description from source and existing artifacts, without allocating a pipeline or changing code.
+See xref:documentation.adoc[] for evidence and ADR handling.
+
+For implementation work, the router answers these questions in order; the first "yes" wins.
 
 [cols="1,3,1"]
 |===
@@ -37,7 +41,7 @@ execute (see xref:verification.adoc[]).
 |===
 | Tier | Skills | Role
 
-| Entry | `camel-start` | Routes to the right pipeline stage
+| Entry | `camel-start` | Routes to the right pipeline stage or reconciles documentation directly
 | Pipeline | `camel-brainstorm`, `camel-migrate`, `camel-plan`, `camel-execute`, `camel-validate` | Five skills for
   the four stages; brainstorm and migrate are the alternative design entries
 | Utilities | `camel-ship`, `camel-knowledge`, `camel-debug` | Standalone, usable at any time without changing the
@@ -69,3 +73,8 @@ execute (see xref:verification.adoc[]).
 
 Use a stage directly when the destination is already known, for example `/camel-plan` with an approved design or
 `/camel-debug` for a broken route. Use `/camel-start` when the request is new or its current stage is uncertain.
+
+== Current documentation and decisions
+
+See xref:documentation.adoc[current system documentation and ADRs] for the shared lifecycle, stage ownership,
+documentation-only reconciliation, source-bound review evidence and verification limits.

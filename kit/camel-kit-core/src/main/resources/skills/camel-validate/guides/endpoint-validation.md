@@ -87,9 +87,9 @@ Validating component existence...
 
 ## Stage 3: Runtime Handoff
 
-`/camel-validate` is a static gate: it never starts the routes, runs a build or downloads dependencies, and the Camel
-CLI has no dry-run option for `camel run` (no `--check` flag exists). Do not run anything in this stage. Every concern
-a runtime start would surface is covered elsewhere — record where:
+Stage 3 only reports existing runtime-verification evidence. Do not start routes, run a build, or download dependencies
+in this stage. This restriction does not skip schema validation or the existing-project baseline test rerun.
+The Camel CLI has no dry-run option for `camel run` (no `--check` flag exists). Record where each runtime concern is checked:
 
 | Runtime concern | Covered by |
 |---|---|
@@ -104,7 +104,7 @@ Show the handoff, quoting the `Verification:` value from `execution-report.md` w
 ```
 == RUNTIME VALIDATION ==
 
-Not run by /camel-validate (static gate; `camel run` has no check mode).
+Not run in Stage 3 (reporting-only handoff; `camel run` has no check mode).
 Runtime verification: {PASS | PARTIAL | FAIL | NOT_RUN} per execution-report.md
 ```
 

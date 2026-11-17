@@ -1667,7 +1667,6 @@ class ResourceConsistencyTest {
         Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
         String validate = Files.readString(root.resolve("camel-validate/SKILL.md"));
         String schema = Files.readString(root.resolve("camel-validate/guides/schema-validation.md"));
-        String endpoint = Files.readString(root.resolve("camel-validate/guides/endpoint-validation.md"));
         String replan = Files.readString(root.resolve("camel-execute/guides/re-plan-loop.md"));
 
         assertTrue(validate.contains("Main: `ROUTE_FILES` is every `{MODULE_PREFIX}*.camel.yaml`"));
@@ -1675,16 +1674,34 @@ class ResourceConsistencyTest {
                 "`{MODULE_PREFIX}src/main/resources/camel/*.camel.yaml`"));
         assertTrue(validate.contains("`{MODULE_PREFIX}` is empty at the project root"));
         assertTrue(schema.contains("-Dcamel.validator.files={ROUTE_FILE}"));
-        assertFalse(endpoint.contains("camel run --check"), "camel run has no --check option (#145)");
-        assertFalse(endpoint.contains("```bash"),
-                "/camel-validate is static: the endpoint guide runs no shell command");
-        assertTrue(endpoint.contains("## Stage 3: Runtime Handoff"));
-        assertTrue(endpoint.contains("`quality-checks.md` §7.2 Property Completeness"));
-        assertTrue(endpoint.contains("`quality-checks.md` §7.3 Bean Definitions"));
-        assertTrue(endpoint.contains("`Verification:` line of `execution-report.md`"));
         assertTrue(replan.contains("Never execute tasks copied from the stale original plan"));
         assertTrue(replan.contains("plan analyze <plan-path>"));
         assertTrue(replan.contains("doc unstale <plan-path>"));
+    }
+
+    @Test
+    void endpointRuntimeHandoffKeepsOtherValidationStages() throws IOException {
+        Path root = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        String endpoint = Files.readString(root.resolve("camel-validate/guides/endpoint-validation.md"));
+        String validate = Files.readString(root.resolve("camel-validate/SKILL.md"));
+
+        assertFalse(endpoint.contains("camel run --check"), "camel run has no --check option (#145)");
+        assertFalse(endpoint.contains("```bash"),
+                "the endpoint guide runs no shell command");
+        assertTrue(endpoint.contains("## Stage 3: Runtime Handoff"));
+        String handoff = endpoint.substring(endpoint.indexOf("## Stage 3: Runtime Handoff")).replaceAll("\\s+", " ");
+        assertTrue(handoff.contains("Stage 3 only reports existing runtime-verification evidence."));
+        assertTrue(handoff.contains("Do not start routes, run a build, or download dependencies in this stage."));
+        assertTrue(handoff.contains("This restriction does not skip schema validation"
+                                    + " or the existing-project baseline test rerun."));
+        assertFalse(handoff.matches(".*\\bcamel\\s+run\\s+.*"), "Stage 3 must not include a route-start command");
+        assertTrue(handoff.contains("`quality-checks.md` §7.2 Property Completeness"));
+        assertTrue(handoff.contains("`quality-checks.md` §7.3 Bean Definitions"));
+        assertTrue(handoff.contains("`Verification:` line of `execution-report.md`"));
+        assertTrue(handoff.contains("Runtime verification: {PASS | PARTIAL | FAIL | NOT_RUN}"));
+        assertTrue(handoff.contains("Runtime verification: not available"));
+        assertTrue(validate.contains("### Step 4: Baseline Test Re-Run"));
+        assertTrue(validate.contains("./mvnw test -B"));
     }
 
     @Test

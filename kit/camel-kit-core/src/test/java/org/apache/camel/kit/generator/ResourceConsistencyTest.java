@@ -1809,10 +1809,11 @@ class ResourceConsistencyTest {
             docs.filter(path -> path.toString().endsWith(".md")).forEach(files::add);
         }
 
+        Pattern formerRepository = Pattern.compile("github\\.com/luigidemasi/camel-kit(?:\\.git)?(?![\\w.-])");
         for (Path file : files) {
             // The former repository is only referenced by the JBang alias of the published 0.4.1 release and by
             // historical CHANGELOG compare links; every URL into it from the documentation is stale (#162).
-            assertFalse(Files.readString(file).contains("github.com/luigidemasi/camel-kit/"),
+            assertFalse(formerRepository.matcher(Files.readString(file)).find(),
                     file.getFileName() + " links to the former repository (#162)");
         }
         assertTrue(Files.readString(root.resolve("kit/README.md")).contains("https://camel.apache.org/camel-kit/next/"),

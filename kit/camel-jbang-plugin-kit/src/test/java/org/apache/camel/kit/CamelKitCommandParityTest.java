@@ -49,13 +49,15 @@ class CamelKitCommandParityTest {
                     "--silent", "--no-fetch", "--force"));
             assertEquals(0, main.run(pluginCommands(main), "kit", "init", pluginDir.toString(), "--ai", "bob2",
                     "--silent", "--no-fetch", "--force"));
+            assertEquals("camel-kit", loadConfig(standaloneDir).getProperty("project.command-prefix"));
+            assertEquals("camel kit", loadConfig(pluginDir).getProperty("project.command-prefix"));
             for (String name : PUBLIC_SKILLS) {
                 String relative = ".bob/skills/" + name + "/SKILL.md";
                 String skill = Files.readString(standaloneDir.resolve(relative));
                 String pluginSkill = Files.readString(pluginDir.resolve(relative));
                 assertTrue(skill.contains("\nuser-invocable: true\n"), name);
-                // Both entry points share this JVM's process-based CLI prefix detection.
-                assertEquals(skill, pluginSkill, name);
+                assertEquals(skill.replace("camel kit", "camel-kit"), pluginSkill.replace("camel kit", "camel-kit"),
+                        name);
             }
         }
     }
@@ -247,10 +249,12 @@ class CamelKitCommandParityTest {
     void nativeInitAndRegenerationDetectThePrefixInSeparateProcesses(boolean plugin, String agent) throws Exception {
         Path workspace = tempDir.resolve("workspace");
         String expectedPrefix = plugin ? "camel kit" : "camel-kit";
-        // The argument file keeps dependency paths out of process-based prefix detection.
-        Path arguments = tempDir.resolve(plugin ? "camel-jbang.args" : "camel-kit.args");
+        // Neither the process name nor its argument file identifies the Kit entry point.
+        Path arguments = tempDir.resolve("java.args");
         String classpath = System.getProperty("surefire.test.class.path", System.getProperty("java.class.path"));
-        Files.writeString(arguments, "--class-path\n" + quoteJavaArgument(classpath) + "\n"
+        Files.writeString(arguments,
+                "-Dfile.encoding=UTF-8\n-Dstdout.encoding=UTF-8\n-Dstderr.encoding=UTF-8\n--class-path\n"
+                                     + quoteJavaArgument(classpath) + "\n"
                                      + InitProcess.class.getName() + "\n" + plugin + "\n"
                                      + quoteJavaArgument(workspace.toString()) + "\n" + agent + "\n");
 

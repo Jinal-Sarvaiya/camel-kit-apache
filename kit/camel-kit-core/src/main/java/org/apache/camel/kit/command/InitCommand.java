@@ -242,7 +242,7 @@ public class InitCommand extends CamelKitCommand {
                 noFetch,
                 withCitrusMcp,
                 sourcePlatform,
-                detectCommandPrefix(),
+                qualifiedName(parent != null ? parent : main),
                 CamelKitMain.DEFAULT_CITRUS_VERSION,
                 CamelKitMain.distribution(),
                 printer(),
@@ -385,10 +385,4 @@ public class InitCommand extends CamelKitCommand {
         printer().println();
     }
 
-    private String detectCommandPrefix() {
-        String cmdLine = ProcessHandle.current().info().commandLine().orElse("");
-        if (cmdLine.contains("camel-kit"))
-            return "camel-kit";
-        return "camel kit";
-    }
 }

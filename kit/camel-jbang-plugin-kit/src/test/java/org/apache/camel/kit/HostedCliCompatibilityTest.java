@@ -75,7 +75,7 @@ class HostedCliCompatibilityTest {
         Result banner = run(CamelKitMain.class);
         assertEquals(0, banner.exit, banner.err);
         assertTrue(banner.err.isBlank(), banner.err);
-        assertTrue(banner.out.contains("Design Apache Camel Integrations with AI"), banner.out);
+        assertTrue(banner.out.contains("Camel-Kit \u2014 Design Apache Camel Integrations with AI"), banner.out);
         assertTrue(banner.out.contains("Usage: camel-kit"), banner.out);
         assertFalse(banner.out.contains("\u001b"), "Redirected output contains terminal control sequences");
     }
@@ -112,7 +112,9 @@ class HostedCliCompatibilityTest {
         }
         classpath = classpath.replace(classes.toString(), jar.toString());
         Path javaArguments = directory.resolve("java.args");
-        Files.writeString(javaArguments, "--class-path\n" + quote(classpath) + "\n"
+        Files.writeString(javaArguments,
+                "-Dfile.encoding=UTF-8\n-Dstdout.encoding=UTF-8\n-Dstderr.encoding=UTF-8\n--class-path\n"
+                                         + quote(classpath) + "\n"
                                          + quote("-Duser.home=" + directory) + "\n" + entryPoint.getName()
                                          + "\n");
         List<String> command = new ArrayList<>(

@@ -1777,6 +1777,11 @@ class ResourceConsistencyTest {
         String forage = Files.readString(skills.resolve("shared/forage.md"));
         String testConfiguration = Files.readString(skills.resolve("camel-test/guides/test-configuration.md"));
 
+        assertContainsAll(section(forage, "**Configuration precedence:**", "\n## "),
+                "Both override channels address default and named beans alike:");
+        assertContainsAll(section(testConfiguration, "> **Forage override channels:**", "### 5.2 Test Dependencies"),
+                "precedence env vars > system properties > properties files, for default and named beans alike.");
+
         for (String guide : List.of(forage, testConfiguration)) {
             // Forage resolves FORAGE_<NAME>_<DOMAIN>_<PROP> and -Dforage.<name>.<domain>.<prop> for named beans
             // with the same precedence as the default-bean form (#122).

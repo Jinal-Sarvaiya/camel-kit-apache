@@ -108,11 +108,8 @@ camel kit init my-integration --ai claude
 Development snapshot::
 +
 --
-[source,bash,subs="attributes+"]
-----
-# Latest deployed {camel-kit-snapshot-version}
-jbang app install --force camel-kit@luigidemasi/camel-kit
-----
+Apache snapshot artifacts are not yet published. To use the latest development version
+`{camel-kit-snapshot-version}`, see the "Build from source" section below.
 --
 
 Build from source::

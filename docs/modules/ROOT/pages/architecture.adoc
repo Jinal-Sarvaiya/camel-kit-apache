@@ -69,9 +69,9 @@ rule list] lives in the shared template. The four agent-specific templates each 
 
 **Coverage by agent:**
 
-* *Claude Code, Bob 2, OpenCode*: Use the shared template (`templates/shared/agents-md.md`). These agents load
+* *Claude Code, Bob 2, OpenCode*: Use the shared template (`templates/shared/agents-md.md`). By default, these agents load
 the rules from their entry file (`CLAUDE.md`, `AGENTS.md`) immediately when the project is opened, before
-any skill invocation.
+any skill invocation. Bob Shell skips the project `AGENTS.md` in restricted mode when folder trust is enabled and the folder is untrusted.
 * *Qwen*: Uses the shared template. With project trust enabled, Qwen reads both `QWEN.md` and `AGENTS.md` at project
 open. The fifteen rules are in `AGENTS.md`; the generated `QWEN.md` points readers there.
 * *Antigravity, Codex CLI, GitHub Copilot CLI, Pi*: Use agent-specific templates

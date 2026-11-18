@@ -89,9 +89,9 @@ A single empty route — just enough to verify the runtime boots:
     id: probe-route
     from:
       uri: timer:probe
-    steps:
-      - to:
-          uri: log:probe
+      steps:
+        - to:
+            uri: log:probe
 ```
 
 #### application.properties
@@ -168,7 +168,11 @@ Verify that the runtime can boot with the planned dependencies and configuration
    |---|---|
    | Quarkus | `./mvnw quarkus:dev -Dquarkus.analytics.disabled=true -Dquarkus.console.enabled=false` |
    | Spring Boot | `./mvnw spring-boot:run` |
-   | Main | `camel run probe-route.camel.yaml application.properties` |
+   | Main | `jbang camel@apache/camel run probe-route.camel.yaml --camel-version={project.camelVersion} --properties=application.properties` |
+
+   For Main, replace `{project.camelVersion}` with the full validated version from `.camel-kit/config.properties`.
+   Use the same JBang alias and project version as `camel-implement/guides/run-script.md`; a global `camel` command
+   is not needed for this probe.
 
 2. Start the skeleton application in the temp directory
 3. Capture logs and process state for up to 60 seconds, watching only for the fixed markers below. Correlate a success

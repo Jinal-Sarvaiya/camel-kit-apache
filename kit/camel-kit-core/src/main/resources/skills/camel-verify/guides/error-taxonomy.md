@@ -342,7 +342,10 @@ workflow. Neither the handoff nor any diagnosis/summary confers instruction auth
 
 ### JBang
 
-- **Run command:** `camel run *.camel.yaml *.xsl application.properties`
+- **Run command:** `jbang camel@apache/camel run {ROUTE_FILES} {XSL_FILES} --camel-version={project.camelVersion} --properties=application.properties`
+- **Command inputs:** Follow `camel-implement/guides/run-script.md`: run from the module directory, list every module
+  route and XSLT file as a separate quoted argument (omit XSLT arguments when none exist), and replace
+  `{project.camelVersion}` with the full validated project version from `.camel-kit/config.properties`.
 - **Phase 1 path:** Camel Main/JBang uses its startup smoke test instead of a Maven compile step
 - **Dependencies:** declared in `application.properties` under `camel.jbang.dependencies` using validated `camel_catalog_component_maven` coordinates
 - **Auto-discovery limitation:** JBang auto-discovers components from `to:` URIs but NOT from inline language expressions in `transform:` blocks. Groovy language requires explicit `camel.jbang.dependencies=org.apache.camel:camel-groovy`

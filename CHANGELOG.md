@@ -30,9 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Main environment probes, recovery guidance, direct migration and YAML header examples now use the JBang alias
-  with the project's Camel version, matching generated `run.sh` without requiring a global `camel` command.
-  Correct the environment probe's YAML step nesting so its sample route can start.
+- Align Main environment probes, recovery guidance, direct migration and generated `AGENTS.md` with the JBang alias
+  and the project's Camel version, matching generated `run.sh` (#110). Report incompatible local JBang plugins as
+  environment failures. Correct the environment probe's YAML step nesting so its sample route can start.
 - `init --ai codex` validates an existing `.codex/config.toml` before writing anything, and `--dry-run` rejects the
   same files: invalid TOML, damaged managed-block markers and Camel-Kit server tables defined outside the block no
   longer leave a partly initialized workspace (#174).

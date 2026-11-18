@@ -100,7 +100,7 @@ class ResourceConsistencyTest {
                     Pattern.compile("docs/camel-kit/<PIPELINE_ID>/test-data/\\{FLOW_NAME\\}")),
             new StalePattern(
                     "retired internal command exposed as slash command",
-                    Pattern.compile("(?<![\\w-])/camel-(implement|test|flow)\\b")),
+                    Pattern.compile("(?<![\\w-])/camel-(implement|test|flow)\\b(?!/)")),
             new StalePattern("legacy camel.version property", Pattern.compile("\\bcamel\\.version\\b")),
             new StalePattern("legacy versions.properties source", Pattern.compile("\\bversions\\.properties\\b")),
             new StalePattern(
@@ -167,6 +167,18 @@ class ResourceConsistencyTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void retiredCommandScanAllowsGuidePaths() {
+        Pattern retiredCommand = STALE_PATTERNS.stream()
+                .filter(stale -> stale.description().equals("retired internal command exposed as slash command"))
+                .findFirst().orElseThrow().pattern();
+        for (String command : List.of("camel-implement", "camel-test", "camel-flow")) {
+            assertTrue(retiredCommand.matcher("Use `/" + command + "`").find(), command);
+            assertFalse(retiredCommand.matcher("Read `{SKILLS_DIR}/" + command + "/guides/run-script.md`").find(),
+                    command);
+        }
+    }
 
     @Test
     void activeShippedResourcesDoNotContainKnownStaleContractTokens() throws IOException {

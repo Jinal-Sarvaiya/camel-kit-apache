@@ -22,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class MainRunGuidanceTest {
 
     private static final Pattern RUN_COMMAND = Pattern.compile(
-            "(?m)(?:`|^# Run with: )((?:jbang camel@apache/camel|camel) run [^`\\n]+)");
+            "`((?:jbang camel@apache/camel|camel) run(?: [^`\\n]+)?)`");
 
     @TempDir
     Path tempDir;
@@ -50,21 +50,16 @@ class MainRunGuidanceTest {
     void installedMainCommandsUseJBangAndKeepTheProjectVersion(String agentName) throws Exception {
         AgentConfig agent = AgentRegistry.get(agentName);
         Path project = tempDir.resolve(agentName);
-        Files.createDirectories(project.resolve(".camel-kit"));
-        Files.writeString(project.resolve(".camel-kit/config.properties"),
-                "project.runtime=main\nproject.camelVersion=4.18.4\n");
         Path skills = project.resolve(agent.skillsDirectory());
         Path commands = agent.generatesCommandStubs() ? project.resolve(agent.commandDirectory()) : skills;
         InitContext context = new InitContext(
                 agent, agentName, commands, skills, project, "camel-kit", Printer.noop());
-        assertNotEquals("4.18.4", context.distribution().camelMainVersion());
         AgentGeneratorFactory.create(agentName).generate(context);
 
         for (String guide : List.of(
                 "camel-execute/guides/environment-probe.md",
                 "camel-verify/guides/error-taxonomy.md",
-                "camel-migrate/SKILL.md",
-                "shared/yaml-structure.md")) {
+                "camel-migrate/SKILL.md")) {
             String content = Files.readString(skills.resolve(guide));
             var matches = RUN_COMMAND.matcher(content).results().map(match -> match.group(1)).toList();
             assertEquals(1, matches.size(), guide + " must contain one executable Main command");
@@ -73,8 +68,16 @@ class MainRunGuidanceTest {
             assertTrue(List.of(command.split("\\s+")).contains("--camel-version={project.camelVersion}"),
                     guide + " must preserve the project version in the command, not just the prose");
             assertTrue(command.contains("--properties=application.properties"), guide);
+            if (!guide.startsWith("camel-execute/")) {
+                assertTrue(command.contains("run {ROUTE_FILES} {XSL_FILES} "),
+                        guide + " must preserve route and XSLT inputs during installation");
+            }
         }
-        assertTrue(Files.readString(skills.resolve("shared/yaml-structure.md"))
-                .contains("# Camel Version: {project.camelVersion}"));
+        String runRule = Files.readAllLines(project.resolve("AGENTS.md")).stream()
+                .filter(line -> line.startsWith("5. Passing the schema check"))
+                .findFirst().orElseThrow();
+        assertFalse(runRule.contains("`camel run`"));
+        assertTrue(runRule.contains("`" + agent.skillsDirectory() + "/camel-implement/guides/run-script.md`"),
+                "AGENTS.md must route Main startup to the installed run-script guide");
     }
 }

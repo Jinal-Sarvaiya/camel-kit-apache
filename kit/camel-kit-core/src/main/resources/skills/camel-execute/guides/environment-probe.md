@@ -170,9 +170,7 @@ Verify that the runtime can boot with the planned dependencies and configuration
    | Spring Boot | `./mvnw spring-boot:run` |
    | Main | `jbang camel@apache/camel run probe-route.camel.yaml --camel-version={project.camelVersion} --properties=application.properties` |
 
-   For Main, replace `{project.camelVersion}` with the full validated version from `.camel-kit/config.properties`.
-   Use the same JBang alias and project version as `camel-implement/guides/run-script.md`; a global `camel` command
-   is not needed for this probe.
+   For Main, resolve the version per `camel-implement/guides/run-script.md`.
 
 2. Start the skeleton application in the temp directory
 3. Capture logs and process state for up to 60 seconds, watching only for the fixed markers below. Correlate a success
@@ -206,11 +204,13 @@ Verify that the runtime can boot with the planned dependencies and configuration
 
 ## Step 5: Error Classification
 
-Classify each error found in Steps 2-4. Apply the "Assume Mechanical, Promote on Failure" rule.
+Classify each error found in Steps 2-4. For JBang's `Cannot load plugin ... because plugin has first version: ...`,
+report an environment failure per `camel-verify/guides/error-taxonomy.md` and go directly to Step 8 with `ESCALATE`.
+Do not attempt route repairs or architectural promotion. For other errors, apply "Assume Mechanical, Promote on Failure".
 
 ### Classification Rule
 
-All probe errors start classified as **MECHANICAL**. Only promote to **ARCHITECTURAL** after:
+Other probe errors start classified as **MECHANICAL**. Only promote to **ARCHITECTURAL** after:
 
 - A successful, complete exact-name type-list result under the catalog-version binding from `shared/mcp-setup.md`
   contains no matching component or extension identity, OR
@@ -331,7 +331,7 @@ Result: {PROCEED | RE-PLAN (architectural: reason) | ESCALATE (reason) | NEEDS_U
 |---|---|---|
 | PROCEED | All checks passed (with or without mechanical fixes) | Continue to implementer dispatch |
 | RE-PLAN | Architectural failure detected | Re-plan loop revises the design spec, re-run probe |
-| ESCALATE | A tool required by the selected runtime is unavailable (for example, no Maven/JDK for a Maven project or no JBang/Camel CLI for Camel Main) | Report to user, cannot proceed automatically |
+| ESCALATE | A tool required by the selected runtime is unavailable or incompatible (for example, no Maven/JDK for a Maven project, no JBang for Camel Main, or a JBang plugin requiring a newer Camel version) | Report to user, cannot proceed automatically |
 | NEEDS_USER_CONFIRMATION | An independently necessary action/effect lies outside the invoked shipped probe workflow | Perform nothing affected; return its source, exact action, verified reason, and scope to the orchestrator |
 
 ---

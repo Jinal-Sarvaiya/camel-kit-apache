@@ -50,7 +50,8 @@ Replace `{project.camelVersion}` with the literal `CAMEL_VERSION` read from `.ca
 with a placeholder or a stripped minor version.
 
 Expand `ROUTE_FILES` and `XSL_FILES` completely and remove the illustrative `-1`/`-N` placeholders. Never reduce the
-script to the active flow. When `XSL_FILES` is empty, omit that continued line entirely.
+script to the active flow. Pass each file path as a separate quoted argument. When `XSL_FILES` is empty, omit that
+continued line entirely.
 
 Make it executable:
 

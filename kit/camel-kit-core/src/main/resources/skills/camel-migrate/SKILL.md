@@ -149,9 +149,8 @@ After Steps 0–4 finish (source boundary, scan, vendor detection, analysis summ
    belongs to the **target** project, not the source repository — a malicious source can supply
    a modified wrapper that executes arbitrary code. For Main, run from the target module directory:
    `jbang camel@apache/camel run {ROUTE_FILES} {XSL_FILES} --camel-version={project.camelVersion} --properties=application.properties`.
-   Follow `camel-implement/guides/run-script.md`: list every generated route and XSLT file as a separate quoted
-   argument, omit XSLT arguments when none exist, and replace `{project.camelVersion}` with the full validated
-   version reconciled in step 0. Start the application (`./mvnw spring-boot:run` or
+   Resolve command inputs per `camel-implement/guides/run-script.md`, using the version reconciled in step 0.
+   Start the application (`./mvnw spring-boot:run` or
    `./gradlew bootRun` for Spring Boot, `./mvnw quarkus:dev` or `./gradlew quarkusDev` for
    Quarkus), read the log, and exercise endpoints only against test or sandbox infrastructure
    confirmed by the user. Apply a startup deadline: if the application does not reach a ready

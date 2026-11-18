@@ -65,24 +65,26 @@ The development snapshot includes fifteen Camel 4.22 YAML DSL rules in the gener
 cover placement and value types, `routeConfiguration`, HTTP and mail headers, dependency loading, and ActiveMQ
 acknowledgement modes. The
 https://github.com/apache/camel-kit/blob/main/kit/camel-kit-core/src/main/resources/templates/shared/agents-md.md#camel-422-rules[maintained
-rule list] lives in the shared template and is copied into agent-specific templates during the build.
+rule list] lives in the shared template. The four agent-specific templates each maintain a copy.
 
 **Coverage by agent:**
 
-* *Claude Code, Bob 2, Qwen, OpenCode*: Use the shared template (`templates/shared/agents-md.md`). These agents load
-the rules from their entry file (`CLAUDE.md`, `AGENTS.md`, `QWEN.md`) immediately when the project is opened, before
+* *Claude Code, Bob 2, OpenCode*: Use the shared template (`templates/shared/agents-md.md`). These agents load
+the rules from their entry file (`CLAUDE.md`, `AGENTS.md`) immediately when the project is opened, before
 any skill invocation.
+* *Qwen*: Uses the shared template. With project trust enabled, Qwen reads both `QWEN.md` and `AGENTS.md` at project
+open. The fifteen rules are in `AGENTS.md`; the generated `QWEN.md` points readers there.
 * *Antigravity, Codex CLI, GitHub Copilot CLI, Pi*: Use agent-specific templates
 (`templates/{antigravity,codex,copilot,pi}/agents-md.md`) that include the same rule set. Loading behavior varies:
 ** *Antigravity and Codex CLI*: Rules are available from `AGENTS.md` when the project is opened.
-** *GitHub Copilot CLI*: Rules load from `.github/copilot-instructions.md` on first invocation or when the
-instructions are refreshed.
-** *Pi*: Rules are loaded when Pi reads `AGENTS.md` as project context, typically on first skill invocation or when
-the project is explicitly trusted.
+** *GitHub Copilot CLI*: Copilot discovers the fifteen rules in the repository-root `AGENTS.md` alongside its
+repository-wide `.github/copilot-instructions.md`.
+** *Pi*: Pi loads the root `AGENTS.md` as project context at startup, before project trust or skill invocation.
 
 **Schema validation vs. runtime verification:**
 
-Rule 4 instructs the agent to run `camel validate` on the final YAML file after the last edit. This validates the
+Rule 4 calls for schema validation after the final edit. Use `camel_validate_yaml_dsl` or, with the validate plugin installed,
+run `camel validate yaml <file>`. This validates the
 route against the Camel YAML DSL schema and catches structural errors, type mismatches, and invalid placements.
 However, passing the schema check does not guarantee the route will run successfully.
 

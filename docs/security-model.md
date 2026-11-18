@@ -1064,7 +1064,8 @@ tags read *(maintainer, 2026-10-27 — Qn)*.
   authorized; distinguish that from an unintended escape (V5).
 - **Q10 — Publication → §4.1.** Retain this as an additive Camel sub-project security model, linked from `SECURITY.md`.
   Register it on the ASF security site and the Camel security page after acceptance, with
-  [apache/camel-kit#131](https://github.com/apache/camel-kit/issues/131) tracking that work.
+  [apache/camel-kit#131](https://github.com/apache/camel-kit/issues/131) tracking that work. See
+  [SECURITY-REGISTRATION.md](SECURITY-REGISTRATION.md) for external PR templates and registration checklist.
 - **Q11 — Knowledge → §4.2, §4.3, §4.4a, §4.12.** Include its server and index in this same security model, with a
   dedicated Knowledge section. The monorepo move has happened. Missing coverage remains work to complete (V6), and
   reports use the same private reporting process.

@@ -74,8 +74,8 @@ Refs apache/camel-kit#131
 
 #### Content to Add
 
-In the `read_first.body` field of `content/security/_index.md`, append the following sentence after the existing
-paragraph that lists sub-projects with their own security models:
+In the `read_first.body` field of `content/security/_index.md`, append the following sentence after the paragraph
+explaining how Camel subprojects inherit the umbrella security model.
 
 ```
 Camel Kit also publishes its own [security model](https://github.com/apache/camel-kit/blob/main/docs/security-model.md).
@@ -99,8 +99,7 @@ Apache Camel Security Model.
 **Security Model:** https://github.com/apache/camel-kit/blob/main/docs/security-model.md  
 **Tracking Issue:** https://github.com/apache/camel-kit/issues/131
 
-This aligns the security page with other Camel sub-projects (Quarkus, Spring Boot, Karaf,
-Kamelets, Kafka Connector, Camel K) that maintain their own models.
+This makes Camel Kit's security model discoverable from the Camel security page.
 
 Refs apache/camel-kit#131
 ```

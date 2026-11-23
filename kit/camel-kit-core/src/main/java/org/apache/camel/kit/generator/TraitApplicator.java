@@ -4,9 +4,11 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.camel.kit.util.AnsiColors;
 import org.apache.camel.kit.util.TemplateUtils;
+import org.apache.camel.kit.workflow.SkillCatalog;
 import org.apache.camel.kit.workflow.WorkflowManifest;
 
 class TraitApplicator {
@@ -16,6 +18,7 @@ class TraitApplicator {
     void apply(InitContext ctx, WorkflowManifest workflow) throws Exception {
         String traitsBasePath = "templates/traits/" + ctx.agentName() + "/";
         int traitCount = 0;
+        Set<String> installed = SkillCatalog.bundled().paths();
 
         List<String> skillNames = workflow.skills().stream()
                 .map(WorkflowManifest.WorkflowSkill::name)
@@ -23,15 +26,12 @@ class TraitApplicator {
 
         for (String skillName : skillNames) {
             String traitResourcePath = traitsBasePath + skillName + ".append.md";
-            Path targetSkillMd = ctx.skillsDir().resolve(skillName + "/SKILL.md");
+            Path targetSkillMd = ctx.skillFile(skillName + "/SKILL.md");
             if (appendTraitIfExists(traitResourcePath, targetSkillMd, ctx)) {
                 traitCount++;
             }
 
-            traitCount += applyGuideTraits(
-                    traitsBasePath + skillName + "/",
-                    ctx.skillsDir().resolve(skillName + "/guides/"),
-                    ctx);
+            traitCount += applyGuideTraits(traitsBasePath + skillName + "/", installed, skillName, ctx);
         }
 
         if (traitCount > 0) {
@@ -40,12 +40,17 @@ class TraitApplicator {
         }
     }
 
-    private int applyGuideTraits(String traitDirPath, Path guidesDir, InitContext ctx) throws Exception {
+    private int applyGuideTraits(String traitDirPath, Set<String> installed, String skillName, InitContext ctx)
+            throws Exception {
         int count = 0;
         for (String traitFileName : TemplateUtils.listTemplateFiles(traitDirPath, APPEND_TRAIT_SUFFIX)) {
             String guideName = stripAppendSuffix(traitFileName);
+            String guidePath = skillName + "/guides/" + guideName + ".md";
+            if (!installed.contains(guidePath)) {
+                continue;
+            }
             String traitResourcePath = traitDirPath + guideName + APPEND_TRAIT_SUFFIX;
-            Path targetGuide = guidesDir.resolve(guideName + ".md");
+            Path targetGuide = ctx.skillFile(guidePath);
             if (appendTraitIfExists(traitResourcePath, targetGuide, ctx)) {
                 count++;
             }

@@ -2,6 +2,7 @@ package org.apache.camel.kit.command;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.PosixFilePermissions;
 
 import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.CommandRunner;
@@ -12,10 +13,14 @@ import org.apache.camel.kit.service.InitRequest;
 import org.apache.camel.kit.service.InitResult;
 import org.apache.camel.kit.service.InitService;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
 
 class InitCommandTest {
 
@@ -29,7 +34,7 @@ class InitCommandTest {
     }
 
     @Test
-    void nextStepsUseCurrentSkillRouterCommands() {
+    void nextStepsUseCurrentSkillRouterCommands() throws Exception {
         CapturingPrinter printer = new CapturingPrinter();
         CamelKitMain main = new CamelKitMain();
         main.setOut(printer);
@@ -47,7 +52,7 @@ class InitCommandTest {
     }
 
     @Test
-    void bob2NextStepsDistinguishShellSkillsAndIdeCommands() {
+    void bob2NextStepsDistinguishShellSkillsAndIdeCommands() throws Exception {
         CapturingPrinter printer = new CapturingPrinter();
         CamelKitMain main = new CamelKitMain();
         main.setOut(printer);
@@ -64,7 +69,7 @@ class InitCommandTest {
     }
 
     @Test
-    void copilotNextStepsUseSkillsInsteadOfCamelSlashCommands() {
+    void copilotNextStepsUseSkillsInsteadOfCamelSlashCommands() throws Exception {
         CapturingPrinter printer = new CapturingPrinter();
         CamelKitMain main = new CamelKitMain();
         main.setOut(printer);
@@ -80,7 +85,7 @@ class InitCommandTest {
     }
 
     @Test
-    void piNextStepsUseTrustAndSkillInvocation() {
+    void piNextStepsUseTrustAndSkillInvocation() throws Exception {
         CapturingPrinter printer = new CapturingPrinter();
         CamelKitMain main = new CamelKitMain();
         main.setOut(printer);
@@ -108,7 +113,7 @@ class InitCommandTest {
     }
 
     @Test
-    void codexNextStepsUseTrustSkillsAndMcpDiscovery() {
+    void codexNextStepsUseTrustSkillsAndMcpDiscovery() throws Exception {
         CapturingPrinter printer = new CapturingPrinter();
         CamelKitMain main = new CamelKitMain();
         main.setOut(printer);
@@ -156,6 +161,44 @@ class InitCommandTest {
                 .count());
         assertFalse(printer.output().contains("InvalidAgentConfigurationException"));
         assertFalse(printer.output().contains("\tat "));
+    }
+
+    @Test
+    @Tag("cli-compat")
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void initNamesTheDirectoryMissingSearchPermission(@TempDir Path project) throws Exception {
+        Path dir = Files.createDirectories(project.resolve(".claude/skills/shared/sub"));
+        Files.createDirectory(dir.resolve("deep"));
+        var permissions = Files.getPosixFilePermissions(dir);
+        try {
+            Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rw-r--r--"));
+            assumeFalse(Files.isExecutable(dir), "The current user can bypass search permissions");
+            assertPreflightError(project, "Cannot inspect " + dir + ". Restore read and search permissions and retry.");
+        } finally {
+            Files.setPosixFilePermissions(dir, permissions);
+        }
+    }
+
+    @Test
+    @Tag("cli-compat")
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void initReportsALinkedSkillsDirectory(@TempDir Path project) throws Exception {
+        Path link = Files.createDirectory(project.resolve(".claude")).resolve("skills");
+        Files.createSymbolicLink(link, Files.createDirectory(project.resolve("stored-skills")));
+        assertPreflightError(project, "Initialization aborted: Refusing generated path through symbolic link: " + link);
+    }
+
+    private static void assertPreflightError(Path project, String message) throws Exception {
+        for (boolean preview : new boolean[]{false, true}) {
+            CapturingPrinter printer = new CapturingPrinter();
+            InitCommand command = initCommand(project, printer);
+            command.dryRun = preview;
+            assertEquals(1, command.doCall(), printer.output());
+            assertEquals(1, printer.output().lines().filter(line -> line.contains("Error: " + message)).count(),
+                    printer.output());
+            assertFalse(printer.output().contains("\tat "), printer.output());
+            assertFalse(Files.exists(project.resolve(".camel-kit")));
+        }
     }
 
     @Test

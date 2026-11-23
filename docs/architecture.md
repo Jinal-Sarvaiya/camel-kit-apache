@@ -20,7 +20,7 @@ Camel-Kit combines two mechanisms to give AI agents accurate, efficient access t
 
 Together they enable AI-powered integration development targeting Apache Camel. Skills carry the process knowledge (how to design a flow, how to generate YAML, how to validate a route), while MCP provides the data knowledge (which components exist, what options they accept, whether an endpoint URI or Citrus test action is valid).
 
-The authoritative workflow contract lives in `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml`. It defines command names and aliases, generated command stubs, skill visibility, pipeline stages, artifacts, transitions, MCP servers, allowed tools, and documentation references. Generator code reads this manifest for command stubs and for tool filters where the target runtime supports them; tests validate skill frontmatter against it. When changing workflow behavior, update the manifest first and then update the Markdown skill bodies and docs to match.
+The core workflow contract lives in `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml`. It defines command names and aliases, generated command stubs, skill visibility, pipeline stages, artifacts, transitions, MCP servers, allowed tools, and documentation references. The build composes this manifest with the selected skill packs. Generator code reads the bundled catalog for command stubs and for tool filters where the target runtime supports them; tests validate skill frontmatter against it. When changing workflow behavior, update the manifest first and then update the Markdown skill bodies and docs to match.
 
 ---
 
@@ -32,7 +32,9 @@ A skill is a directory containing a manifest file (`SKILL.md`) and an optional `
 
 **Skill location:** `kit/camel-kit-core/src/main/resources/skills/{skill-name}/`
 
-**Workflow manifest:** `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml` is the source of truth for skill visibility and generated slash-command stubs. The `SKILL.md` frontmatter must match the manifest.
+The contributor guide includes the [pack descriptor and runnable example](modules/ROOT/pages/contributing.adoc#skill-packs).
+
+**Core workflow manifest:** `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml` is the source of truth for skill visibility and generated slash-command stubs. The `SKILL.md` frontmatter must match the manifest.
 
 ### SKILL.md Format
 
@@ -926,9 +928,14 @@ that decides what happens to them:
   be merged is rejected before anything is written, by `--dry-run` as well as by initialization; for Codex both build
   and validate the same merged candidate.
 
-Assets Camel-Kit ships under its own names (`camel-*` skills, subagents, personas, hooks, `.camel-kit/templates/`) are
-not tracked and are always regenerated. This keeps reinitialization able to restore the restricted Ship worker
-definitions regardless of local edits. Files the user adds next to them are never visited.
+Each run regenerates the selected skills, subagents, personas, hooks and `.camel-kit/templates/`, including the
+restricted Ship worker definitions. The ledger also records the final content of catalog skills, guides and
+command stubs. On a catalog switch, init checks the old records in the selected host directories before retiring
+files. Text hashes normalize LF and CRLF for the formats listed in the contributor guide. Opaque resources use
+SHA-256 of their exact bytes. An edited retired file keeps its record so later runs can report it. A switch
+between a file and a directory stages the new content and requires all files it displaces to match the ledger.
+Init checks write access before switching. If a run leaves staged content or a backup, subsequent previews,
+initializations and Doctor identify the recovery directory under the selected assistant's skills.
 
 Rejected alternatives:
 

@@ -1,0 +1,6 @@
+id: core
+schema: 1
+add:
+  step/validate/report/timestamp:
+    contract: 1
+    resource: report-timestamp.md

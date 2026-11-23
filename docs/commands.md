@@ -72,9 +72,13 @@ camel kit init --here [options]
 | `--source-platform` | `auto` | Source platform for migration: `mulesoft`, `camel`, `biztalk`, `auto` |
 | `--force` | `false` | Reinitialize a project that already has `.camel-kit/`. Your content in shared files is kept |
 | `--replace <path>` | none | Replace one existing shared file in full (for example `AGENTS.md` or `mvnw`) instead of merging or preserving it; repeatable |
-| `--dry-run` | `false` | Show what init would do to each shared file (create, replace, merge or preserve) without writing anything |
+| `--dry-run` | `false` | Preview which shared files init would create, replace, merge or preserve and which retired catalog files it would remove or preserve |
 | `--silent` | `false` | Suppress all output (no banner, no TUI, no progress, no summary) -- useful for CI/scripted environments |
 | `-V`, `--version` | -- | Print camel-kit version and exit |
+
+If a symbolic link lies on the path from the workspace to the skills directory, `init` and `init --dry-run`
+report the link and exit with code 1. If `init` reports `Cannot inspect`, restore read and search access on
+the directory named in the message.
 
 **Examples:**
 
@@ -158,7 +162,7 @@ If the target directory already contains `.camel-kit/`, init warns and exits:
   Directory: /path/to/my-integration
   Found:     .camel-kit/
 
-  To reinitialize: --force (files you changed are preserved)
+  To reinitialize: --force (refreshes selected assets and preserves edits to shared files)
   Example:      camel-kit init my-integration --ai claude --force
 ```
 
@@ -170,7 +174,11 @@ untouched and listed at the end of the run; the version Camel-Kit would have wri
 `.camel-kit/conflicts/`, except for Maven wrapper files, which are listed without a saved version; use
 `--replace-wrapper` to replace the whole wrapper. Pass `--replace <path>` to replace a file in full, or `--dry-run` to preview;
 the preview runs the same validation as init and rejects an existing MCP configuration that cannot be merged. Shipped
-skills and other `camel-*` assets are always regenerated.
+skills and other selected `camel-*` assets are regenerated. When switching distributions, `init --force` removes
+recorded skills, guides and command stubs that the new catalog omits and that still match the last installation.
+Run init for each assistant installation you want to update. Codex and Antigravity share the same skills directory.
+A retained `SKILL.md` remains discoverable. Review edited and unrecorded skills and move or remove those you want to retire.
+The dry run lists the planned removals.
 
 **TUI experience:**
 
@@ -293,7 +301,12 @@ For Bob 2, `doctor` reports a `FAIL` for each public skill hidden by an effectiv
 It honors `metadata.user-invocable` before the top-level field, as Bob does; the four
 internal helpers remain hidden. Empty public skill files and unparseable metadata also fail validation.
 
-`doctor` validates `.camel-kit/config.properties`, selected agent command stubs when that target uses them, skill directories and `SKILL.md` files, registered workspace templates, user-invocable command exposure, runtime-supported MCP filtering and permission fields, graph availability, command prefix configuration, Java/Maven/JBang prerequisites, and common stale references in active generated files. For Codex, it parses `.codex/config.toml`, checks the exact MCP allowlists and prompt approval modes, and verifies that every generated custom-agent TOML file declares `name`, `description`, and `developer_instructions`. For Qwen it checks `includeTools` and prompt-preserving `trust`; for OpenCode it checks the generated server-tool `ask` patterns. Legacy Qwen/OpenCode configurations that predate those fields produce upgrade warnings rather than failures, while malformed current configurations fail. Internal skills such as `camel-verify` must exist as skills, but must not be exposed as user command stubs.
+A missing catalog-selected skill file or guide produces a `FAIL` finding with its path and exit code 1.
+Doctor also fails if a symbolic link lies on the path from the workspace to the selected assistant's skills directory.
+Doctor also fails on an interrupted catalog update and gives the recovery directory's path. After init
+has stopped, review the directory, move it outside the skills tree, and retry initialization.
+
+`doctor` validates `.camel-kit/config.properties`, selected agent command stubs when that target uses them, skill directories and `SKILL.md` files, supporting files selected by the catalog, registered workspace templates, user-invocable command exposure, runtime-supported MCP filtering and permission fields, graph availability, command prefix configuration, Java/Maven/JBang prerequisites, and common stale references in active generated files. For Codex, it parses `.codex/config.toml`, checks the exact MCP allowlists and prompt approval modes, and verifies that every generated custom-agent TOML file declares `name`, `description`, and `developer_instructions`. For Qwen it checks `includeTools` and prompt-preserving `trust`; for OpenCode it checks the generated server-tool `ask` patterns. Legacy Qwen/OpenCode configurations that predate those fields produce upgrade warnings rather than failures, while malformed current configurations fail. Internal skills such as `camel-verify` must exist as skills, but must not be exposed as user command stubs.
 
 In the development snapshot, Citrus MCP configuration is optional. When the project has not opted in,
 `doctor` accepts a missing `citrus` entry; when opted in, a missing entry is a failure. Any existing Citrus
@@ -579,7 +592,7 @@ camel-kit doc unstale docs/camel-kit/001-order-processing/implementation-plan.md
 
 These commands are used inside your AI coding assistant after project initialization. The entry point is `/camel-start`, which routes to the right pipeline skill. Skills are organized into tiers:
 
-The machine-readable source of truth for command names, generated stubs, skill visibility, pipeline stages, transitions, artifacts, and MCP tool filters is `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml`. Generated command stubs and consistency tests read that manifest; update it before changing this reference text or any skill frontmatter.
+The machine-readable source of truth for command names, generated stubs, skill visibility, pipeline stages, transitions, artifacts, and MCP tool filters is `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml`. Command generation and Doctor read the effective workflow from the built skill catalog. Update the core workflow YAML before changing this reference text or the corresponding core skill frontmatter.
 
 **Tier 1 — Pipeline:** `/camel-brainstorm`, `/camel-migrate`, `/camel-plan`, `/camel-execute`, `/camel-validate` — five skills implementing a four-stage pipeline, with brainstorm and migrate as alternative Design-stage entries. Invoke them via the `/camel-start` decision tree or directly via slash command.
 

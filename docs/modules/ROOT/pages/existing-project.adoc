@@ -69,7 +69,8 @@ camel-kit init --here --ai claude --dry-run
 ----
 
 The preview lists shared files with a `create`, `replace`, `merge` or `preserve` action, using the same
-ownership and replacement rules as initialization. It does not write files or run baseline tests, even when
+ownership and replacement rules as initialization. It also lists retired catalog files with a `remove` or
+`preserve` action. It does not write files or run baseline tests, even when
 `--record-baseline` is also supplied. It also runs the validation of initialization: an existing MCP configuration
 that cannot be merged, such as a `.codex/config.toml` that is not valid TOML, is rejected by the preview with the
 message `init` would give. See xref:getting-started.adoc#existing-project[Existing projects] for

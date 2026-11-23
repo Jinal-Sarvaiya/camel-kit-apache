@@ -16,8 +16,7 @@ class CommandStubGenerator {
 
         for (WorkflowCommand command : commands) {
             String content = commandContent(ctx, command);
-            String filename = command.name() + "." + ctx.agent().fileFormat();
-            AtomicFileWriter.write(ctx.commandsDir().resolve(filename), content);
+            AtomicFileWriter.write(ctx.commandStub(command.name()), content);
         }
 
         ctx.printer().println(AnsiColors.green("✓") + " Created " + commands.size() + " command stubs");

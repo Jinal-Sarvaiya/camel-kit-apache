@@ -103,14 +103,20 @@ skills:
     user_invocable: true
     status: router
     generated_command: camel-start
+    # The core router's decision tree and tier table refer to these skills by name.
+    requires: [skill/camel-brainstorm, skill/camel-migrate, skill/camel-plan, skill/camel-execute,
+               skill/camel-validate, skill/camel-debug, skill/camel-ship, skill/camel-knowledge,
+               skill/camel-design, skill/camel-implement, skill/camel-test, skill/camel-verify]
   - name: camel-brainstorm
     user_invocable: false
     status: pipeline
     generated_command: camel-brainstorm
+    requires: [skill/camel-knowledge]
   - name: camel-migrate
     user_invocable: false
     status: pipeline
     generated_command: camel-migrate
+    requires: [skill/camel-knowledge]
   - name: camel-plan
     user_invocable: false
     status: pipeline
@@ -119,6 +125,7 @@ skills:
     user_invocable: false
     status: pipeline
     generated_command: camel-execute
+    requires: [skill/camel-knowledge]
   - name: camel-validate
     user_invocable: false
     status: pipeline

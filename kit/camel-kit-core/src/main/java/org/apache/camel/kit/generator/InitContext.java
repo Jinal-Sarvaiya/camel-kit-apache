@@ -18,6 +18,14 @@ public record InitContext(
         Printer printer,
         ManagedFiles files) {
 
+    Path commandStub(String name) {
+        return commandsDir.resolve(name + "." + agent.fileFormat());
+    }
+
+    Path skillFile(String relative) {
+        return files.catalogOutput(skillsDir.resolve(relative));
+    }
+
     public InitContext(
                        AgentConfig agent,
                        String agentName,

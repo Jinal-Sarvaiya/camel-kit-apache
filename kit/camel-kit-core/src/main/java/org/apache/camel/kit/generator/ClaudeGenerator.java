@@ -4,10 +4,8 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.apache.camel.kit.config.AgentDescriptor;
 import org.apache.camel.kit.config.AgentRegistry;
@@ -23,6 +21,10 @@ public class ClaudeGenerator extends DefaultGenerator {
     private final QuteTemplateEngine templateEngine = new QuteTemplateEngine();
 
     private static final String LEGACY_COMMAND_DIR = ".claude/commands";
+    // These files were generated before Claude switched to native skills. New commands have never owned this path.
+    private static final Set<String> LEGACY_COMMAND_STUBS = Set.of("camel-start.md", "camel-brainstorm.md",
+            "camel-migrate.md", "camel-plan.md", "camel-execute.md", "camel-validate.md", "camel-debug.md",
+            "camel-knowledge.md", "camel-ship.md");
 
     @Override
     public void preflight(InitContext ctx) throws Exception {
@@ -57,11 +59,8 @@ public class ClaudeGenerator extends DefaultGenerator {
         if (!Files.isDirectory(legacyDir)) {
             return;
         }
-        Set<String> ownedStubs = WorkflowManifestLoader.loadDefault().generatedCommandStubs().stream()
-                .map(c -> c.name() + ".md")
-                .collect(Collectors.toSet());
         try (var files = Files.list(legacyDir)) {
-            for (Path file : files.filter(f -> ownedStubs.contains(f.getFileName().toString())).toList()) {
+            for (Path file : files.filter(f -> LEGACY_COMMAND_STUBS.contains(f.getFileName().toString())).toList()) {
                 GeneratedAssetCleaner.deleteRegularFile(ctx, file);
             }
         }
@@ -82,9 +81,7 @@ public class ClaudeGenerator extends DefaultGenerator {
     }
 
     private void generateClaudeMd(InitContext ctx) throws Exception {
-        Map<String, Object> data = new HashMap<>(
-                Map.of(
-                        "COMMAND_PREFIX", ctx.commandPrefix()));
+        Map<String, Object> data = AgentsMdGenerator.templateData(ctx);
         String content = templateEngine.render("templates/claude/claude-md.md", data);
         ctx.files().write(ctx.projectDir().resolve("CLAUDE.md"), content);
     }

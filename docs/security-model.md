@@ -99,7 +99,7 @@ metadata; Kit configures it for each harness, and it also serves MCP clients tha
   | --- | --- | --- | --- |
   | **A. Workspace CLI** — `init`, `doctor`, `doc`, `nextId`, `plan analyze`, `graph *` (`camel-kit-core` commands, services, generators, catalog downloaders; `camel-kit-main` JBang launcher; `camel-jbang-plugin-kit`) | Aesh commands | Writes the target workspace; reads `~/.camel-kit/config.properties`; `init` downloads catalogs over HTTPS unless `--no-fetch`; prerequisite probes spawn `java`, `jbang`, `camel` (including `camel test --help`) and `mvn` when no wrapper exists; see §4.5 | **In** |
   | **B. Graph analysis** (`camel-kit-graph`: Pom, Java, Groovy, XML route, Mule XML, DataWeave, BizTalk, YAML route, Config parsers plus the cross-linker and property-binding post-processors) | `camel-kit graph …`; `init --here` auto-analysis | Reads the analysed tree; writes `.camel-kit/project-graph.json`; no network, no child process *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))* | **In** — the analysed tree is untrusted input |
-  | **C. Skills, templates, traits, agent registry, workflow manifest** (`kit/camel-kit-core/src/main/resources/{skills,templates,agents,workflow}`) | installed by `init` into the workspace | Nothing by itself; the harness executes the instructions with its own permissions; generated MCP configs make the harness launch MCP servers through `jbang` at pinned coordinates | **In** as shipped instructions and generated configuration; the harness and the model are out (§4.3) |
+  | **C. Skills, templates, traits, agent registry, workflow manifest and assembled skill catalog** (`kit/camel-kit-core/src/main/resources/{skills,templates,agents,workflow,META-INF/camel-kit/packs}` and the packaged `META-INF/camel-kit/*catalog.zip`) | installed by `init` into the workspace | Nothing by itself; the harness executes the instructions with its own permissions; generated MCP configs make the harness launch MCP servers through `jbang` at pinned coordinates | **In** as shipped instructions and generated configuration; the harness and the model are out (§4.3) |
   | **D. Ship controller** (Technology Preview; `camel-kit-core` `ship/**`, `command/ship`) | `camel-kit ship`, `/camel-ship` delegates | Spawns `pi`/`node` (Pi backend), `/usr/bin/setsid`, `/bin/kill`, its own `java`; writes `.camel-kit/ship/state` or `$CAMEL_KIT_SHIP_STATE_HOME`; publishes into the live project; HTTPS to Maven Central through family E | **In** |
   | **E. Ship resolver and evidence payloads** (`camel-kit-ship-resolver`; `ship/evidence/**` launchers) | controller-only | HTTPS to Maven Central; private local Maven repository; private tmp/home | **In** |
   | **F. External MCP servers** — Camel JBang MCP (`camel-jbang-mcp`), Citrus MCP | launched by the harness from the generated config | Network; whatever the server does | **Out** — separately owned (§4.3). Camel-Kit's responsibility ends at the generated configuration: pinned coordinate, named repositories, allowed-tool list. |
@@ -394,7 +394,12 @@ links), controller-owned state, caches and private temporary directories *(docum
 
 ## 4.5a Build-time and configuration variants
 
-Camel-Kit is a family of postures. The knobs that move the security envelope:
+Camel-Kit is a family of postures. Skill pack selection is a distribution build input. The maintainer selects modules
+on the build classpath. The compiler checks provider types without initializing them. `init` reads installed skill
+content from the bundled catalog and applies the existing generated-path checks. Pack descriptors in the project
+being initialized do not participate in selection. See the [pack contract](modules/ROOT/pages/contributing.adoc#skill-packs).
+
+The knobs that move the security envelope:
 
 | Knob | Default | Effect on the model | Maintainer stance |
 | --- | --- | --- | --- |
@@ -554,7 +559,13 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
    `GeneratedAssetCleaner`)*; generated file replacements use atomic writes *(documented — `AtomicFileWriter`)*; existing
    `.codex/config.toml` / `opencode.json` are merged, not replaced *(documented — `docs/architecture.md`)*. `InitService` preflights the exact generated leaves and their ancestors, plus Camel-owned skill,
    shared-guide and template subtrees before writing. `ConfinedPaths` refuses links in these managed
-   paths; unrelated worktrees, custom skills and existing data may contain links. New atomic writes
+   paths; unrelated worktrees, custom skills and existing data may contain links. Catalog retirement reads
+   the previous installation's SHA-256 records only for valid resource or stub paths under the selected
+   agent's generated directories. The committed ledger supplies the ownership claim. Review its changes along
+   with the files it tracks. Kit checks confinement and compares installed content before removal, normalizing
+   LF and CRLF for recognized UTF-8 text and comparing opaque resources byte for byte. Layout replacements
+   displace only recorded, matching files and their directories. Init and Doctor report interrupted catalog
+   work directories for inspection. Kit leaves their contents for recovery. Other retirements prune only empty parents. New atomic writes
    use umask-default permissions and replacements retain existing POSIX modes.
    Explicitly selected target aliases remain supported. Catalog, Citrus and Forage validate version
    components; Citrus and Forage also validate cache ancestry; Citrus also checks extracted paths and derived reference destinations.

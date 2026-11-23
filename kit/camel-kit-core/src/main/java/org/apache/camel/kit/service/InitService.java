@@ -2,6 +2,7 @@ package org.apache.camel.kit.service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -26,6 +27,7 @@ import org.apache.camel.kit.generator.AgentGeneratorFactory;
 import org.apache.camel.kit.generator.AtomicFileWriter;
 import org.apache.camel.kit.generator.GeneratedAssetPreflight;
 import org.apache.camel.kit.generator.InitContext;
+import org.apache.camel.kit.generator.InvalidAgentConfigurationException;
 import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.generator.QuteTemplateEngine;
 import org.apache.camel.kit.graph.GraphBuildResult;
@@ -64,7 +66,7 @@ public class InitService {
                 agent, request.agentName(), commandsDir, skillsDir, targetDir,
                 request.commandPrefix(), request.distribution(), request.withCitrusMcp(), request.printer(), files);
         requireConfinedOutputs(targetDir, genCtx, isExistingCamelProject(targetDir, request.sourcePlatform()));
-        AgentGeneratorFactory.create(request.agentName()).validate(genCtx);
+        var prepared = AgentGeneratorFactory.create(request.agentName()).prepareCatalog(genCtx, true);
 
         Set<Path> shared = new LinkedHashSet<>();
         shared.add(targetDir.resolve("AGENTS.md"));
@@ -72,7 +74,7 @@ public class InitService {
             shared.add(targetDir.resolve(template.target()));
         }
         shared.add(targetDir.resolve("docs/constitution.md"));
-        List<ManagedFiles.Change> changes = new ArrayList<>();
+        List<ManagedFiles.Change> changes = new ArrayList<>(prepared.catalog().retirements());
         for (Path file : shared) {
             if (files.isShared(file)) {
                 changes.add(change(targetDir, file, files.plan(file)));
@@ -152,7 +154,7 @@ public class InitService {
                 request.commandPrefix(), request.distribution(), request.withCitrusMcp(), request.printer(), files);
         AgentGenerator generator = AgentGeneratorFactory.create(request.agentName());
         requireConfinedOutputs(targetDir, genCtx, isExistingProject);
-        generator.preflight(genCtx);
+        var prepared = generator.prepareCatalog(genCtx, false);
 
         List<Path> createdPaths = new ArrayList<>();
         List<InitWarning> warnings = new ArrayList<>();
@@ -172,7 +174,8 @@ public class InitService {
             progress.finishTask();
 
             progress.startTask("\uD83E\uDD16", "Generating " + agent.name() + " workspace");
-            generator.generate(genCtx);
+            prepared.generate();
+            files.recordCatalogFiles(genCtx);
             progress.finishTask();
 
             progress.startTask("\uD83D\uDD0C", "Configuring Maven wrapper");
@@ -236,8 +239,10 @@ public class InitService {
             ConfinedPaths.requireTree(targetDir, targetDir.resolve(".camel-kit/templates"));
             ConfinedPaths.requireTree(targetDir, targetDir.resolve(ManagedFiles.PROPOSALS));
             GeneratedAssetPreflight.check(genCtx);
+        } catch (AccessDeniedException e) {
+            throw InvalidAgentConfigurationException.unreadableDirectory(e);
         } catch (IOException e) {
-            throw new IOException("Initialization aborted: " + e.getMessage(), e);
+            throw new InvalidAgentConfigurationException("Initialization aborted: " + e.getMessage(), e);
         }
     }
 

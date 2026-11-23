@@ -4,9 +4,8 @@
 > and personas keep their own framing (what to ask, what to print, how to classify a finding) and reference this file
 > for the rules and configuration snippets instead of restating them. When a rule or snippet changes, change it here.
 
-Loaded by `camel-design/guides/security.md` and `camel-design/guides/monitoring.md` during design, by every validation
-pass (`camel-validate` guide manifest; used by `guides/quality-checks.md`, `guides/security-analysis.md`, and
-`guides/anti-patterns.md`), and by the `code-quality-reviewer` persona. The `critic-security` persona inlines the subset
+Design uses this checklist for security and monitoring. Validation uses it for quality checks, security analysis,
+and anti-patterns. The `code-quality-reviewer` persona also uses it. The `critic-security` persona inlines the subset
 of these rules that applies at external boundaries — credentials, expression injection, TLS, header handling, and
 authentication (rules 1, 2, 5, the logging part of rule 3, and the expression-injection part of rule 4) — so it stays
 self-contained in a fresh context, and names this file as its source of truth.

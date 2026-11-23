@@ -30,6 +30,11 @@ Records are used in this codebase (`WorkflowManifest`, `InitContext`, …) and a
 
 Location: `kit/camel-kit-core/src/main/resources/skills/{skill-name}/`
 
+Selected skill packs are assembled at build time. Under `src/main/resources/` in the core module,
+`workflow/camel-kit-workflow.yaml` declares the core skills and their dependencies.
+`META-INF/camel-kit/packs/core/` holds the core step descriptor and its instructions. Keep named step markers in
+stage skills such as `camel-validate/SKILL.md`. Edit the bound pack resource to change its instructions.
+
 Pipeline (user-invocable):
 `/camel-start` → `/camel-brainstorm` or `/camel-migrate` → `/camel-plan` →
 `/camel-execute` → `/camel-validate`
@@ -44,9 +49,8 @@ Rules:
 - **Never hardcode versions** — reference `distribution.properties` (repo root;
   single source of truth for all version pins, copied into the JAR).
 - `skills/shared/` guides feed multiple skills — check every caller before editing.
-- A new **user-invocable** skill must be registered in ALL 8 agent templates:
-  `templates/{antigravity,bob2,claude,codex,copilot,opencode,pi,qwen}/` and added to
-  `docs/commands.md`.
+- Register core skills in the workflow manifest and pack skills in their pack descriptor. Verify generated
+  entry points across all eight agents and document public core skills in `docs/commands.md`.
 - Agent traits: `templates/traits/{agent}/{skill}.append.md` — no code registration
   needed. `ShippedAssetStructureTest` enforces the contract; run it after any
   skill/template/trait change.
@@ -84,7 +88,7 @@ Work is finished only when all of these hold:
    root when changes span modules or touch skills/templates/`distribution.properties`.
 2. `./mvnw -Psourcecheck validate -B` passes (CI format gate).
 3. Skill/template/trait change: `ShippedAssetStructureTest` passes.
-4. New user-invocable skill: registered in all 8 agent templates + `docs/commands.md`.
+4. New user-invocable skill: verify generated entry points for all eight agents and the command reference.
 5. No hardcoded versions where `distribution.properties` should be referenced.
 6. `docs/` updated as needed; `CHANGELOG.md` for significant changes.
 7. Architectural decision documentation is updated as required.

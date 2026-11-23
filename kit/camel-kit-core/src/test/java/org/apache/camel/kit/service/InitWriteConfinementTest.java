@@ -7,6 +7,7 @@ import java.util.List;
 
 import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.config.AgentRegistry;
+import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.output.Printer;
 
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,32 @@ class InitWriteConfinementTest {
 
     @TempDir
     Path tempDir;
+
+    @Test
+    void retiredCatalogPathsRespectAgentRootsAndLinksBeforeWriting() throws Exception {
+        Path project = Files.createDirectory(tempDir.resolve("project"));
+        Path sentinel = Files.createFile(project.resolve("keep"));
+        Path ledger = project.resolve(ManagedFiles.LEDGER);
+        Files.createDirectories(ledger.getParent());
+        String emptyHash = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+        String records = "catalog/.bob/skills/../../keep=" + emptyHash + "\ncatalog/keep=" + emptyHash + "\n";
+        Files.writeString(ledger, records);
+        new InitService().initialize(request(project, "bob2"));
+        assertTrue(Files.isRegularFile(sentinel));
+
+        Path retired = project.resolve(".bob/skills/camel-retired/SKILL.md");
+        Files.createDirectories(retired.getParent());
+        Files.createSymbolicLink(retired, sentinel);
+        Files.writeString(ledger, records + "catalog/.bob/skills/camel-retired/SKILL.md=" + emptyHash + "\n");
+        String original = Files.readString(project.resolve(".camel-kit/config.properties"));
+        var service = new InitService();
+        var request = request(project, "bob2");
+        assertThrows(IOException.class, () -> service.preview(request));
+        assertThrows(IOException.class, () -> service.initialize(request));
+        assertTrue(Files.isSymbolicLink(retired));
+        assertTrue(Files.isRegularFile(sentinel));
+        assertEquals(original, Files.readString(project.resolve(".camel-kit/config.properties")));
+    }
 
     @ParameterizedTest
     @ValueSource(strings = {

@@ -23,6 +23,7 @@ import org.apache.camel.kit.config.AgentGeneratorStrategy;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.config.OpenCodeProjectConfig;
 import org.apache.camel.kit.doc.FrontmatterHandler;
+import org.apache.camel.kit.generator.CatalogUpdate;
 import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.ParserDiagnostic;
@@ -176,6 +177,12 @@ public class DoctorService {
             return;
         }
 
+        try {
+            CatalogUpdate.checkInterruptedUpdate(root, skillsDir);
+        } catch (IOException e) {
+            findings.add(DoctorFinding.fail("skills", relativize(root, skillsDir), e.getMessage(),
+                    "Review the reported path before re-running init."));
+        }
         List<String> missingSkills = expectations.requiredSkills().stream()
                 .filter(skill -> !Files.isRegularFile(skillsDir.resolve(skill).resolve("SKILL.md")))
                 .toList();
@@ -187,6 +194,13 @@ public class DoctorService {
             findings.add(DoctorFinding.fail("skills", relativize(root, skillsDir),
                     "Missing SKILL.md for: " + String.join(", ", missingSkills),
                     "Restore the missing skill folders or re-run camel-kit init --here --force."));
+        }
+        List<String> missingResources = expectations.resources().stream()
+                .filter(path -> !Files.isRegularFile(skillsDir.resolve(path))).toList();
+        if (!missingResources.isEmpty()) {
+            findings.add(DoctorFinding.fail("skills", relativize(root, skillsDir),
+                    "Missing skill resources: " + String.join(", ", missingResources),
+                    "Re-run camel-kit init --here --force to restore the bundled resources."));
         }
         checkAgentSpecificWorkspace(root, agent, findings);
     }

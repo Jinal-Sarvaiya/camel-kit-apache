@@ -1,0 +1,7 @@
+id: report-review
+schema: 1
+requires: [core]
+add:
+  step/validate/report/review:
+    contract: 1
+    resource: review.md

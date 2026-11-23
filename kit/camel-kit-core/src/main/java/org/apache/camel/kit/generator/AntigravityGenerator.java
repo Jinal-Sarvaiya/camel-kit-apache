@@ -1,7 +1,6 @@
 package org.apache.camel.kit.generator;
 
 import java.io.IOException;
-import java.net.JarURLConnection;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -17,6 +16,11 @@ public class AntigravityGenerator extends DefaultGenerator {
 
     @Override
     public void preflight(InitContext ctx) throws Exception {
+        prepareCatalog(ctx, false);
+    }
+
+    @Override
+    public Prepared prepareCatalog(InitContext ctx, boolean preview) throws Exception {
         try {
             GeneratedAssetPreflight.check(ctx);
         } catch (IOException e) {
@@ -44,26 +48,8 @@ public class AntigravityGenerator extends DefaultGenerator {
                 requireType(parent, true);
             }
         }
-        if (Files.isDirectory(ctx.skillsDir())) {
-            try (var paths = Files.walk(ctx.skillsDir())) {
-                for (Path target : paths.toList()) {
-                    String relative = ctx.skillsDir().relativize(target).toString().replace('\\', '/');
-                    if (!relative.isEmpty()) {
-                        var loader = getClass().getClassLoader();
-                        var resource = loader.getResource("skills/" + relative);
-                        if (resource == null) {
-                            resource = loader.getResource("skills/" + relative + "/");
-                        }
-                        if (resource != null) {
-                            boolean directory = resource.openConnection() instanceof JarURLConnection jar
-                                    ? jar.getJarEntry().isDirectory() : Files.isDirectory(Path.of(resource.toURI()));
-                            requireType(target, directory);
-                        }
-                    }
-                }
-            }
-        }
         McpConfigGenerator.readAntigravityConfig(ctx.projectDir().resolve(ctx.agent().mcpConfigPath()));
+        return new Prepared(ctx.files().planCatalog(ctx), this::writeWorkspace);
     }
 
     private void requireType(Path target, boolean directory) throws InvalidAgentConfigurationException {
@@ -77,13 +63,17 @@ public class AntigravityGenerator extends DefaultGenerator {
     @Override
     public void generate(InitContext ctx) throws Exception {
         preflight(ctx);
+        writeWorkspace(ctx);
+    }
+
+    private void writeWorkspace(InitContext ctx) throws Exception {
         super.generate(ctx);
         QuteTemplateEngine templates = new QuteTemplateEngine();
+        Map<String, Object> data = AgentsMdGenerator.templateData(ctx);
         for (AgentDescriptor.TemplateInstall template : AgentRegistry.descriptor(ctx.agentName()).templates()) {
             if (!PersonaResourceInstaller.isPersonaTemplate(template)) {
                 Path target = ctx.projectDir().resolve(template.target());
-                ctx.files().write(target, templates.render(template.source(),
-                        Map.of("COMMAND_PREFIX", ctx.commandPrefix())));
+                ctx.files().write(target, templates.render(template.source(), data));
             }
         }
         retireGeminiImports(ctx.projectDir());

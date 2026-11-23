@@ -173,6 +173,20 @@ class AntigravityGeneratorTest {
     }
 
     @Test
+    void directGenerationChecksTheCatalogBeforeWriting() throws Exception {
+        var ctx = context("camel-kit");
+        Files.createDirectories(ctx.skillsDir());
+        Path conflict = Files.writeString(ctx.skillsDir().resolve("camel-design"), "Existing file");
+        var generator = new AntigravityGenerator();
+        assertThrows(InvalidAgentConfigurationException.class, () -> generator.preflight(ctx));
+        assertThrows(InvalidAgentConfigurationException.class, () -> generator.generate(ctx));
+        assertFalse(Files.exists(tempDir.resolve("AGENTS.md")));
+        try (var files = Files.walk(tempDir)) {
+            assertEquals(List.of(conflict), files.filter(Files::isRegularFile).toList());
+        }
+    }
+
+    @Test
     void regenerationWithoutCitrusRemovesPreviousCitrusServer() throws Exception {
         new AntigravityGenerator().generate(context("camel-kit", true));
         Path mcpFile = tempDir.resolve(".agents/mcp_config.json");

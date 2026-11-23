@@ -1,7 +1,6 @@
 package org.apache.camel.kit.generator;
 
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -21,9 +20,7 @@ public class CopilotGenerator extends DefaultGenerator {
     public void generate(InitContext ctx) throws Exception {
         super.generate(ctx);
 
-        Map<String, Object> data = new HashMap<>(
-                Map.of(
-                        "COMMAND_PREFIX", ctx.commandPrefix()));
+        Map<String, Object> data = AgentsMdGenerator.templateData(ctx);
         installDescriptorTemplates(ctx, data);
     }
 

@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>kit-with-report-review</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.camel</groupId>
+            <artifactId>camel-kit-core</artifactId>
+            <version>${camel-kit.version}</version>
+        </dependency>
+    </dependencies>
+    <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <version>3.1.0</version>
+                <executions>
+                    <execution>
+                        <phase>process-classes</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <java classname="org.apache.camel.kit.workflow.SkillPackCompiler" fork="true" resultproperty="pack.compiler.exit" errorproperty="pack.compiler.error">
+                                    <classpath refid="maven.runtime.classpath"/>
+                                    <arg value="${project.build.outputDirectory}/META-INF/camel-kit/catalog.zip"/>
+                                    <arg value="report-review"/>
+                                </java>
+                                <fail message="${pack.compiler.error}">
+                                    <condition><not><equals arg1="${pack.compiler.exit}" arg2="0"/></not></condition>
+                                </fail>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+</project>

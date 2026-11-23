@@ -26,7 +26,7 @@ class SkillResourceInstallerTest {
                 Body.
                 """);
 
-        new SkillResourceInstaller().addCopilotReadableInternalSkillMetadata(skill);
+        new SkillResourceInstaller().addInternalSkillInvocationMetadata(skill, "copilot");
 
         String content = Files.readString(skill);
         assertTrue(content.contains("user-invocable: false"));
@@ -47,7 +47,7 @@ class SkillResourceInstallerTest {
                 Body.
                 """);
 
-        new SkillResourceInstaller().addPiReadableInternalSkillMetadata(skill);
+        new SkillResourceInstaller().addInternalSkillInvocationMetadata(skill, "pi");
 
         String content = Files.readString(skill);
         assertTrue(content.contains("user-invocable: false"));

@@ -2,12 +2,16 @@ package org.apache.camel.kit.generator;
 
 import java.io.IOException;
 import java.io.StringWriter;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.DirectoryNotEmptyException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.HexFormat;
@@ -16,9 +20,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.camel.kit.util.ConfinedPaths;
+import org.apache.camel.kit.workflow.SkillCatalog;
 
 /**
  * Decides how initialization treats a file that an existing project can already own.
@@ -42,8 +50,12 @@ import java.util.regex.Pattern;
  */
 public final class ManagedFiles {
 
-    /** Project-relative ledger of the shared files Camel-Kit wrote and the hash of what it wrote. */
+    /** Project-relative ledger of shared files and installed catalog assets. */
     public static final String LEDGER = ".camel-kit/managed-files.properties";
+    private static final String CATALOG = "catalog/";
+
+    private static final Pattern CATALOG_TEXT = Pattern.compile(
+            "(?i).+\\.(?:md|adoc|txt|ya?ml|json|xml|xsl|sh|toml|properties)");
 
     /** Project-relative directory holding the content Camel-Kit would have written to a preserved file. */
     public static final String PROPOSALS = ".camel-kit/conflicts";
@@ -83,7 +95,9 @@ public final class ManagedFiles {
         /** Camel-Kit's block is added to, or replaced inside, a file that also holds the user's content. */
         MERGE,
         /** The file belongs to the user and is left untouched. */
-        PRESERVE
+        PRESERVE,
+        /** A file retired from the catalog still matches the installed content. */
+        REMOVE
     }
 
     /**
@@ -93,8 +107,12 @@ public final class ManagedFiles {
      * @param proposal for a preserved file, where the content Camel-Kit would have written was saved, when it was
      */
     public record Change(String path, Action action, Path proposal) {
+        public boolean preservedRetiredFile() {
+            return action == Action.PRESERVE && !isShared(path);
+        }
     }
 
+    private Map<Path, Path> stagedCatalog = Map.of();
     private final Path projectDir;
     /** Only for callers outside initialization, which never protect existing files. */
     private final boolean unrestricted;
@@ -221,6 +239,147 @@ public final class ManagedFiles {
         changes.putIfAbsent(key, new Change(key, Action.PRESERVE, null));
     }
 
+    private Set<String> catalogPaths(InitContext ctx) throws IOException {
+        var catalog = SkillCatalog.bundled();
+        Set<String> installed = new HashSet<>();
+        catalog.paths().forEach(path -> installed.add(key(ctx.skillsDir().resolve(path))));
+        if (ctx.agent().generatesCommandStubs()) {
+            catalog.manifest().workflow().generatedCommandStubs().stream()
+                    .filter(command -> !command.isSkillOnly(ctx.agentName()))
+                    .forEach(command -> installed.add(key(ctx.commandStub(command.name()))));
+        }
+        return installed;
+    }
+
+    private boolean catalogPath(InitContext ctx, String path) {
+        String skills = key(ctx.skillsDir()) + "/";
+        if (path.startsWith(skills)) {
+            String resource = path.substring(skills.length());
+            return resource.contains("/") && SkillCatalog.safePath(resource);
+        }
+        String commands = key(ctx.commandsDir()) + "/";
+        return ctx.agent().generatesCommandStubs() && path.startsWith(commands)
+                && path.substring(commands.length())
+                        .matches("[a-z][a-z0-9-]*\\." + Pattern.quote(ctx.agent().fileFormat()));
+    }
+
+    /** Plan retirements before init writes anything. Only this host's catalog roots are eligible. */
+    public CatalogUpdate planCatalog(InitContext ctx) throws IOException {
+        CatalogUpdate.checkInterruptedUpdate(ctx.projectDir(), ctx.skillsDir());
+        Set<String> installed = catalogPaths(ctx);
+        Map<String, String> spellings = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
+        installed.forEach(path -> spellings.put(path, path));
+        List<Change> retired = new ArrayList<>();
+        for (String entry : new TreeSet<>(ledger.stringPropertyNames())) {
+            if (!entry.startsWith(CATALOG)) {
+                continue;
+            }
+            String path = entry.substring(CATALOG.length());
+            if (installed.contains(path) || !catalogPath(ctx, path)) {
+                continue;
+            }
+            Path target = projectDir.resolve(path);
+            ConfinedPaths.requirePath(projectDir, target);
+            if (Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+                String spelling = spellings.get(path);
+                if (spelling != null && Files.exists(projectDir.resolve(spelling), LinkOption.NOFOLLOW_LINKS)
+                        && Files.isSameFile(target, projectDir.resolve(spelling))) {
+                    continue;
+                }
+                boolean unchanged = matchesCatalogFile(path, target);
+                retired.add(new Change(path, unchanged ? Action.REMOVE : Action.PRESERVE, null));
+            }
+        }
+        return new CatalogUpdate(ctx, installed, retired);
+    }
+
+    void stageCatalog(Map<Path, Path> outputs) {
+        stagedCatalog = outputs;
+    }
+
+    Path catalogOutput(Path target) {
+        return stagedCatalog.getOrDefault(target.toAbsolutePath().normalize(), target);
+    }
+
+    void retireCatalogFiles(InitContext ctx, List<Change> retired) throws IOException {
+        for (Change change : retired) {
+            if (!catalogPath(ctx, change.path())) {
+                throw new IOException("Invalid retired catalog path: " + change.path());
+            }
+            Path target = projectDir.resolve(change.path());
+            ConfinedPaths.requirePath(projectDir, target);
+            if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
+                continue;
+            }
+            if (change.action() == Action.PRESERVE || !matchesCatalogFile(change.path(), target)) {
+                preserve(target);
+                continue;
+            }
+            Files.delete(target);
+            Path skills = ctx.skillsDir().toAbsolutePath().normalize();
+            Path root = target.startsWith(skills) ? skills : ctx.commandsDir().toAbsolutePath().normalize();
+            for (Path dir = target.getParent(); !dir.equals(root); dir = dir.getParent()) {
+                try {
+                    Files.delete(dir);
+                } catch (DirectoryNotEmptyException e) {
+                    break;
+                }
+            }
+            ctx.printer().println("  Removed retired catalog file " + change.path());
+        }
+    }
+
+    boolean matchesCatalogFile(String path, Path target) throws IOException {
+        String recorded = ledger.getProperty(CATALOG + path);
+        if (recorded == null || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
+            return false;
+        }
+        byte[] bytes = Files.readAllBytes(target);
+        if (recorded.equals(digest(bytes))) {
+            return true;
+        }
+        String text = catalogText(Path.of(path), bytes);
+        if (text == null) {
+            return false;
+        }
+        String lf = text.replace("\r\n", "\n");
+        // Older ledgers recorded the installed bytes, which could have used CRLF before checkout.
+        return recorded.equals(digest(lf.getBytes(StandardCharsets.UTF_8)))
+                || recorded.equals(digest(lf.replace("\n", "\r\n").getBytes(StandardCharsets.UTF_8)));
+    }
+
+    private static String catalogText(Path target, byte[] bytes) {
+        if (!CATALOG_TEXT.matcher(target.getFileName().toString()).matches()) {
+            return null;
+        }
+        try {
+            String text = StandardCharsets.UTF_8.newDecoder().decode(ByteBuffer.wrap(bytes)).toString();
+            return text.indexOf('\0') < 0 ? text : null;
+        } catch (CharacterCodingException e) {
+            return null;
+        }
+    }
+
+    /** Record the final content after traits are applied. Keep entries for other host directories. */
+    public void recordCatalogFiles(InitContext ctx) throws IOException {
+        Map<String, String> current = new LinkedHashMap<>();
+        for (String path : catalogPaths(ctx)) {
+            Path target = projectDir.resolve(path);
+            byte[] bytes = Files.readAllBytes(target);
+            String text = catalogText(target, bytes);
+            current.put(CATALOG + path, text == null ? digest(bytes) : hash(text));
+        }
+        for (String entry : ledger.stringPropertyNames()) {
+            if (entry.startsWith(CATALOG)) {
+                String path = entry.substring(CATALOG.length());
+                if (catalogPath(ctx, path) && !changes.containsKey(path)) {
+                    ledger.remove(entry);
+                }
+            }
+        }
+        ledger.putAll(current);
+    }
+
     /** The outcome for every shared file handled so far, in the order it was handled. */
     public List<Change> changes() {
         return List.copyOf(changes.values());
@@ -243,8 +402,8 @@ public final class ManagedFiles {
         StringWriter raw = new StringWriter();
         ledger.store(raw, null);
         StringBuilder content = new StringBuilder(
-                "# Shared files written by camel-kit init and the hash of the written content.\n"
-                                                  + "# A file whose content no longer matches is treated as yours and is preserved.\n");
+                "# Shared files and catalog assets written by camel-kit init and their content hashes.\n"
+                                                  + "# Edited shared and retired catalog files are preserved. Selected catalog files are regenerated.\n");
         raw.toString().lines().filter(line -> !line.startsWith("#")).sorted()
                 .forEach(line -> content.append(line).append('\n'));
         Path ledgerFile = projectDir.resolve(LEDGER);
@@ -311,15 +470,18 @@ public final class ManagedFiles {
 
     /** Line endings are normalized so a checkout that converts them does not look like a user edit. */
     private static String hash(String content) {
+        return digest(content.replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8));
+    }
+
+    private static String digest(byte[] bytes) {
         try {
-            byte[] normalized = content.replace("\r\n", "\n").getBytes(StandardCharsets.UTF_8);
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(normalized));
+            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException(e);
         }
     }
 
-    private String key(Path target) {
+    String key(Path target) {
         return key(projectDir, target.toAbsolutePath().normalize());
     }
 

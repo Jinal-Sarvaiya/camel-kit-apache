@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
+import org.apache.camel.kit.workflow.SkillCatalog;
 import org.apache.camel.kit.workflow.WorkflowManifest;
 import org.apache.camel.kit.workflow.WorkflowManifestLoader;
 
@@ -48,22 +49,18 @@ public class DefaultGenerator implements AgentGenerator {
 
     @Override
     public void generate(InitContext ctx) throws Exception {
-        WorkflowManifest workflow = loadWorkflowManifest();
+        WorkflowManifest workflow = WorkflowManifestLoader.loadDefault();
         skillResourceInstaller.removeRetiredShipGuides(ctx);
         for (WorkflowManifest.WorkflowCommand command : workflow.generatedCommandStubs()) {
             if (command.isSkillOnly(ctx.agentName())) {
                 GeneratedAssetCleaner.deleteRegularFile(
-                        ctx, ctx.commandsDir().resolve(command.name() + "." + ctx.agent().fileFormat()));
+                        ctx, ctx.commandStub(command.name()));
             }
         }
         generateBaseAssets(ctx, workflow);
         beforeApplyTraits(ctx);
         applyTraits(ctx, workflow);
         generateMcpConfig(ctx, workflow);
-    }
-
-    private WorkflowManifest loadWorkflowManifest() throws IOException {
-        return WorkflowManifestLoader.loadDefault();
     }
 
     protected void generateBaseAssets(InitContext ctx, WorkflowManifest workflow) throws Exception {
@@ -73,7 +70,7 @@ public class DefaultGenerator implements AgentGenerator {
             Files.createDirectories(ctx.commandsDir());
             commandStubGenerator.generate(ctx, workflow);
         }
-        skillResourceInstaller.install(ctx, workflow);
+        skillResourceInstaller.install(ctx, SkillCatalog.bundled());
         new PersonaResourceInstaller().install(ctx);
     }
 

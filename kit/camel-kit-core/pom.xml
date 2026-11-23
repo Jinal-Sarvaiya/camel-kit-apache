@@ -12,6 +12,10 @@
     <artifactId>camel-kit-core</artifactId>
     <name>Camel Kit :: Core</name>
 
+    <properties>
+        <camel.kit.packs></camel.kit.packs>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.aesh</groupId>
@@ -181,6 +185,30 @@
                 <filtering>false</filtering>
             </resource>
         </resources>
+        <plugins>
+            <plugin>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>compose-skill-catalog</id>
+                        <phase>process-classes</phase>
+                        <goals><goal>run</goal></goals>
+                        <configuration>
+                            <target>
+                                <java classname="org.apache.camel.kit.workflow.SkillPackCompiler" fork="true" resultproperty="pack.compiler.exit" errorproperty="pack.compiler.error">
+                                    <classpath refid="maven.runtime.classpath"/>
+                                    <arg value="${project.build.outputDirectory}/META-INF/camel-kit/default-catalog.zip"/>
+                                    <arg value="${camel.kit.packs}"/>
+                                </java>
+                                <fail message="${pack.compiler.error}">
+                                    <condition><not><equals arg1="${pack.compiler.exit}" arg2="0"/></not></condition>
+                                </fail>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
     </build>
 
     <profiles>

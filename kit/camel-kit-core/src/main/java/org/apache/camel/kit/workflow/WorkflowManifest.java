@@ -70,7 +70,15 @@ public record WorkflowManifest(
             String name,
             boolean userInvocable,
             String status,
-            String generatedCommand) {
+            String generatedCommand,
+            List<String> requires) {
+        public WorkflowSkill {
+            requires = List.copyOf(nullToEmpty(requires));
+        }
+
+        public WorkflowSkill(String name, boolean userInvocable, String status, String generatedCommand) {
+            this(name, userInvocable, status, generatedCommand, List.of());
+        }
     }
 
     public record WorkflowStage(

@@ -67,9 +67,10 @@ component_families:
     in_model: true
     reachability: Reachable from the contents of the analysed tree (file bodies, names, symbolic links) without building or running the project.
   - id: C
-    name: Kit skills, templates, traits, agent registry, workflow manifest
-    paths: [kit/camel-kit-core/src/main/resources/skills, kit/camel-kit-core/src/main/resources/templates, kit/camel-kit-core/src/main/resources/agents, kit/camel-kit-core/src/main/resources/workflow]
+    name: Kit skills, templates, traits, agent registry, workflow manifest and assembled skill catalog
+    paths: [kit/camel-kit-core/src/main/resources/skills, kit/camel-kit-core/src/main/resources/templates, kit/camel-kit-core/src/main/resources/agents, kit/camel-kit-core/src/main/resources/workflow, kit/camel-kit-core/src/main/resources/META-INF/camel-kit/packs]
     in_model: true
+    build_inputs: Distribution-selected pack modules. Provider types are checked without initialization. Init consumes the bundled catalog and uses its existing generated-path checks.
     reachability: Only when a shipped instruction or generated artifact itself crosses a boundary it documents holding (allow-list, worker tool list, hook or guard, MCP coordinate or repository). The model disobeying an instruction is not a finding.
   - id: D
     name: Ship controller (Technology Preview)
@@ -298,7 +299,7 @@ claimed_properties:
     property: init confines its writes to the operator-selected target directory and removes only what it generated, through no symlink. An untrusted tree or a symbolic link that redirects a write outside the target is in scope; an intentionally operator-selected destination is authorized.
     violation_symptom: File created, replaced or deleted outside the operator-selected target, or a write or deletion redirected through a symbolic link.
     severity: security-critical when reachable from an attacker-controllable input (analysed tree, registry data); otherwise correctness
-    provenance: "Contract: maintainer (2026-10-27, Q9). InitService/ConfinedPaths preflight generated leaves/ancestors and Camel-owned skill/shared/template subtrees; unrelated worktrees and data links are allowed; new atomic files use umask-default modes and replacements preserve existing POSIX modes; GeneratedAssetCleaner guards deletion; generated file replacements use AtomicFileWriter. InitWriteConfinementTest covers static hostile descendant links and selected-root aliases."
+    provenance: "Contract: maintainer (2026-10-27, Q9). InitService/ConfinedPaths preflight generated leaves/ancestors and Camel-owned skill/shared/template subtrees; unrelated worktrees and data links are allowed; new atomic files use umask-default modes and replacements preserve existing POSIX modes; GeneratedAssetCleaner guards legacy deletion; catalog retirement trusts the committed ownership ledger and verifies host-scoped paths, confinement and SHA-256 of regular files (normalized line endings for recognized UTF-8 text, exact bytes for opaque resources) before removal or a layout change; init and Doctor report interrupted catalog work directories and preserve their contents for recovery; generated file replacements use AtomicFileWriter. InitWriteConfinementTest covers static hostile descendant links and selected-root aliases."
   - id: P4
     property: Pinned, named-repository supply chain for everything fetched or configured; Ship resolver uses fixed HTTPS Maven Central, checksum fail, no redirects, exact coordinates, size caps, SHA-256 content identity, isolated URLClassLoader payloads. Kit's own handling of what it downloads is in scope - catalog JSON is read from the JAR stream in memory, Citrus schema entries are written only inside the cache directory after lexical containment and descendant-link checks; Catalog/Citrus/Forage versions are safe single path components; Citrus/Forage cache ancestry is preflighted; Forage writes only the two allowlisted catalog files into fresh staging.
     violation_symptom: Unpinned coordinate, repository outside the named lists, download accepted on checksum mismatch (Ship), artifact outside its exact path, payload class loaded from elsewhere, or a downloaded artifact that escapes the cache directory or executes code through Kit's parsing or extraction.

@@ -5,7 +5,6 @@ import java.io.InputStream;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
-import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
 /**
  * Loads the bundled Camel-Kit workflow manifest.
@@ -14,7 +13,7 @@ public final class WorkflowManifestLoader {
 
     public static final String DEFAULT_RESOURCE = "workflow/camel-kit-workflow.yaml";
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper(new YAMLFactory())
+    private static final ObjectMapper OBJECT_MAPPER = SkillPack.YAML.copy()
             .setPropertyNamingStrategy(PropertyNamingStrategies.SNAKE_CASE);
 
     private WorkflowManifestLoader() {
@@ -22,7 +21,7 @@ public final class WorkflowManifestLoader {
     }
 
     public static WorkflowManifest loadDefault() throws IOException {
-        return load(DEFAULT_RESOURCE);
+        return SkillCatalog.bundled().manifest().workflow();
     }
 
     public static WorkflowManifest load(String resourcePath) throws IOException {

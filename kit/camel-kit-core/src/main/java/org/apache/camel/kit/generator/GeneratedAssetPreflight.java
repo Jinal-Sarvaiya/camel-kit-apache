@@ -22,7 +22,7 @@ public final class GeneratedAssetPreflight {
         outputs.add(ctx.projectDir().resolve(ctx.agent().mcpConfigPath()));
         for (var command : workflow.generatedCommandStubs()) {
             if (ctx.agent().generatesCommandStubs() || command.isSkillOnly(ctx.agentName())) {
-                outputs.add(ctx.commandsDir().resolve(command.name() + "." + ctx.agent().fileFormat()));
+                outputs.add(ctx.commandStub(command.name()));
             }
         }
         for (var template : AgentRegistry.descriptor(ctx.agentName()).templates()) {

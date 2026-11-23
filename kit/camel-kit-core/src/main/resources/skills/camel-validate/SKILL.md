@@ -399,7 +399,7 @@ After completing all validation checks, generate a markdown report saved to:
 - **Chained mode and standalone pipeline-scoped:** `docs/camel-kit/<PIPELINE_ID>/validation-report.md`
 - **Standalone project-scoped (no pipeline):** `docs/validation-report-YYYY-MM-DD_HH-mm.md`
 
-Use the current date and time for the timestamped filename (e.g., `validation-report-2026-04-22_14-30.md`).
+<!-- camel-kit:step report -->
 
 ### Report Format
 

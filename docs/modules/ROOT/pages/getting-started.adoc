@@ -264,9 +264,22 @@ regular file. On reinitialization, properties you added to `.camel-kit/config.pr
 Camel Kit records the hash of each tracked file it wrote in `.camel-kit/managed-files.properties`; commit it with
 the project. Known limits:
 
-* Files Camel Kit ships under its own names, such as the `camel-*` skills, subagents, personas and
-  `.camel-kit/templates/`, are regenerated on every run; changes to them are not preserved. Your own skills and
-  files next to them are not touched.
+* Each run regenerates the selected skills, subagents, personas and `.camel-kit/templates/`.
+  When switching distributions, `init --force` removes unmodified, recorded skills, guides and command stubs from
+  the selected assistant's directories after generating the replacement assets. Git conversions between LF and CRLF
+  count as the same content for the xref:contributing.adoc#skill-packs[supported text formats].
+  Use `--dry-run` to preview removals.
+  Run init for each assistant you want to update. Codex and Antigravity share `.agents/skills/`, so updating either
+  one also updates the skills the other discovers.
+* Switching between a file and a directory requires write access to the directories holding the old files.
+  Restore write access and retry if the preview reports a read-only directory. If an interrupted switch left
+  a recovery directory, `init`, `--dry-run` and Doctor report its path. After any running init has finished,
+  inspect its `previous` and `new` contents when present, move the directory outside the skills tree, and retry.
+  If the directory cannot be inspected, restore read and search permissions first.
+* Older installations may have no catalog ownership record. Kit also keeps and reports edited retired files.
+  A retained `SKILL.md` remains discoverable even when Doctor passes. Review the skill folder and any associated
+  command stub, then move them outside the assistant's discovery directories or delete them if you want to retire
+  the skill. On hosts that use command stubs, Doctor reports any retained `camel-*` stub outside the selected command list.
 * A workspace initialized by an earlier Camel Kit has no ledger, and a missing record never counts as ownership.
   On its first reinitialization the unmarked instruction files get the block appended and the other shared files
   are preserved and reported, even if Camel Kit generated them. Replace those you want refreshed with

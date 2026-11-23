@@ -13,13 +13,13 @@ For integration work, use the `/camel-start` project skill first. It routes to t
 - `camel-validate` for route quality, correctness, security, and anti-pattern checks.
 - `camel-debug` for ad-hoc build, startup, or runtime failures.
 
-Use `camel-knowledge` directly for Apache Camel documentation, component,
+{#if HAS_KNOWLEDGE}Use `camel-knowledge` directly for Apache Camel documentation, component,
 CVE/security-advisory, and version questions; `/camel-start` does not route knowledge queries.
 
-Use `/camel-ship` (Technology Preview) only when the user explicitly asks for Ship or an unattended controller-owned run.
+{/if}{#if HAS_SHIP}Use `/camel-ship` (Technology Preview) only when the user explicitly asks for Ship or an unattended controller-owned run.
 When running Ship, follow its generated project skill and the `camel-ship-worker` custom agent rules.
 
-Use `/skills list` if you need to inspect project skills.
+{/if}Use `/skills list` if you need to inspect project skills.
 
 ## Native Copilot Assets
 

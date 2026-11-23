@@ -231,6 +231,12 @@ class DoctorCommandTest {
             Files.writeString(skillDir.resolve("SKILL.md"), "# " + skill + "\n");
         }
 
+        for (String path : EXPECTATIONS.resources()) {
+            Path file = skills.resolve(path);
+            Files.createDirectories(file.getParent());
+            Files.createFile(file);
+        }
+
         Files.createDirectories(root.resolve(".bob"));
         Files.writeString(root.resolve(".bob/mcp.json"),
                 mcpJson(

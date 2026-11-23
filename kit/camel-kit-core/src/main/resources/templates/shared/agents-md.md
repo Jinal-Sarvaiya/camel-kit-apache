@@ -1,7 +1,7 @@
 # Camel-Kit Project
 
 Integration work → `/camel-start`
-Direct skill invocation → `/camel-brainstorm`, `/camel-migrate`, `/camel-plan`, `/camel-execute`, `/camel-validate`, `/camel-ship` (only when the user explicitly asks for Ship), `/camel-knowledge`, `/camel-debug`
+Direct skill invocation → {#for name in DIRECT_SKILLS}`/{name}`{#if name == 'camel-ship'} (only when the user explicitly asks for Ship){/if}{#if name_hasNext}, {/if}{/for}
 
 {#if BOB2}
 ## Bob entry points
@@ -9,8 +9,8 @@ Direct skill invocation → `/camel-brainstorm`, `/camel-migrate`, `/camel-plan`
 In Bob Shell, open `/skills` or type `$camel-` to select a native skill.
 Use `$camel-start` for routing and `$camel-migrate` for migration, with the request
 after the skill name. Interpret `/camel-*` workflow references in these instructions
-as the corresponding `$camel-*` skill in Bob Shell. `$camel-ship` forwards the supplied
-options to the CLI once. In Bob IDE, use `/camel-*` to invoke the corresponding native
+as the corresponding `$camel-*` skill in Bob Shell.{#if HAS_SHIP} `$camel-ship` forwards the supplied
+options to the CLI once.{/if} In Bob IDE, use `/camel-*` to invoke the corresponding native
 skill. Legacy command stubs remain installed for compatibility.
 
 {/if}

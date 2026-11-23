@@ -7,11 +7,13 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.util.ConfinedPaths;
@@ -20,43 +22,49 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
-/** Known installed bytes from before init recorded ownership, scoped to the project's previous assistant. */
+/** Known pre-ledger files for the selected assistant in an existing Camel Kit workspace. */
 final class ReleasedCatalog {
     private ReleasedCatalog() {
     }
 
-    static Map<String, Set<String>> forWorkspace(Path root, String agentName) throws IOException {
-        if (agentName == null) {
-            return Map.of();
-        }
+    static boolean hasWorkspaceConfiguration(Path root) throws IOException {
         Path config = root.resolve(".camel-kit/config.properties");
         ConfinedPaths.requirePath(root, config);
-        String previous;
+        String configuredAgent;
         if (Files.isRegularFile(config, LinkOption.NOFOLLOW_LINKS)) {
             var settings = new Properties();
             try (var in = Files.newBufferedReader(config)) {
                 settings.load(in);
             } catch (IllegalArgumentException malformed) {
-                return Map.of();
+                return false;
             }
-            previous = settings.getProperty("agent.name");
+            configuredAgent = settings.getProperty("agent.name");
         } else {
             Path yaml = root.resolve(".camel-kit/config.yaml");
             if (!Files.isRegularFile(yaml, LinkOption.NOFOLLOW_LINKS)) {
-                return Map.of();
+                return false;
             }
             ConfinedPaths.requirePath(root, yaml);
             try (var in = Files.newInputStream(yaml)) {
                 var settings = new ObjectMapper(new YAMLFactory()).readTree(in);
-                previous = settings == null ? null : settings.path("agent").path("name").asText();
+                configuredAgent = settings == null ? null : settings.path("agent").path("name").textValue();
             } catch (JsonProcessingException malformed) {
-                return Map.of();
+                return false;
             }
         }
-        if (!agentName.equals(previous) && !("bob2".equals(agentName) && "bob".equals(previous))) {
+        // A shared workspace records only the last assistant initialized.
+        return configuredAgent != null && !configuredAgent.isBlank();
+    }
+
+    static Map<String, Set<String>> forAgent(String agentName) throws IOException {
+        var agent = AgentRegistry.get(agentName);
+        if (agent == null) {
             return Map.of();
         }
-        var agent = AgentRegistry.get(agentName);
+        Set<String> skillWriters = AgentRegistry.names().stream()
+                .filter(name -> agent.skillsDirectory().equals(AgentRegistry.get(name).skillsDirectory()))
+                .collect(Collectors.toSet());
+        Set<String> commandWriters = Set.of(agentName);
         Map<String, Set<String>> hashes = new HashMap<>();
         try (var in = ReleasedCatalog.class.getResourceAsStream("/workflow/pre-ledger-catalog.tsv")) {
             if (in == null) {
@@ -68,9 +76,11 @@ final class ReleasedCatalog {
                     continue;
                 }
                 String[] fields = line.split("\t");
-                if (fields[2].equals("*") || Set.of(fields[2].split(",")).contains(agentName)) {
+                boolean skill = fields[0].startsWith("skills/");
+                Set<String> writers = skill ? skillWriters : commandWriters;
+                if (fields[2].equals("*") || Arrays.stream(fields[2].split(",")).anyMatch(writers::contains)) {
                     int slash = fields[0].indexOf('/');
-                    String dir = fields[0].startsWith("skills/") ? agent.skillsDirectory() : agent.commandDirectory();
+                    String dir = skill ? agent.skillsDirectory() : agent.commandDirectory();
                     hashes.computeIfAbsent(dir + fields[0].substring(slash), ignored -> new HashSet<>()).add(fields[1]);
                 }
             }

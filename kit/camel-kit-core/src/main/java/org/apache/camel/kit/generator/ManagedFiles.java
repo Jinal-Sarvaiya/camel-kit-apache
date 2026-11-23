@@ -55,6 +55,7 @@ public final class ManagedFiles {
     /** Project-relative ledger of shared files and installed catalog assets. */
     public static final String LEDGER = ".camel-kit/managed-files.properties";
     private static final String CATALOG = "catalog/";
+    private static final String TRACKED_FROM_INIT = "catalog.tracked-from-init";
 
     private static final Pattern CATALOG_TEXT = Pattern.compile(
             "(?i).+\\.(?:md|adoc|txt|ya?ml|json|xml|xsl|sh|toml|properties)");
@@ -126,20 +127,23 @@ public final class ManagedFiles {
     private final Set<String> usedReplacements = new HashSet<>();
     private final Properties ledger;
     private final Map<String, Set<String>> released;
+    private final boolean startsCatalogTracking;
     private final Map<String, Change> changes = new LinkedHashMap<>();
 
     private ManagedFiles(Path projectDir, boolean unrestricted, Set<String> replace, Properties ledger,
-                         Map<String, Set<String>> released) {
+                         Map<String, Set<String>> released, boolean startsCatalogTracking) {
         this.projectDir = projectDir;
         this.unrestricted = unrestricted;
         this.replace = replace;
         this.ledger = ledger;
         this.released = released;
+        this.startsCatalogTracking = startsCatalogTracking;
     }
 
     /** Rewrites every file in full, as initialization did before shared files were protected. */
     public static ManagedFiles unrestricted(Path projectDir) {
-        return new ManagedFiles(projectDir.toAbsolutePath().normalize(), true, Set.of(), new Properties(), Map.of());
+        return new ManagedFiles(
+                projectDir.toAbsolutePath().normalize(), true, Set.of(), new Properties(), Map.of(), false);
     }
 
     /**
@@ -194,7 +198,24 @@ public final class ManagedFiles {
         } catch (IOException | IllegalArgumentException e) {
             throw new InvalidAgentConfigurationException("Cannot read " + ledgerFile + ": " + e.getMessage(), e);
         }
-        return new ManagedFiles(root, false, replacements, ledger, ReleasedCatalog.forWorkspace(root, agentName));
+        Map<String, Set<String>> released = Map.of();
+        boolean startsTracking = false;
+        if (agentName != null && !Boolean.parseBoolean(ledger.getProperty(TRACKED_FROM_INIT))) {
+            if (ReleasedCatalog.hasWorkspaceConfiguration(root)) {
+                released = ReleasedCatalog.forAgent(agentName);
+            } else {
+                startsTracking = true;
+            }
+        }
+        return new ManagedFiles(root, false, replacements, ledger, released, startsTracking);
+    }
+
+    /** Remember first adoption before init creates the configuration that identifies an older workspace. */
+    public void beginCatalogTracking() throws IOException {
+        if (startsCatalogTracking) {
+            ledger.setProperty(TRACKED_FROM_INIT, "true");
+            save();
+        }
     }
 
     /** What {@link #write} would do to this file. Reads only: nothing is written or recorded. */
@@ -331,7 +352,8 @@ public final class ManagedFiles {
         Map<String, String> spellings = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         installed.forEach(path -> spellings.put(path, path));
         List<String> obsolete = new ArrayList<>();
-        Set<String> previous = new TreeSet<>(legacyCatalogPaths(agentName));
+        Set<String> legacy = legacyCatalogPaths(agentName);
+        Set<String> previous = new TreeSet<>(legacy);
         previous.addAll(released.keySet());
         ledger.stringPropertyNames().stream().filter(entry -> entry.startsWith(CATALOG))
                 .map(entry -> entry.substring(CATALOG.length())).forEach(previous::add);
@@ -347,7 +369,10 @@ public final class ManagedFiles {
                         && Files.isSameFile(target, projectDir.resolve(spelling))) {
                     continue;
                 }
-                obsolete.add(path);
+                // A historical filename can also belong to a personal skill.
+                if (legacy.contains(path) || ledger.containsKey(CATALOG + path) || matchesCatalogFile(path, target)) {
+                    obsolete.add(path);
+                }
             }
         }
         return obsolete;
@@ -405,6 +430,9 @@ public final class ManagedFiles {
             Files.delete(target);
             Path skills = ctx.skillsDir().toAbsolutePath().normalize();
             Path root = target.startsWith(skills) ? skills : projectDir.resolve(ctx.agent().commandDirectory());
+            if (!root.equals(skills) && !ctx.agent().generatesCommandStubs()) {
+                root = root.getParent();
+            }
             pruneEmptyParents(target.getParent(), root);
             ctx.printer().println("  Removed retired catalog file " + change.path());
         }

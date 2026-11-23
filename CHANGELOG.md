@@ -31,9 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - Preserve local changes to catalog skills, guides and command stubs during initialization and upgrades (#193).
-  Upgrades from pre-ledger releases refresh stock assets and remove stock retired commands. Preview changed paths
-  with `--dry-run`, compare `.proposed` copies under `.camel-kit/conflicts/catalog/`, and accept files or catalog
-  directories with `--replace <path>`. Doctor identifies edited retired entry points still installed.
+  Upgrades from pre-ledger releases refresh stock assets and remove stock retired commands for each assistant in
+  a shared workspace. Preview changed paths with `--dry-run`, compare `.proposed` copies under
+  `.camel-kit/conflicts/catalog/`, and accept files or catalog directories with `--replace <path>`. Doctor
+  identifies retired entry points and accepts personal skills that reuse a historical name.
 - Align Main environment probes, recovery guidance, direct migration and generated `AGENTS.md` with the JBang alias
   and the project's Camel version, matching generated `run.sh` (#110). Report incompatible local JBang plugins as
   environment failures. Correct the environment probe's YAML step nesting so its sample route can start.

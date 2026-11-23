@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
@@ -129,18 +130,11 @@ class InitSafeAdoptionTest {
         String guide = ".claude/skills/camel-implement/guides/run-script.md";
         String retired = ".claude/skills/camel-ship/guides/auto-fix-loop.md";
         // Exact installed 0.4.1 guide and the Ship guide from the last revision that shipped it.
-        for (String path : List.of(guide, retired)) {
-            Path file = tempDir.resolve(path);
-            Files.createDirectories(file.getParent());
-            try (var in = getClass().getResourceAsStream("/pre-ledger/" + file.getFileName())) {
-                Files.copy(in, file);
-            }
-        }
+        copyReleasedFixture(tempDir.resolve(guide));
+        copyReleasedFixture(tempDir.resolve(retired));
         String release = Files.readString(tempDir.resolve(guide));
         String stub = ".claude/commands/camel-validate.md";
-        Path commands = Files.createDirectories(tempDir.resolve(".claude/commands"));
-        Files.writeString(tempDir.resolve(stub),
-                "Read .claude/skills/camel-validate/SKILL.md and follow those instructions. Requested input: $ARGUMENTS");
+        Path commands = writeReleasedClaudeStub(tempDir).getParent();
         Files.writeString(commands.resolve("camel-start.md"), "My launch instructions");
         Files.writeString(commands.resolve("team.md"), "Team command");
         var original = snapshot(tempDir);
@@ -163,6 +157,100 @@ class InitSafeAdoptionTest {
         Files.writeString(tempDir.resolve(guide), release);
         assertTrue(service.initialize(init).conflicts().stream().anyMatch(c -> c.path().equals(guide)));
         assertEquals(release, Files.readString(tempDir.resolve(guide)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"claude, codex", "codex, claude"})
+    @Tag("cli-compat")
+    void releasedWorkspaceUpgradesBothAssistantsInEitherOrder(String first, String second) throws Exception {
+        Path project = tempDir.resolve("released");
+        Path fresh = tempDir.resolve("fresh");
+        Files.createDirectories(project.resolve(".camel-kit"));
+        Files.writeString(project.resolve(".camel-kit/config.properties"), "agent.name=codex\n");
+        Path commands = writeReleasedClaudeStub(project).getParent();
+        var service = new InitService();
+        for (String host : List.of(first, second)) {
+            String skills = AgentRegistry.get(host).skillsDirectory();
+            copyReleasedFixture(project.resolve(skills).resolve("camel-implement/guides/run-script.md"));
+            service.initialize(request(fresh, host));
+        }
+        for (String host : List.of(first, second)) {
+            var init = request(project, host);
+            String guide = AgentRegistry.get(host).skillsDirectory() + "/camel-implement/guides/run-script.md";
+            assertTrue(service.preview(init).stream()
+                    .anyMatch(c -> c.path().equals(guide) && c.action() == Action.REFRESH));
+            service.initialize(init);
+        }
+        var expected = catalogRecords(fresh);
+        assertEquals(expected, catalogRecords(project));
+        for (String path : expected.keySet()) {
+            assertEquals(-1L, Files.mismatch(fresh.resolve(path), project.resolve(path)), path);
+        }
+        assertFalse(Files.exists(commands));
+        assertFalse(Files.exists(project.resolve(ManagedFiles.PROPOSALS + "/catalog")));
+    }
+
+    @Test
+    void adoptingAnExistingProjectPreservesCopiesOfReleasedFilesAcrossRetries() throws Exception {
+        String path = ".claude/skills/camel-implement/guides/run-script.md";
+        Path guide = tempDir.resolve(path);
+        copyReleasedFixture(guide);
+        Path stub = writeReleasedClaudeStub(tempDir);
+        String originalGuide = Files.readString(guide);
+        String originalStub = Files.readString(stub);
+        var service = new InitService();
+        service.preview(request(tempDir, "claude"));
+        assertFalse(Files.exists(tempDir.resolve(ManagedFiles.LEDGER)));
+        for (int run = 0; run < 2; run++) {
+            service.initialize(request(tempDir, "claude"));
+            assertEquals(originalGuide, Files.readString(guide));
+            assertEquals(originalStub, Files.readString(stub));
+        }
+        service.initialize(request(tempDir, "claude", List.of(path)));
+        assertNotEquals(originalGuide, Files.readString(guide));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @Tag("cli-compat")
+    void historicalSkillNameAloneDoesNotMakeAPersonalSkillRetired(boolean existingKitWorkspace) throws Exception {
+        if (existingKitWorkspace) {
+            Files.createDirectories(tempDir.resolve(".camel-kit"));
+            Files.writeString(tempDir.resolve(".camel-kit/config.properties"), "agent.name=claude\n");
+        }
+        String path = ".claude/skills/camel-flow/SKILL.md";
+        Path skill = tempDir.resolve(path);
+        Files.createDirectories(skill.getParent());
+        String content = "---\nname: camel-flow\ndescription: Team inventory checklist\n---\nRun the team checklist.\n";
+        Files.writeString(skill, content);
+        var init = request(tempDir, "claude");
+        var service = new InitService();
+        service.initialize(init);
+        var doctor = new DoctorService().inspect(new DoctorRequest(tempDir));
+        assertFalse(doctor.hasFailures(), doctor.findings().toString());
+        assertTrue(service.preview(init).stream().noneMatch(c -> c.path().equals(path)));
+        assertTrue(service.initialize(init).conflicts().stream().noneMatch(c -> c.path().equals(path)));
+        assertEquals(content, Files.readString(skill));
+        assertFalse(ledger(tempDir).containsKey("catalog/" + path));
+    }
+
+    private static void copyReleasedFixture(Path file) throws Exception {
+        Files.createDirectories(file.getParent());
+        try (var in = InitSafeAdoptionTest.class.getResourceAsStream("/pre-ledger/" + file.getFileName())) {
+            Files.copy(in, file);
+        }
+    }
+
+    private static Path writeReleasedClaudeStub(Path project) throws Exception {
+        Path commands = Files.createDirectories(project.resolve(".claude/commands"));
+        return Files.writeString(commands.resolve("camel-validate.md"),
+                "Read .claude/skills/camel-validate/SKILL.md and follow those instructions. Requested input: $ARGUMENTS");
+    }
+
+    private static Map<String, String> catalogRecords(Path project) throws Exception {
+        var records = ledger(project);
+        return records.stringPropertyNames().stream().filter(key -> key.startsWith("catalog/"))
+                .collect(Collectors.toMap(key -> key.substring("catalog/".length()), records::getProperty));
     }
 
     @ParameterizedTest

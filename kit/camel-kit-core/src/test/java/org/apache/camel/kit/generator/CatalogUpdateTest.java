@@ -25,6 +25,20 @@ class CatalogUpdateTest {
 
     @Test
     @Tag("cli-compat")
+    void releaseHashesFollowTheSharedSkillsDirectory() throws Exception {
+        String shared = ".agents/skills/camel-test/SKILL.md";
+        var hashes = ReleasedCatalog.forAgent("codex").get(shared);
+        assertEquals(hashes, ReleasedCatalog.forAgent("antigravity").get(shared));
+        // The three released 0.4.1 renderings of the same skill.
+        assertTrue(hashes.contains("7382de1bc3eac55b2169371d80bf11714a9a06bccac3d4e7b0b42736bab5a230"));
+        assertTrue(hashes.contains("f1c3e3ca8409e28665ada0527f8eb0ea2ceae491318dbd849700b735cb28ad61"));
+        String claudeHash = "b55574a4b7717bfe730ec71daf8aa5e75d6ed855b1a9dc3a5a86f01b25d0d970";
+        assertTrue(ReleasedCatalog.forAgent("claude").get(".claude/skills/camel-test/SKILL.md").contains(claudeHash));
+        assertFalse(hashes.contains(claudeHash));
+    }
+
+    @Test
+    @Tag("cli-compat")
     void queryingRetiredCaseAliasesDoesNotAlterTheLedger(@TempDir Path project) throws Exception {
         Path folder = Files.createDirectories(project.resolve(".claude/skills/camel-start"));
         Path canonical = Files.writeString(folder.resolve("SKILL.md"), "Installed content");

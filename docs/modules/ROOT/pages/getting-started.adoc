@@ -266,9 +266,13 @@ the project.
 ==== Upgrading from 0.4.1 and earlier
 
 From the project root, run `camel-kit init --here --ai claude --force`, substituting your assistant's name.
-Kit recognizes stock catalog files from pre-ledger releases by their installed path and content for that assistant.
+In a shared workspace, run this command once for each assistant, in any order.
+Kit recognizes stock catalog files from pre-ledger releases by their installed path and content for the selected assistant.
 It upgrades them and removes recognized stock files the new catalog retired. A file already equal to the new
-rendering is recorded in place, even when its ledger entry is missing or stale. Run `camel-kit doctor` after the upgrade.
+rendering is recorded in place, even when its ledger entry is missing or stale. Run `camel-kit doctor` after each
+init to check the assistant you just updated.
+When adopting a project for the first time, Kit records that ownership tracking began with this init.
+Copies from older releases that differ from the new rendering stay in place on this and later runs.
 
 ==== Reviewing catalog changes
 
@@ -286,17 +290,17 @@ rendering is recorded in place, even when its ledger entry is missing or stale. 
   An edited retired file stays in place and has no new version to merge. Git conversions between LF and CRLF
   count as the same content for the xref:contributing.adoc#skill-packs[supported text formats].
   Use `--dry-run` to see changed paths and a count of catalog files already current.
-  Run init for each assistant you want to update. Codex and Antigravity share `.agents/skills/`, so updating either
-  one also updates the skills the other discovers.
+  Codex and Antigravity share `.agents/skills/`. Updating either one recognizes both assistants' stock files
+  there and installs the selected assistant's rendering.
 * Switching between a file and a directory requires write access to the directories holding the old files.
   Restore write access and retry if the preview reports a read-only directory. If an interrupted switch left
   a recovery directory, `init`, `--dry-run` and Doctor report its path. After any running init has finished,
   inspect its `previous` and `new` contents when present, move the directory outside the skills tree, and retry.
   If the directory cannot be inspected, restore read and search permissions first.
-* A retained `SKILL.md` or command stub can still be discovered by the assistant. Doctor reports recorded retired
-  entry points and recognized legacy command stubs. Review the files and move them outside the assistant's discovery
-  directories to retire them. In an older workspace without a catalog ledger, review any additional skill folders
-  yourself.
+* A retained `SKILL.md` or command stub can still be discovered by the assistant. Doctor reports retired entry
+  points with an ownership record or matching release content, and recognized legacy command stubs. Review these
+  files and move them outside the assistant's discovery directories to retire them. An unrecorded skill with
+  different content can keep using a historical skill name.
 * For shared files in a pre-ledger workspace, init appends the managed block to unmarked instructions and
   preserves unfamiliar content in the other shared files. Use `--replace <path>` to accept a shared file.
 

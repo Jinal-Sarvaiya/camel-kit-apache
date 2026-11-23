@@ -65,6 +65,7 @@ camel-kit init --here --ai claude --force
 Run with `--dry-run` first to see which skills and commands will change.
 
 * From 0.4.0 or 0.4.1, the command above updates stock skills and removes the nine stock command stubs.
+  Kit removes `.claude/commands/` if deleting the last stock stub leaves it empty.
   A customized skill stays in place. Compare its `.proposed` file under `.camel-kit/conflicts/catalog/claude/skills/`.
   To accept the selected skills as a group, add `--replace .claude/skills`.
 * Kit reports edited retired stubs. Claude Code gives a skill precedence over a command with the same name.

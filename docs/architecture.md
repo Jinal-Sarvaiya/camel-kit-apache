@@ -930,11 +930,15 @@ that decides what happens to them:
 
 Each run regenerates subagents, personas, hooks and `.camel-kit/templates/`, including restricted Ship workers.
 Catalog files are rendered with their host traits and invocation metadata in staging. Init compares each destination
-with its ledger record before publishing the finished file or retiring it. Without a record, a known pre-ledger
-hash for the installed assistant and path identifies the stock file. A file already matching the new rendering is
-recorded in place. Other selected files receive an inert `.proposed` copy under `.camel-kit/conflicts/catalog/`. Text hashes normalize LF and CRLF for the formats listed in the contributor guide. Opaque resources use
+with its ledger record before publishing the finished file or retiring it. In a pre-ledger Kit workspace, a known
+release hash identifies a stock file at its installed path. Assistants that share a skills
+directory can recognize either rendering there. The config names only the most recently initialized assistant.
+First-time adoption records `catalog.tracked-from-init=true` in the ledger before writing the Kit config,
+so a retry preserves pre-existing copies of released files. Init records a file that already matches the new
+rendering in place. For a selected file with unfamiliar or edited content, it saves a `.proposed` copy under
+`.camel-kit/conflicts/catalog/`. Text hashes normalize LF and CRLF for the formats listed in the contributor guide. Opaque resources use
 SHA-256 of their exact bytes. An edited retired file keeps its record so later runs can report it. A switch
-between a file and a directory stages the new content and requires all files it displaces to match the ledger.
+between a file and a directory stages the new content and requires every displaced file to match its recorded or released hash.
 Init checks write access before switching. If a run leaves staged content or a backup, subsequent previews,
 initializations and Doctor identify the recovery directory under the selected assistant's skills.
 

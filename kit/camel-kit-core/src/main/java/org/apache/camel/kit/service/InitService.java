@@ -167,6 +167,7 @@ public class InitService {
 
         try {
             progress.startTask("\uD83D\uDCDD", "Writing configuration");
+            files.beginCatalogTracking();
             createConfigFile(camelKitDir, request.projectName(), request.agentName(), agent, request, createdPaths,
                     isExistingProject);
             createConstitution(docsDir, request, files, createdPaths);

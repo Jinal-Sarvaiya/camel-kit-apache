@@ -562,7 +562,11 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
    paths; unrelated worktrees, custom skills and existing data may contain links. Catalog updates and retirements read
    the previous installation's SHA-256 records only for valid resource or stub paths under the selected
    agent's generated directories. A ledger record takes precedence. For a missing record, Kit can recognize the
-   installed assistant's stock file by path and a bundled release fingerprint. Review ledger changes alongside the files they track. Kit checks confinement and compares installed content before refresh or removal.
+   selected assistant's stock file by path and a bundled release fingerprint in a pre-ledger Kit workspace. In a
+   shared skills directory this includes fingerprints from assistants that install to the same path. First-time
+   adoption records its origin in the ledger before writing the config, so retries preserve pre-existing copies. An
+   unrecorded skill with different content can reuse a historical name. Review ledger changes alongside the files they
+   track. Kit checks confinement and compares installed content before refresh or removal.
    An identical catalog file is adopted. An unfamiliar or edited file receives a rendered proposal outside assistant discovery directories unless the operator selects it for replacement.
    Hashes normalize
    LF and CRLF for recognized UTF-8 text. Opaque resources are compared byte for byte. Layout replacements

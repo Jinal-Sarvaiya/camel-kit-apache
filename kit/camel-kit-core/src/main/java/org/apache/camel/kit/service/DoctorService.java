@@ -180,7 +180,7 @@ public class DoctorService {
 
         try {
             CatalogUpdate.checkInterruptedUpdate(root, skillsDir);
-            for (String path : ManagedFiles.open(root, Set.of()).retiredEntryPoints(agentKey(agent))) {
+            for (String path : ManagedFiles.open(root, Set.of(), agentKey(agent)).retiredEntryPoints(agentKey(agent))) {
                 // The command directory check already reports unexpected camel-* stubs on stub-based hosts.
                 if (agent.generatesCommandStubs() && path.startsWith(agent.commandDirectory() + "/camel-")) {
                     continue;

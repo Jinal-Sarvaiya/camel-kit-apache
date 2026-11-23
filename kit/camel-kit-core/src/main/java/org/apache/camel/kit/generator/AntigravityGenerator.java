@@ -49,7 +49,7 @@ public class AntigravityGenerator extends DefaultGenerator {
             }
         }
         McpConfigGenerator.readAntigravityConfig(ctx.projectDir().resolve(ctx.agent().mcpConfigPath()));
-        return new Prepared(ctx.files().planCatalog(ctx), this::writeWorkspace);
+        return new Prepared(ctx.files().planCatalog(ctx, preview), this::writeWorkspace);
     }
 
     private void requireType(Path target, boolean directory) throws InvalidAgentConfigurationException {

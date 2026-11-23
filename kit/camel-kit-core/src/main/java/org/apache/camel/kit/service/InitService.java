@@ -192,7 +192,7 @@ public class InitService {
             request.reporter().conflict(conflict);
         }
         for (String unused : files.unusedReplacements()) {
-            reportWarning(request, warnings, "--replace " + unused + " had no effect: the file does not exist.");
+            reportWarning(request, warnings, "--replace " + unused + " had no effect: no existing file was replaced.");
         }
 
         progress.startTask("\uD83D\uDD0D", "Building project graph");

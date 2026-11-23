@@ -64,11 +64,12 @@ camel-kit init --here --ai claude --force
 
 Run with `--dry-run` first to see which skills and commands will change.
 
-* If you customized a selected skill, compare the copy under `.camel-kit/conflicts/` and use `--replace <path>`
-  to accept the generated version.
-* For the nine former public command stubs in `.claude/commands/`, Kit removes a file that matches its ownership
-  record. It reports an edited or unrecorded stub for manual review. Move the old stub out of `.claude/commands/`
-  to let Claude discover the native skill. Your other commands stay in place.
+* From 0.4.0 or 0.4.1, the command above updates stock skills and removes the nine stock command stubs.
+  A customized skill stays in place. Compare its `.proposed` file under `.camel-kit/conflicts/catalog/claude/skills/`.
+  To accept the selected skills as a group, add `--replace .claude/skills`.
+* Kit reports edited retired stubs. Claude Code gives a skill precedence over a command with the same name.
+  Review the old stub and move it out of `.claude/commands/` to retire it from the command inventory.
+  See https://code.claude.com/docs/en/skills#resolve-skills-that-share-a-name[Claude Code skill precedence].
 * `init` stops before it writes anything when `.claude`, one of the Claude directories it manages or the legacy
   `.claude/commands` path is a symbolic link. The error names the link; replace it with a real directory and run
   `init` again.
@@ -95,8 +96,8 @@ Bob Shell's native skill picker uses `+$camel-*+`; its `/` picker holds built-in
 `+/camel-*+`. Legacy command stubs stay installed for compatibility. The four internal helper skills are hidden.
 
 If a public skill does not appear in the picker, run `camel-kit doctor`: it reports each affected `SKILL.md` as
-`FAIL` with regeneration instructions. Regenerate from the project root with
-`camel-kit init --here --ai bob2 --force` (after committing or backing up customized generated files) and restart Bob.
+`FAIL` with regeneration instructions. For example, to restore the generated validation skill after reviewing your local edits, run
+`camel-kit init --here --ai bob2 --force --replace .bob/skills/camel-validate/SKILL.md` and restart Bob.
 
 [[antigravity]]
 == Google Antigravity

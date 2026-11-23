@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 
+import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.util.ConfinedPaths;
 
 /** Previews a catalog switch and keeps retired assets in place until generation succeeds. */
@@ -31,12 +32,14 @@ public final class CatalogUpdate {
     private final Path project;
     private final List<ManagedFiles.Change> retirements;
     private final List<ManagedFiles.Change> changes;
+    private final List<ManagedFiles.Change> previousProposals;
     private final Set<Path> selected = new TreeSet<>();
     private final Set<Path> removable = new HashSet<>();
     private final Set<Path> removableDirs;
     private final Set<Path> shapeChanges = new TreeSet<>();
 
-    CatalogUpdate(InitContext ctx, Set<String> installed, List<ManagedFiles.Change> retired) throws IOException {
+    CatalogUpdate(InitContext ctx, Set<String> installed, List<ManagedFiles.Change> retired,
+                  Map<String, byte[]> rendered) throws IOException {
         this.ctx = ctx;
         project = ctx.projectDir().toAbsolutePath().normalize();
         retirements = List.copyOf(retired);
@@ -58,13 +61,44 @@ public final class CatalogUpdate {
         for (Path root : shapeChanges) {
             removableTree(root, root);
         }
-        List<ManagedFiles.Change> planned = new ArrayList<>(retirements);
+        previousProposals = previousProposals();
+        List<ManagedFiles.Change> planned = new ArrayList<>(previousProposals);
+        planned.addAll(retirements);
         for (Path target : selected) {
             planned.add(shapeChanges.contains(target)
                     ? new ManagedFiles.Change(ctx.files().key(target), ManagedFiles.Action.REFRESH, null)
-                    : ctx.files().planCatalogFile(target));
+                    : ctx.files().planCatalogFile(target, rendered.get(ctx.files().key(target))));
         }
         changes = List.copyOf(planned);
+    }
+
+    /** Older previews of this feature mirrored hidden host roots, which Claude can discover on a nested read. */
+    private List<ManagedFiles.Change> previousProposals() throws IOException {
+        Path conflicts = project.resolve(ManagedFiles.PROPOSALS);
+        if (!Files.isDirectory(conflicts, LinkOption.NOFOLLOW_LINKS)) {
+            return List.of();
+        }
+        Set<String> roots = new TreeSet<>();
+        for (var host : AgentRegistry.names()) {
+            var agent = AgentRegistry.get(host);
+            roots.add(agent.skillsDirectory());
+            if (agent.commandDirectory() != null) {
+                roots.add(agent.commandDirectory());
+            }
+        }
+        List<ManagedFiles.Change> moves = new ArrayList<>();
+        for (String root : roots) {
+            Path source = conflicts.resolve(root);
+            if (Files.isDirectory(source, LinkOption.NOFOLLOW_LINKS)) {
+                String name = "previous-" + root.substring(1).replace('/', '-');
+                Path destination = conflicts.resolve(name);
+                for (int i = 2; Files.exists(destination, LinkOption.NOFOLLOW_LINKS); i++) {
+                    destination = conflicts.resolve(name + "-" + i);
+                }
+                moves.add(new ManagedFiles.Change(ctx.files().key(source), ManagedFiles.Action.MOVE, destination));
+            }
+        }
+        return moves;
     }
 
     private Set<Path> parents(Set<Path> files) {
@@ -157,7 +191,7 @@ public final class CatalogUpdate {
     public void generate(AgentGenerator generator) throws Exception {
         List<Replacement> replacements = new ArrayList<>();
         Path rendered = Files.createTempDirectory(project.resolve(".camel-kit"), STAGING_PREFIX);
-        try (Closeable cleanupRendered = () -> deleteGeneratedTree(rendered);
+        try (Closeable cleanupRendered = () -> deleteGeneratedTree(project, rendered);
              Closeable cleanup = () -> discardStaging(replacements)) {
             Map<Path, Path> outputs = new HashMap<>();
             for (Path root : shapeChanges) {
@@ -177,6 +211,13 @@ public final class CatalogUpdate {
             }
             ctx.files().stageCatalog(outputs);
             generator.generate(ctx);
+            for (var move : previousProposals) {
+                Path source = project.resolve(move.path());
+                ConfinedPaths.requirePath(project, source);
+                ConfinedPaths.requirePath(project, move.proposal());
+                Files.move(source, move.proposal());
+                ctx.printer().println("  Moved previous catalog proposals to " + ctx.files().key(move.proposal()));
+            }
             try {
                 for (Replacement replacement : replacements) {
                     removableTree(replacement.target(), replacement.target());
@@ -235,7 +276,7 @@ public final class CatalogUpdate {
         }
     }
 
-    private void deleteGeneratedTree(Path root) throws IOException {
+    static void deleteGeneratedTree(Path project, Path root) throws IOException {
         ConfinedPaths.requireTree(project, root);
         if (Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
             List<Path> entries;
@@ -253,7 +294,7 @@ public final class CatalogUpdate {
         for (Replacement replacement : replacements) {
             try {
                 Path generated = replacement.scratch().resolve("new");
-                deleteGeneratedTree(generated);
+                deleteGeneratedTree(project, generated);
                 // If restoration failed, leave the original in its recovery directory.
                 Files.delete(replacement.scratch());
             } catch (IOException e) {

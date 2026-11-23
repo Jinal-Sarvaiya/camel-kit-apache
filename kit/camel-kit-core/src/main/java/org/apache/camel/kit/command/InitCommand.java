@@ -72,8 +72,7 @@ public class InitCommand extends CamelKitCommand {
     public boolean dryRun;
 
     @OptionList(parser = KitOptionParser.class, name = "replace",
-                description = "Replace this shared file or selected catalog asset instead of "
-                              + "preserving it (repeatable)",
+                description = "Replace a shared file, a selected catalog file, or the selected files in a catalog directory (repeatable)",
                 valueSeparator = OptionList.NO_SEPARATOR)
     public List<String> replace;
     @Option(parser = KitOptionParser.class, name = "replace-wrapper",
@@ -203,19 +202,31 @@ public class InitCommand extends CamelKitCommand {
         }
         printer()
                 .println(bold("Dry run") + dim(" \u2014 nothing was written to ") + cyan(resolvedTargetDir.toString()));
+        int unchanged = 0;
         for (ManagedFiles.Change change : changes) {
             String outcome = switch (change.action()) {
+                case UNCHANGED -> null;
+                case MOVE -> green("move    ");
                 case CREATE -> green("create  ");
                 case REFRESH -> green("replace ");
                 case MERGE -> green("merge   ");
                 case REMOVE -> green("remove  ");
                 case PRESERVE -> yellow("preserve");
             };
-            printer().println("  " + outcome + "  " + change.path());
+            if (outcome == null) {
+                unchanged++;
+                continue;
+            }
+            String destination = change.action() == ManagedFiles.Action.MOVE
+                    ? " -> " + resolvedTargetDir.relativize(change.proposal()) : "";
+            printer().println("  " + outcome + "  " + change.path() + destination);
+        }
+        if (unchanged > 0) {
+            printer().println("  " + unchanged + " unchanged catalog files");
         }
         printer().println(dim("  merge: Camel Kit's block or servers are added and your content is kept."));
         printer().println(
-                dim("  preserve: the file stays as it is. Use --replace <path> to accept a shared file or selected catalog asset."));
+                dim("  preserve: the file stays as it is. Use --replace <path> to accept a file or the selected assets in a catalog directory."));
         printer().println(dim(
                 "  remove: an unchanged catalog file is retired."));
         return 0;

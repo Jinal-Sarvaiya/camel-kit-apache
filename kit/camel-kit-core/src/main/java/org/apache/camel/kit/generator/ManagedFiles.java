@@ -94,6 +94,10 @@ public final class ManagedFiles {
         CREATE,
         /** The file holds what Camel-Kit wrote, or was named for replacement, and is rewritten. */
         REFRESH,
+        /** The installed catalog bytes already match and their ownership is recorded. */
+        UNCHANGED,
+        /** A previous catalog proposal directory is moved out of assistant discovery. */
+        MOVE,
         /** Camel-Kit's block is added to, or replaced inside, a file that also holds the user's content. */
         MERGE,
         /** The file belongs to the user and is left untouched. */
@@ -121,47 +125,54 @@ public final class ManagedFiles {
     private final Set<String> replace;
     private final Set<String> usedReplacements = new HashSet<>();
     private final Properties ledger;
+    private final Map<String, Set<String>> released;
     private final Map<String, Change> changes = new LinkedHashMap<>();
 
-    private ManagedFiles(Path projectDir, boolean unrestricted, Set<String> replace, Properties ledger) {
+    private ManagedFiles(Path projectDir, boolean unrestricted, Set<String> replace, Properties ledger,
+                         Map<String, Set<String>> released) {
         this.projectDir = projectDir;
         this.unrestricted = unrestricted;
         this.replace = replace;
         this.ledger = ledger;
+        this.released = released;
     }
 
     /** Rewrites every file in full, as initialization did before shared files were protected. */
     public static ManagedFiles unrestricted(Path projectDir) {
-        return new ManagedFiles(projectDir.toAbsolutePath().normalize(), true, Set.of(), new Properties());
+        return new ManagedFiles(projectDir.toAbsolutePath().normalize(), true, Set.of(), new Properties(), Map.of());
     }
 
     /**
      * Opens the ledger of a project without writing anything.
      *
      * <p>
-     * A missing ledger, or a file missing from it, never implies ownership: a workspace initialized before the ledger
-     * existed is treated like any other existing project, so its unmarked instruction files are merged and its other
-     * shared files are preserved until they are named for replacement.
+     * A missing record alone never establishes ownership. Init can recognize catalog files by their finished rendering
+     * or a matching pre-ledger release. Shared files retain their own merge and replacement rules.
      *
      * @param  replace                  project-relative shared files the user explicitly asked to replace
      * @throws IllegalArgumentException when a replacement is not a shared file Camel-Kit writes
      */
     public static ManagedFiles open(Path projectDir, Collection<String> replace) throws IOException {
-        return open(projectDir, replace, Set.of());
+        return open(projectDir, replace, null);
     }
 
     public static ManagedFiles open(Path projectDir, Collection<String> replace, String agentName) throws IOException {
-        return open(projectDir, replace, replace.isEmpty() ? Set.of() : catalogPaths(agentName));
-    }
-
-    private static ManagedFiles open(Path projectDir, Collection<String> replace, Set<String> selected)
-            throws IOException {
+        Set<String> selected = replace.isEmpty() || agentName == null ? Set.of() : catalogPaths(agentName);
         Path root = projectDir.toAbsolutePath().normalize();
         Set<String> replacements = new HashSet<>();
         for (String requested : replace) {
             Path resolved = root.resolve(requested).normalize();
             String key = resolved.startsWith(root) ? key(root, resolved) : requested;
-            if (!isShared(key) && !selected.contains(key)) {
+            boolean selectedDirectory = false;
+            if (agentName != null && !selected.contains(key)) {
+                var agent = AgentRegistry.get(agentName);
+                Path directory = Path.of(key);
+                boolean inSkills = directory.startsWith(agent.skillsDirectory());
+                boolean inCommands = agent.generatesCommandStubs() && directory.startsWith(agent.commandDirectory());
+                selectedDirectory
+                        = (inSkills || inCommands) && selected.stream().anyMatch(p -> Path.of(p).startsWith(directory));
+            }
+            if (!isShared(key) && !selected.contains(key) && !selectedDirectory) {
                 Set<String> shared = new TreeSet<>(MERGED);
                 shared.addAll(TRACKED);
                 throw new IllegalArgumentException(
@@ -183,7 +194,7 @@ public final class ManagedFiles {
         } catch (IOException | IllegalArgumentException e) {
             throw new InvalidAgentConfigurationException("Cannot read " + ledgerFile + ": " + e.getMessage(), e);
         }
-        return new ManagedFiles(root, false, replacements, ledger);
+        return new ManagedFiles(root, false, replacements, ledger, ReleasedCatalog.forWorkspace(root, agentName));
     }
 
     /** What {@link #write} would do to this file. Reads only: nothing is written or recorded. */
@@ -287,7 +298,7 @@ public final class ManagedFiles {
     }
 
     /** Plan retirements before init writes anything. Only this host's catalog roots are eligible. */
-    public CatalogUpdate planCatalog(InitContext ctx) throws IOException {
+    public CatalogUpdate planCatalog(InitContext ctx, boolean preview) throws Exception {
         CatalogUpdate.checkInterruptedUpdate(ctx.projectDir(), ctx.skillsDir());
         Set<String> installed = catalogPaths(ctx.agentName());
         List<Change> retired = new ArrayList<>();
@@ -295,7 +306,12 @@ public final class ManagedFiles {
             Action action = matchesCatalogFile(path, projectDir.resolve(path)) ? Action.REMOVE : Action.PRESERVE;
             retired.add(new Change(path, action, null));
         }
-        return new CatalogUpdate(ctx, installed, retired);
+        // Only an existing proposal tree can obstruct publication before rendering. Preview always needs exact bytes.
+        boolean compare = (preview || Files.exists(projectDir.resolve(PROPOSALS)))
+                && installed.stream()
+                        .anyMatch(path -> Files.isRegularFile(projectDir.resolve(path), LinkOption.NOFOLLOW_LINKS));
+        return new CatalogUpdate(
+                ctx, installed, retired, compare ? DefaultGenerator.previewCatalog(ctx, installed) : Map.of());
     }
 
     /**
@@ -316,10 +332,11 @@ public final class ManagedFiles {
         installed.forEach(path -> spellings.put(path, path));
         List<String> obsolete = new ArrayList<>();
         Set<String> previous = new TreeSet<>(legacyCatalogPaths(agentName));
+        previous.addAll(released.keySet());
         ledger.stringPropertyNames().stream().filter(entry -> entry.startsWith(CATALOG))
                 .map(entry -> entry.substring(CATALOG.length())).forEach(previous::add);
         for (String path : previous) {
-            if (installed.contains(path) || !catalogPath(agentName, path)) {
+            if (installed.contains(path) || !catalogPath(agentName, path) && !released.containsKey(path)) {
                 continue;
             }
             Path target = projectDir.resolve(path);
@@ -328,10 +345,6 @@ public final class ManagedFiles {
                 String spelling = spellings.get(path);
                 if (spelling != null && Files.exists(projectDir.resolve(spelling), LinkOption.NOFOLLOW_LINKS)
                         && Files.isSameFile(target, projectDir.resolve(spelling))) {
-                    String previousHash = ledger.getProperty(CATALOG + path);
-                    if (previousHash != null) {
-                        ledger.putIfAbsent(CATALOG + spelling, previousHash);
-                    }
                     continue;
                 }
                 obsolete.add(path);
@@ -377,7 +390,7 @@ public final class ManagedFiles {
 
     void retireCatalogFiles(InitContext ctx, List<Change> retired) throws IOException {
         for (Change change : retired) {
-            if (!catalogPath(ctx.agentName(), change.path())) {
+            if (!catalogPath(ctx.agentName(), change.path()) && !released.containsKey(change.path())) {
                 throw new IOException("Invalid retired catalog path: " + change.path());
             }
             Path target = projectDir.resolve(change.path());
@@ -408,18 +421,44 @@ public final class ManagedFiles {
     }
 
     boolean matchesCatalogFile(String path, Path target) throws IOException {
-        String recorded = ledger.getProperty(CATALOG + path);
-        if (recorded == null || !Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
+        if (!Files.isRegularFile(target, LinkOption.NOFOLLOW_LINKS)) {
             return false;
         }
-        byte[] bytes;
+        return matchesCatalogFile(path, readCatalogFile(target));
+    }
+
+    private String recordedCatalogHash(String path) throws IOException {
+        String recorded = ledger.getProperty(CATALOG + path);
+        if (recorded == null) {
+            // A case-only rename can refer to the same file on a case-insensitive filesystem.
+            for (String entry : ledger.stringPropertyNames()) {
+                if (entry.equalsIgnoreCase(CATALOG + path)) {
+                    Path spelling = projectDir.resolve(entry.substring(CATALOG.length()));
+                    Path target = projectDir.resolve(path);
+                    if (Files.exists(spelling) && Files.exists(target) && Files.isSameFile(spelling, target)) {
+                        return ledger.getProperty(entry);
+                    }
+                }
+            }
+        }
+        return recorded;
+    }
+
+    private static byte[] readCatalogFile(Path target) throws IOException {
         try {
-            bytes = Files.readAllBytes(target);
+            return Files.readAllBytes(target);
         } catch (AccessDeniedException e) {
             throw new InvalidAgentConfigurationException(
                     "Cannot read catalog file " + target
                                                          + ". Restore read permission and retry.",
                     e);
+        }
+    }
+
+    private boolean matchesCatalogFile(String path, byte[] bytes) throws IOException {
+        String recorded = recordedCatalogHash(path);
+        if (recorded == null) {
+            return released.getOrDefault(path, Set.of()).contains(catalogHash(Path.of(path), bytes));
         }
         if (recorded.equals(digest(bytes))) {
             return true;
@@ -434,6 +473,11 @@ public final class ManagedFiles {
                 || recorded.equals(digest(lf.replace("\n", "\r\n").getBytes(StandardCharsets.UTF_8)));
     }
 
+    private static String catalogHash(Path target, byte[] bytes) {
+        String text = catalogText(target, bytes);
+        return text == null ? digest(bytes) : hash(text);
+    }
+
     private static String catalogText(Path target, byte[] bytes) {
         if (!CATALOG_TEXT.matcher(target.getFileName().toString()).matches()) {
             return null;
@@ -446,16 +490,28 @@ public final class ManagedFiles {
         }
     }
 
-    Change planCatalogFile(Path target) throws IOException {
+    static Path catalogProposal(Path project, String path) {
+        // Catalog roots are hidden host directories. Their children cannot start with a dot (SkillCatalog.safePath).
+        return project.resolve(PROPOSALS).resolve("catalog").resolve(path.substring(1) + ".proposed");
+    }
+
+    Change planCatalogFile(Path target, byte[] incoming) throws IOException {
         String path = key(target);
         if (!Files.exists(target, LinkOption.NOFOLLOW_LINKS)) {
             return new Change(path, Action.CREATE, null);
         }
-        if (unrestricted || replace.contains(path) || matchesCatalogFile(path, target)) {
+        if (unrestricted || replace.stream().anyMatch(Path.of(path)::startsWith)) {
+            return new Change(path, Action.REFRESH, null);
+        }
+        byte[] current = readCatalogFile(target);
+        if (incoming != null && catalogHash(target, incoming).equals(catalogHash(target, current))) {
+            return new Change(path, Action.UNCHANGED, null);
+        }
+        if (matchesCatalogFile(path, current)) {
             return new Change(path, Action.REFRESH, null);
         }
         Path proposals = projectDir.resolve(PROPOSALS);
-        Path proposal = proposals.resolve(path);
+        Path proposal = catalogProposal(projectDir, path);
         ConfinedPaths.requirePath(projectDir, proposal);
         for (Path entry = proposal; entry.startsWith(proposals); entry = entry.getParent()) {
             if (!Files.exists(entry, LinkOption.NOFOLLOW_LINKS)) {
@@ -478,22 +534,22 @@ public final class ManagedFiles {
     void installCatalogFile(Path target, Path generated) throws IOException {
         ConfinedPaths.requirePath(projectDir, target);
         String path = key(target);
-        Path proposal = projectDir.resolve(PROPOSALS).resolve(path);
+        Path proposal = catalogProposal(projectDir, path);
         ConfinedPaths.requirePath(projectDir, proposal);
-        Change change = planCatalogFile(target);
         byte[] bytes = Files.readAllBytes(generated);
+        Change change = planCatalogFile(target, bytes);
         if (change.action() == Action.PRESERVE) {
             Files.createDirectories(proposal.getParent());
             AtomicFileWriter.write(proposal, bytes);
             changes.put(path, change);
             return;
         }
-        Files.createDirectories(target.getParent());
-        AtomicFileWriter.write(target, bytes);
-        recordCatalogFile(target, bytes, change.action());
-        if (change.action() == Action.REFRESH && replace.contains(path)) {
-            usedReplacements.add(path);
+        if (change.action() != Action.UNCHANGED) {
+            Files.createDirectories(target.getParent());
+            AtomicFileWriter.write(target, bytes);
         }
+        recordCatalogFile(target, bytes, change.action());
+
         if (Files.isRegularFile(proposal, LinkOption.NOFOLLOW_LINKS)) {
             Files.delete(proposal);
             pruneEmptyParents(proposal.getParent(), projectDir.resolve(PROPOSALS));
@@ -502,8 +558,10 @@ public final class ManagedFiles {
 
     void recordCatalogFile(Path target, byte[] bytes, Action action) {
         String path = key(target);
-        String text = catalogText(target, bytes);
-        ledger.setProperty(CATALOG + path, text == null ? digest(bytes) : hash(text));
+        if (action == Action.REFRESH) {
+            replace.stream().filter(Path.of(path)::startsWith).forEach(usedReplacements::add);
+        }
+        ledger.setProperty(CATALOG + path, catalogHash(target, bytes));
         changes.put(path, new Change(path, action, null));
     }
 
@@ -521,7 +579,7 @@ public final class ManagedFiles {
         for (String entry : ledger.stringPropertyNames()) {
             if (entry.startsWith(CATALOG)) {
                 String path = entry.substring(CATALOG.length());
-                if (catalogPath(agentName, path) && !installed.contains(path)
+                if ((catalogPath(agentName, path) || released.containsKey(path)) && !installed.contains(path)
                         && !changes.containsKey(path)) {
                     ledger.remove(entry);
                 }

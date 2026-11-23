@@ -922,16 +922,17 @@ that decides what happens to them:
   only files named for replacement are written. Preview and execution share that plan.
 - A preserved file is reported and the generated version is saved under `.camel-kit/conflicts/`. A preserved Maven
   wrapper file is the exception: it is reported without a saved version, so no partial wrapper is offered for
-  merging; `--replace-wrapper` replaces the whole wrapper. `--replace <path>` rewrites one shared file or selected catalog asset in full;
-  `--dry-run` reports the outcome per file without writing.
+  merging. `--replace-wrapper` replaces the whole wrapper. `--replace <path>` accepts a shared file, a catalog file,
+  or the selected assets in a catalog directory. The preview lists changed paths and counts unchanged catalog files.
 - Existing MCP configurations, JSON and `.codex/config.toml`, are merged, not replaced. One that cannot
   be merged is rejected before anything is written, by `--dry-run` as well as by initialization; for Codex both build
   and validate the same merged candidate.
 
 Each run regenerates subagents, personas, hooks and `.camel-kit/templates/`, including restricted Ship workers.
 Catalog files are rendered with their host traits and invocation metadata in staging. Init compares each destination
-with its ledger record before publishing the finished file or retiring it. Edited or unrecorded selected files
-receive a proposal. Their live content never becomes the recorded installation merely by rerunning init. Text hashes normalize LF and CRLF for the formats listed in the contributor guide. Opaque resources use
+with its ledger record before publishing the finished file or retiring it. Without a record, a known pre-ledger
+hash for the installed assistant and path identifies the stock file. A file already matching the new rendering is
+recorded in place. Other selected files receive an inert `.proposed` copy under `.camel-kit/conflicts/catalog/`. Text hashes normalize LF and CRLF for the formats listed in the contributor guide. Opaque resources use
 SHA-256 of their exact bytes. An edited retired file keeps its record so later runs can report it. A switch
 between a file and a directory stages the new content and requires all files it displaces to match the ledger.
 Init checks write access before switching. If a run leaves staged content or a backup, subsequent previews,
@@ -947,11 +948,8 @@ Rejected alternatives:
   from one the user wrote, so generated files would never be refreshed on reinitialization.
 - **Hash-track the instruction files too.** A preserved `AGENTS.md` would lack the skill routing until merged by hand.
 - **Use marked blocks for every shared file.** JSON, YAML and shell files cannot carry a reliable marker.
-- **Track every generated file.** Catalog skills are tracked after rendering. Restricted Ship worker definitions
-  must still be regenerated to enforce the current restrictions.
 
-Missing provenance is unknown ownership, never Camel-Kit ownership. A workspace initialized before the ledger existed
-is treated like any other existing project: unmarked instruction files get the block appended, and other shared files
+Shared files use their own provenance rules. In a workspace initialized before the ledger existed, unmarked instruction files get the block appended, and other shared files
 are preserved until named with `--replace`. Markers that do not form exactly one ordered pair (missing, duplicated,
 nested or reversed) are never merged, because any guess could delete the user's text between them. A replacement is
 recorded as used only once it is written, so one that was skipped is reported.

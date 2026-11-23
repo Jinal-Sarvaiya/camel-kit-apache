@@ -52,9 +52,9 @@ Camel Kit `init` is **safe to run over existing projects** with these protection
 | Use managed blocks - customizations preserved on reinit
 
 | Skill files
-| Reinitialization refreshes files that match their recorded hashes. Local edits and files without an ownership
-  record stay in place. Review the host-specific proposal under `.camel-kit/conflicts/` and use `--replace <path>`
-  to accept it. You can also keep your own skills and guides alongside the installed ones
+| Reinitialization refreshes files matching their recorded hashes or known pre-ledger release content.
+  It adopts files already equal to the new rendering and preserves local edits. Review the `.proposed` copy
+  under `.camel-kit/conflicts/catalog/`. Use `--replace <path>` to accept a file or the selected files in a catalog directory. You can also keep your own skills and guides alongside the installed ones
 
 | Existing routes
 | Never modified unless explicitly listed in design spec
@@ -70,7 +70,7 @@ camel-kit init --here --ai claude --dry-run
 ----
 
 The preview lists shared and selected catalog files with a `create`, `replace`, `merge` or `preserve` action, using the same
-ownership and replacement rules as initialization. It also lists retired catalog files with a `remove` or
+ownership and replacement rules as initialization. It summarizes unchanged catalog files and lists retired catalog files with a `remove` or
 `preserve` action. It does not write files or run baseline tests, even when
 `--record-baseline` is also supplied. It also runs the validation of initialization: an existing MCP configuration
 that cannot be merged, such as a `.codex/config.toml` that is not valid TOML, is rejected by the preview with the

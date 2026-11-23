@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.camel.kit.config.AgentRegistry;
@@ -14,12 +15,33 @@ import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.output.Printer;
 import org.apache.camel.kit.output.SystemPrinter;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class CatalogUpdateTest {
+
+    @Test
+    @Tag("cli-compat")
+    void queryingRetiredCaseAliasesDoesNotAlterTheLedger(@TempDir Path project) throws Exception {
+        Path folder = Files.createDirectories(project.resolve(".claude/skills/camel-start"));
+        Path canonical = Files.writeString(folder.resolve("SKILL.md"), "Installed content");
+        Path previous = folder.resolve("Skill.md");
+        if (!Files.exists(previous)) {
+            Files.createLink(previous, canonical);
+        }
+        Files.createDirectories(project.resolve(".camel-kit"));
+        var files = ManagedFiles.open(project, Set.of());
+        files.recordCatalogFile(previous, Files.readAllBytes(previous), ManagedFiles.Action.CREATE);
+        files.save();
+        String original = Files.readString(project.resolve(ManagedFiles.LEDGER));
+        assertTrue(files.retiredEntryPoints("claude").isEmpty());
+        assertTrue(files.matchesCatalogFile(files.key(canonical), canonical));
+        files.save();
+        assertEquals(original, Files.readString(project.resolve(ManagedFiles.LEDGER)));
+    }
 
     @Test
     void editDuringRenderingPreservesLiveBytesAndProposesTheCompletedBinary(@TempDir Path project) throws Exception {
@@ -33,7 +55,7 @@ class CatalogUpdateTest {
         var ctx = new InitContext(
                 agent, "bob2", project.resolve(agent.commandDirectory()), project.resolve(agent.skillsDirectory()),
                 project, "camel-kit", DistributionConfig.loadFromClasspathOrDefaults(), false, Printer.noop(), files);
-        var update = new CatalogUpdate(ctx, Set.of(path), List.of());
+        var update = new CatalogUpdate(ctx, Set.of(path), List.of(), Map.of());
         byte[] incoming = {0, (byte) 0xff, '\r', '\n'};
         byte[] personal = {0, (byte) 0xfe, '\n'};
         assertEquals(ManagedFiles.Action.CREATE, update.changes().getFirst().action());
@@ -45,7 +67,8 @@ class CatalogUpdateTest {
         });
         files.save();
         assertArrayEquals(personal, Files.readAllBytes(target));
-        assertArrayEquals(incoming, Files.readAllBytes(project.resolve(ManagedFiles.PROPOSALS).resolve(path)));
+        assertArrayEquals(incoming, Files
+                .readAllBytes(project.resolve(".camel-kit/conflicts/catalog/bob/skills/shared/example.bin.proposed")));
         assertFalse(Files.readString(ledger).contains("catalog/" + path));
     }
 
@@ -73,7 +96,7 @@ class CatalogUpdateTest {
                 "camel-kit", DistributionConfig.loadFromClasspathOrDefaults(), false, printer, files);
         var update = new CatalogUpdate(
                 ctx, Set.of(path),
-                List.of(new ManagedFiles.Change(files.key(old), ManagedFiles.Action.REMOVE, null)));
+                List.of(new ManagedFiles.Change(files.key(old), ManagedFiles.Action.REMOVE, null)), Map.of());
         update.generate(install -> {
             Path target = install.skillFile("shared/layout");
             Files.createDirectories(target.getParent());
@@ -81,7 +104,8 @@ class CatalogUpdateTest {
         });
 
         assertEquals("Team edit", Files.readString(project.resolve(path)));
-        assertEquals(ManagedFiles.Action.PRESERVE, files.planCatalogFile(project.resolve(path)).action());
+        assertEquals(ManagedFiles.Action.PRESERVE,
+                files.planCatalogFile(project.resolve(path), "After".getBytes(StandardCharsets.UTF_8)).action());
     }
 
     @Test
@@ -106,7 +130,7 @@ class CatalogUpdateTest {
                 ManagedFiles.open(project, Set.of()));
         var retired = List.of(first, second).stream()
                 .map(key -> new ManagedFiles.Change(key, ManagedFiles.Action.REMOVE, null)).toList();
-        var plan = new CatalogUpdate(ctx, Set.of(first + "/guide.md", second + "/guide.md"), retired);
+        var plan = new CatalogUpdate(ctx, Set.of(first + "/guide.md", second + "/guide.md"), retired, Map.of());
 
         IOException failure = assertThrows(IOException.class, () -> plan.generate(install -> {
             Path guide = install.skillFile("shared/first/guide.md");

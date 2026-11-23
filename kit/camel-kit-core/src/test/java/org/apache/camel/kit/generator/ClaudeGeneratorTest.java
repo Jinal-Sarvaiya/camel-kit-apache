@@ -187,7 +187,7 @@ class ClaudeGeneratorTest {
     }
 
     @Test
-    void removesLegacyCommandStubsOnRegeneration() throws Exception {
+    void unrestrictedGeneratorRemovesKnownLegacyCommandNames() throws Exception {
         InitContext ctx = createContext();
         Path legacyDir = tempDir.resolve(".claude/commands");
         Files.createDirectories(legacyDir);

@@ -202,7 +202,9 @@ camel-kit init --here --ai bob2 --force
 camel kit init --here --ai bob2 --force
 ```
 
-Preview the update with `--dry-run`. Edited skills stay in place. Compare their generated proposals under `.camel-kit/conflicts/` or use `--force --replace <path>` to accept one.
+Preview the update with `--dry-run`. Edited skills stay in place. Compare their generated copies under `.camel-kit/conflicts/catalog/`. For an edited validation skill, use
+`camel-kit init --here --ai bob2 --force --replace .bob/skills/camel-validate/SKILL.md` to accept the generated file.
+To accept the entire selected Bob skills catalog, use `--replace .bob/skills`.
 Restart Bob after regeneration. Earlier `0.4.0-SNAPSHOT` builds can still contain
 the defect. Until you upgrade, set both invocation fields to `true` only in the
 nine public skills listed above, then restart Bob; leave internal helpers unchanged.

@@ -20,7 +20,7 @@ public interface AgentGenerator {
         } else {
             preflight(ctx);
         }
-        return new Prepared(ctx.files().planCatalog(ctx), this);
+        return new Prepared(ctx.files().planCatalog(ctx, preview), this);
     }
 
     /** The catalog and the host writer validated for that run. */

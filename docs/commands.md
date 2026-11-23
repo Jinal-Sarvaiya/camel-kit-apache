@@ -71,7 +71,7 @@ camel kit init --here [options]
 | `--record-baseline` | `false` | Run the existing project's build and tests once to record baseline results; never runs during `--dry-run` |
 | `--source-platform` | `auto` | Source platform for migration: `mulesoft`, `camel`, `biztalk`, `auto` |
 | `--force` | `false` | Reinitialize a project that already has `.camel-kit/`. Preserves edits to shared files and catalog assets |
-| `--replace <path>` | none | Accept the generated version of one shared file or catalog file selected for this assistant. Repeat for each path |
+| `--replace <path>` | none | Accept a shared file, a selected catalog file, or the selected assets in a catalog directory (repeatable) |
 | `--dry-run` | `false` | Preview create, replace, merge, preserve and remove actions for shared and catalog files |
 | `--silent` | `false` | Suppress all output (no banner, no TUI, no progress, no summary) -- useful for CI/scripted environments |
 | `-V`, `--version` | -- | Print camel-kit version and exit |
@@ -173,9 +173,10 @@ file and later replaces only that block. An existing `docs/constitution.md`, `.c
 untouched and listed at the end of the run; the version Camel-Kit would have written is saved under
 `.camel-kit/conflicts/`, except for Maven wrapper files, which are listed without a saved version; use
 `--replace-wrapper` to replace the whole wrapper. Pass `--replace <path>` to replace a file in full, or `--dry-run` to preview;
-the preview runs the same validation as init and rejects an existing MCP configuration that cannot be merged. For a selected skill, guide or command stub with local edits or no recorded
-hash, compare the generated proposal under `.camel-kit/conflicts/` or accept it with `--force --replace <path>`. When switching distributions, `init --force` removes
-recorded skills, guides and command stubs that the new catalog omits and that still match the last installation.
+the preview runs the same validation as init and rejects an existing MCP configuration that cannot be merged. From 0.4.1, `--force` upgrades stock skills and removes stock retired stubs using known release hashes.
+Files already matching the current rendering are adopted. For other unrecognized or edited files, compare the
+`.proposed` copy under `.camel-kit/conflicts/catalog/`. Accept one file with `--force --replace <path>`, or a catalog
+directory such as `--replace .claude/skills`. A preview counts unchanged files and lists changes individually.
 Run init for each assistant installation you want to update. Codex and Antigravity share the same skills directory.
 A retained `SKILL.md` remains discoverable. Review edited and unrecorded skills and move or remove those you want to retire.
 The dry run lists the planned removals.

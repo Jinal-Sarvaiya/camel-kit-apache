@@ -1574,9 +1574,10 @@ class InitServiceTest {
         assertEquals("# Team skill\n" + shippedManifest, Files.readString(targetDir.resolve(manifest)));
         assertEquals("# Team guide\n" + shippedGuide, Files.readString(targetDir.resolve(guide)));
         assertEquals("Project notes", Files.readString(customFile));
-        Path proposals = targetDir.resolve(ManagedFiles.PROPOSALS);
-        assertEquals(shippedManifest, Files.readString(proposals.resolve(manifest)));
-        assertEquals(shippedGuide, Files.readString(proposals.resolve(guide)));
+        Path proposals = targetDir.resolve(ManagedFiles.PROPOSALS + "/catalog/claude/skills");
+        assertEquals(shippedManifest, Files.readString(proposals.resolve("camel-start/SKILL.md.proposed")));
+        assertEquals(shippedGuide,
+                Files.readString(proposals.resolve("camel-brainstorm/guides/version-selection.md.proposed")));
     }
 
     /**

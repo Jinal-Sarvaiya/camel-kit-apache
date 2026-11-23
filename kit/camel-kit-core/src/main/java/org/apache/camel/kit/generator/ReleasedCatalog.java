@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.util.ConfinedPaths;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 
@@ -28,32 +28,32 @@ final class ReleasedCatalog {
     }
 
     static boolean hasWorkspaceConfiguration(Path root) throws IOException {
-        Path config = root.resolve(".camel-kit/config.properties");
-        ConfinedPaths.requirePath(root, config);
-        String configuredAgent;
-        if (Files.isRegularFile(config, LinkOption.NOFOLLOW_LINKS)) {
-            var settings = new Properties();
-            try (var in = Files.newBufferedReader(config)) {
-                settings.load(in);
-            } catch (IllegalArgumentException malformed) {
+        Path properties = root.resolve(".camel-kit/config.properties");
+        Path config = Files.notExists(properties, LinkOption.NOFOLLOW_LINKS)
+                ? properties.resolveSibling("config.yaml")
+                : properties;
+        try {
+            ConfinedPaths.requirePath(root, config);
+            if (Files.notExists(config, LinkOption.NOFOLLOW_LINKS)) {
                 return false;
             }
-            configuredAgent = settings.getProperty("agent.name");
-        } else {
-            Path yaml = root.resolve(".camel-kit/config.yaml");
-            if (!Files.isRegularFile(yaml, LinkOption.NOFOLLOW_LINKS)) {
-                return false;
+            try (var in = Files.newInputStream(config)) {
+                String configuredAgent;
+                if (config.equals(properties)) {
+                    var settings = new Properties();
+                    settings.load(in);
+                    configuredAgent = settings.getProperty("agent.name");
+                } else {
+                    var settings = new ObjectMapper(new YAMLFactory())
+                            .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(in);
+                    configuredAgent = settings == null ? null : settings.path("agent").path("name").textValue();
+                }
+                // A shared workspace records only the last assistant initialized.
+                return configuredAgent != null && !configuredAgent.isBlank();
             }
-            ConfinedPaths.requirePath(root, yaml);
-            try (var in = Files.newInputStream(yaml)) {
-                var settings = new ObjectMapper(new YAMLFactory()).readTree(in);
-                configuredAgent = settings == null ? null : settings.path("agent").path("name").textValue();
-            } catch (JsonProcessingException malformed) {
-                return false;
-            }
+        } catch (IOException | IllegalArgumentException e) {
+            throw new InvalidAgentConfigurationException("Cannot read " + config + ": " + e.getMessage(), e);
         }
-        // A shared workspace records only the last assistant initialized.
-        return configuredAgent != null && !configuredAgent.isBlank();
     }
 
     static Map<String, Set<String>> forAgent(String agentName) throws IOException {

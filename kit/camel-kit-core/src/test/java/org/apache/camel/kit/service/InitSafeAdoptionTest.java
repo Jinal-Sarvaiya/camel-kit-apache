@@ -1,5 +1,6 @@
 package org.apache.camel.kit.service;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -191,7 +193,63 @@ class InitSafeAdoptionTest {
     }
 
     @Test
-    void adoptingAnExistingProjectPreservesCopiesOfReleasedFilesAcrossRetries() throws Exception {
+    @Tag("cli-compat")
+    void releasedWorkspaceUpgradesWithLatin1Properties() throws Exception {
+        Path config = Files.createDirectories(tempDir.resolve(".camel-kit")).resolve("config.properties");
+        Files.writeString(config, "agent.name=claude\nteam.owner=André\n", StandardCharsets.ISO_8859_1);
+        Files.writeString(config.resolveSibling("config.yaml"), "old: [");
+        Path stub = writeReleasedClaudeStub(tempDir);
+        var init = request(tempDir, "claude");
+        var service = new InitService();
+
+        assertTrue(service.preview(init).stream().anyMatch(c -> c.action() == Action.REMOVE
+                && c.path().equals(".claude/commands/camel-validate.md")));
+        service.initialize(init);
+        assertFalse(Files.exists(stub));
+        var settings = new Properties();
+        try (var in = Files.newInputStream(config)) {
+            settings.load(in);
+        }
+        assertEquals("André", settings.getProperty("team.owner"));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"config.properties, false", "config.yaml, false", "config.properties, true", "config.yaml, true"})
+    @Tag("cli-compat")
+    void malformedConfigLeavesWorkspaceUntouchedAndRepairCanBeRetried(String filename, boolean trackedFromInit)
+            throws Exception {
+        Path config = Files.createDirectories(tempDir.resolve(".camel-kit")).resolve(filename);
+        boolean properties = filename.equals("config.properties");
+        Files.writeString(config,
+                properties ? "agent.name=claude\nextra=\\u12x4\n" : "agent:\n  name: claude\nextra: [");
+        if (trackedFromInit) {
+            Files.writeString(tempDir.resolve(ManagedFiles.LEDGER), "catalog.tracked-from-init=true\n");
+        }
+        Path stub = writeReleasedClaudeStub(tempDir);
+        var service = new InitService();
+        var init = request(tempDir, "claude");
+        var original = snapshot(tempDir);
+        var preview = assertThrows(InvalidAgentConfigurationException.class, () -> service.preview(init));
+        assertTrue(preview.getMessage().contains(config.toString()), preview::getMessage);
+        assertEquals(original, snapshot(tempDir));
+        var apply = assertThrows(InvalidAgentConfigurationException.class, () -> service.initialize(init));
+        assertEquals(preview.getMessage(), apply.getMessage());
+        assertEquals(original, snapshot(tempDir));
+
+        Files.writeString(config, properties ? "agent.name=claude\n" : "agent:\n  name: claude\n");
+        service.initialize(init);
+        assertEquals(trackedFromInit, Files.exists(stub));
+        assertEquals(trackedFromInit, Boolean.parseBoolean(ledger(tempDir).getProperty("catalog.tracked-from-init")));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "agent.name=   \n")
+    void adoptingAnExistingProjectPreservesCopiesOfReleasedFilesAcrossRetries(String configuration) throws Exception {
+        if (configuration != null) {
+            Path config = Files.createDirectories(tempDir.resolve(".camel-kit")).resolve("config.properties");
+            Files.writeString(config, configuration);
+        }
         String path = ".claude/skills/camel-implement/guides/run-script.md";
         Path guide = tempDir.resolve(path);
         copyReleasedFixture(guide);

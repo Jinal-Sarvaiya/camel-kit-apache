@@ -86,7 +86,19 @@ class DoctorCommandTest {
         RunResult textResult = runDoctor("--project-dir", tempDir.toString());
         assertNotEquals(0, textResult.exitCode());
         assertTrue(textResult.output().contains(".camel-kit/config.properties is missing"));
+        assertTrue(textResult.output().contains("Restore any lost Kit configuration before upgrading"));
         assertTrue(textResult.output().contains("Run camel-kit init --here --ai <agent>"));
+    }
+
+    @Test
+    void malformedPropertiesProduceAnActionableJsonFinding() throws Exception {
+        writeConfig("agent.name=bob2\nextra=\\u12x4\n");
+        RunResult result = runDoctor("--project-dir", tempDir.toString(), "--json");
+
+        assertEquals(1, result.exitCode());
+        JsonNode json = MAPPER.readTree(result.output());
+        assertTrue(hasFinding(json, "FAIL", "config", "Could not read .camel-kit/config.properties",
+                "restore it from source control"), result.output());
     }
 
     @Test

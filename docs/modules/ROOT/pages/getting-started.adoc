@@ -265,6 +265,11 @@ the project.
 
 ==== Upgrading from 0.4.1 and earlier
 
+If the workspace has lost its Kit configuration, restore the original from version control or a backup *before*
+the first upgrade. Releases 0.4.x used `.camel-kit/config.properties`. Earlier releases used `.camel-kit/config.yaml`.
+When both files exist, Kit reads the properties file. If the active file is malformed, both `--dry-run` and `init`
+report the path before writing anything. Repair or restore that file and retry.
+
 From the project root, run `camel-kit init --here --ai claude --force`, substituting your assistant's name.
 In a shared workspace, run this command once for each assistant, in any order.
 Kit recognizes stock catalog files from pre-ledger releases by their installed path and content for the selected assistant.
@@ -273,6 +278,17 @@ rendering is recorded in place, even when its ledger entry is missing or stale. 
 init to check the assistant you just updated.
 When adopting a project for the first time, Kit records that ownership tracking began with this init.
 Copies from older releases that differ from the new rendering stay in place on this and later runs.
+
+If you already ran `init` while the configuration was missing, restoring it afterward keeps the first-adoption
+record in effect. Review the `.proposed` files under `.camel-kit/conflicts/catalog/`, then rerun `init` with
+`--force --replace <path>` for the changes you accept. For Claude, `--replace .claude/skills` accepts all selected
+skills and guides in that directory, including locally edited ones. Review any retired stubs Doctor lists under
+`.claude/commands/` and move the ones you want to retire outside the assistant's discovery directories.
+
+When upgrading from 0.3.x, also inspect any `camel-flow`, `camel-project`, and `camel-migrate-mule` folders left
+in your assistant's skills directory. Doctor treats an edited `SKILL.md` without an ownership record as personal.
+The assistant can still discover it after Kit removes its stock guides. Keep the folder if you use it, or move it
+outside the skills directory to retire it.
 
 ==== Reviewing catalog changes
 

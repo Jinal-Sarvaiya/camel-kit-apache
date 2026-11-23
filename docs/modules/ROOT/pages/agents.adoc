@@ -63,6 +63,7 @@ camel-kit init --here --ai claude --force
 ----
 
 Run with `--dry-run` first to see which skills and commands will change.
+For recovery after losing the project configuration, see xref:getting-started.adoc#_upgrading_from_0_4_1_and_earlier[Upgrading from 0.4.1 and earlier].
 
 * From 0.4.0 or 0.4.1, the command above updates stock skills and removes the nine stock command stubs.
   Kit removes `.claude/commands/` if deleting the last stock stub leaves it empty.

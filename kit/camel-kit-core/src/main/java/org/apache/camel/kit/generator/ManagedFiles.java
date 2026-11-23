@@ -198,15 +198,12 @@ public final class ManagedFiles {
         } catch (IOException | IllegalArgumentException e) {
             throw new InvalidAgentConfigurationException("Cannot read " + ledgerFile + ": " + e.getMessage(), e);
         }
-        Map<String, Set<String>> released = Map.of();
-        boolean startsTracking = false;
-        if (agentName != null && !Boolean.parseBoolean(ledger.getProperty(TRACKED_FROM_INIT))) {
-            if (ReleasedCatalog.hasWorkspaceConfiguration(root)) {
-                released = ReleasedCatalog.forAgent(agentName);
-            } else {
-                startsTracking = true;
-            }
-        }
+        // Validate the configuration before any writes, even when the ledger already records first adoption.
+        boolean configured = agentName != null && ReleasedCatalog.hasWorkspaceConfiguration(root);
+        boolean trackedFromInit = Boolean.parseBoolean(ledger.getProperty(TRACKED_FROM_INIT));
+        Map<String, Set<String>> released
+                = configured && !trackedFromInit ? ReleasedCatalog.forAgent(agentName) : Map.of();
+        boolean startsTracking = agentName != null && !configured && !trackedFromInit;
         return new ManagedFiles(root, false, replacements, ledger, released, startsTracking);
     }
 

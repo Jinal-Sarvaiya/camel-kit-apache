@@ -90,18 +90,19 @@ public class DoctorService {
         if (!Files.isRegularFile(configFile)) {
             findings.add(DoctorFinding.fail("config", relativize(root, configFile),
                     ".camel-kit/config.properties is missing",
-                    "Run camel-kit init --here --ai <agent> from the workspace root."));
+                    "Restore any lost Kit configuration before upgrading an existing workspace. "
+                                                               + "Run camel-kit init --here --ai <agent> from the workspace root."));
             return new Properties();
         }
 
         Properties config = new Properties();
         try (InputStream in = Files.newInputStream(configFile)) {
             config.load(in);
-        } catch (IOException e) {
+        } catch (IOException | IllegalArgumentException e) {
             findings.add(DoctorFinding.fail("config", relativize(root, configFile),
                     "Could not read .camel-kit/config.properties: " + e.getMessage(),
-                    "Recreate the file with camel-kit init --here --force or restore it from source control."));
-            return config;
+                    "Repair the file or restore it from source control before running init."));
+            return new Properties();
         }
 
         List<String> missing = REQUIRED_CONFIG_KEYS.stream()

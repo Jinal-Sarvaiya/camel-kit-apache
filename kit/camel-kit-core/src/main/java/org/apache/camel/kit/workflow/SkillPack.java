@@ -30,8 +30,10 @@ record SkillPack(String id, int schema, List<String> requires, Map<String, Entry
             .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS);
     static final String ID = "[a-z][a-z0-9-]*";
 
-    record Entry(int contract, String resource, SkillCatalog.Provider provider, List<String> requires) {
+    record Entry(int contract, String resource, SkillCatalog.Provider provider, List<String> requires,
+            WorkflowHook hook, List<String> handles) {
         Entry {
+            handles = handles == null ? List.of() : List.copyOf(handles);
             requires = requires == null ? List.of() : List.copyOf(requires);
         }
     }
@@ -155,6 +157,15 @@ record SkillPack(String id, int schema, List<String> requires, Map<String, Entry
                     && !original.entry().provider().service().equals(edit.entry().provider().service())) {
                 throw edit.error("replacement must preserve service " + original.entry().provider().service()
                                  + " declared by " + original.location());
+            }
+            WorkflowHook originalHook = original.entry().hook();
+            if (originalHook != null && edit.entry() != null) {
+                WorkflowHook replacement = edit.entry().hook();
+                if (replacement == null || !replacement.checks().equals(originalHook.checks())
+                        || !Set.copyOf(replacement.targets()).equals(Set.copyOf(originalHook.targets()))) {
+                    throw edit.error(
+                            "replacement must preserve hook targets and checks declared by " + original.location());
+                }
             }
             if (edit.entry() == null) {
                 if (edit.kind().equals("skill")) {

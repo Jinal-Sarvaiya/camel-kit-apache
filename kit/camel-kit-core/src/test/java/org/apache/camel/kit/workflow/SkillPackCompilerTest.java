@@ -12,6 +12,7 @@ import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
@@ -23,6 +24,7 @@ import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -282,7 +284,9 @@ class SkillPackCompilerTest {
                 core.stages(), artifacts, core.mcpServers(), core.websiteReference());
         WorkflowManifestValidator.validateOrThrow(workflow);
         var overlay = new SkillPack("team", 1, List.of("core"), Map.of(), Map.of(), List.of(key));
-        var original = new SkillPack.Declaration("core", key, new SkillPack.Entry(1, "entry.md", null, List.of()));
+        var original
+                = new SkillPack.Declaration(
+                        "core", key, new SkillPack.Entry(1, "entry.md", null, List.of(), null, List.of()));
         var failure = assertThrows(IOException.class,
                 () -> SkillPack.resolve(Map.of("team", overlay), Map.of(key, original), workflow));
         assertEquals("team: " + key + ": required by core workflow artifact report", failure.getMessage());
@@ -971,6 +975,167 @@ class SkillPackCompilerTest {
             var schema = assertThrows(IOException.class, () -> SkillPackCompiler.compile(loader, List.of("team")));
             assertTrue(schema.getMessage().contains("'team' schema 9"), schema::getMessage);
         }
+    }
+
+    private static final String COVERAGE = "step/validate/report/coverage";
+    private static final String HOOK_INPUT = """
+            {"sources":["orders.yaml"],"target":"quarkus","artifacts":{"inventory":"coverage.tsv"}}
+            """;
+
+    @Test
+    @Tag("cli-compat")
+    void installedSkillSubmitsItsDecisionFailureAndVerifiedCoverage() throws Exception {
+        Path example = Path.of("../../docs/modules/ROOT/examples/skill-pack/src/main/resources").toRealPath();
+        Path dist = distribution(example, "report-review");
+        assertCli(0, dist, temp, "init", "--here", "--ai", "bob2", "--no-fetch", "--silent");
+        Path skills = temp.resolve(".bob/skills");
+        assertTrue(Files.readString(skills.resolve("camel-validate/SKILL.md")).contains("hook --id " + COVERAGE));
+        Files.writeString(temp.resolve("orders.yaml"), "route: orders");
+        Path inventory = Files.writeString(temp.resolve("coverage.tsv"), "unit\torders.yaml\n");
+        Path input = Files.writeString(temp.resolve("input.json"), HOOK_INPUT);
+        var pending = submitCoverage(dist, skills, 1, false);
+        assertEquals("needs-input", pending.path("status").asText());
+        Files.writeString(temp.resolve("pending.json"), pending.toString());
+        String confirmed = HOOK_INPUT.replace("\"sources\"", "\"answer\":\"integration\",\"sources\"");
+        Files.writeString(input, confirmed);
+        var failure = submitCoverage(dist, skills, 1, true);
+        assertEquals("failed", failure.path("status").asText());
+        assertTrue(failure.at("/checks/route-coverage/evidence").asText().contains("missing orders.yaml"));
+        Files.writeString(inventory, "integration\torders.yaml\n");
+        String staleDecision = assertCli(1, dist, temp, "hook", "--id", COVERAGE, "--input", "input.json", "--resume",
+                "pending.json");
+        assertTrue(staleDecision.contains("artifacts"), staleDecision);
+        Files.writeString(input, HOOK_INPUT);
+        Files.writeString(temp.resolve("pending.json"), submitCoverage(dist, skills, 1, false).toString());
+        Files.writeString(input, confirmed);
+        assertEquals("passed", submitCoverage(dist, skills, 0, true).path("status").asText());
+        Files.writeString(inventory, "");
+        String stale = assertCli(1, dist, temp, "hook", "--id", COVERAGE,
+                "--input", "input.json", "--result", "result.json", "--resume", "pending.json");
+        assertTrue(stale.contains("artifacts"), stale);
+    }
+
+    private JsonNode submitCoverage(Path dist, Path skills, int expectedExit, boolean resume) throws Exception {
+        var args = new ArrayList<>(List.of("hook", "--id", COVERAGE, "--input", "input.json"));
+        if (resume) {
+            args.addAll(List.of("--resume", "pending.json"));
+        }
+        String dispatch = assertCli(1, dist, temp, args.toArray(String[]::new));
+        var message = SkillCatalog.JSON.readTree(dispatch);
+        assertEquals("invoke-skill", message.path("status").asText());
+        var request = message.required("request");
+        Path entry = skills.resolve(request.required("implementation").textValue());
+        assertTrue(Files.readString(entry).contains("guides/coverage.py"));
+        Files.writeString(temp.resolve("request.json"), request.toString());
+        String python = File.separatorChar == '\\' ? "python" : "python3";
+        var process = new ProcessBuilder(python, entry.resolveSibling("guides/coverage.py").toString(), "request.json")
+                .directory(temp.toFile()).redirectOutput(temp.resolve("result.json").toFile())
+                .redirectError(ProcessBuilder.Redirect.INHERIT).start();
+        assertEquals(0, process.waitFor());
+        args.addAll(List.of("--result", "result.json"));
+        return SkillCatalog.JSON.readTree(assertCli(expectedExit, dist, temp, args.toArray(String[]::new)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"resource/shared/guide.md", "skill/camel-migrate", "skill/missing", "provider/list"})
+    void buildRejectsUnsupportedHookHandlers(String handler) throws Exception {
+        Path pack = pack("bad", String.format(Locale.ROOT, """
+                add:
+                  provider/list:
+                    contract: 1
+                    provider: {service: java.util.List, implementation: java.util.ArrayList}
+                  step/validate/report/check:
+                    contract: 1
+                    hook: {handler: %s, targets: [quarkus], checks: {coverage: report}}
+                """, handler));
+        try (var loader = loader(pack)) {
+            var error = assertThrows(IOException.class, () -> SkillPackCompiler.compile(loader, List.of("bad")));
+            assertTrue(error.getMessage().contains("step/validate/report/check"), error::getMessage);
+            assertTrue(error.getMessage().contains(handler) || error.getMessage().contains("handler"),
+                    error::getMessage);
+        }
+    }
+
+    @Test
+    void replacementCannotDropARequiredCheck() throws Exception {
+        Path example = Path.of("../../docs/modules/ROOT/examples/skill-pack/src/main/resources").toRealPath();
+        Path pack = pack("overlay", """
+                requires: [report-review]
+                replace:
+                  step/validate/report/coverage:
+                    contract: 1
+                    hook: {handler: skill/camel-validate, targets: [quarkus, spring-boot], checks: {other: inventory}}
+                """);
+        try (var loader = loader(pack, example)) {
+            var error = assertThrows(IOException.class,
+                    () -> SkillPackCompiler.compile(loader, List.of("report-review", "overlay")));
+            assertTrue(error.getMessage().contains("preserve hook targets and checks"), error::getMessage);
+        }
+    }
+
+    public static class InventoryProvider implements WorkflowHookProvider {
+        @Override
+        public Result invoke(Path project, Request request) throws IOException {
+            if (request.decisions().isEmpty()) {
+                return new Result(request, "needs-input", Map.of(), "Which suite?");
+            }
+            String answer = request.decisions().getLast().answer();
+            var inventory = project.resolve(request.artifacts().get("inventory").path());
+            if (answer.equals("rewrite")) {
+                Files.writeString(inventory, "changed during dispatch");
+            }
+            boolean passed = Files.readAllLines(inventory).contains(answer);
+            return new Result(
+                    request, passed ? "passed" : "failed",
+                    Map.of("route-coverage", new Check(passed, "Looked for suite " + answer)), null);
+        }
+    }
+
+    @Test
+    void executableReplacementDispatchesJavaAndRechecksItsFiles() throws Exception {
+        Path example = Path.of("../../docs/modules/ROOT/examples/skill-pack/src/main/resources").toRealPath();
+        Path overlay = pack("compiled", String.format(Locale.ROOT, """
+                requires: [report-review]
+                add:
+                  provider/inventory:
+                    contract: 1
+                    handles: [step/validate/report/coverage]
+                    provider: {service: %s, implementation: %s}
+                replace:
+                  step/validate/report/coverage:
+                    contract: 1
+                    hook:
+                      handler: provider/inventory
+                      targets: [spring-boot, quarkus]
+                      checks: {route-coverage: inventory}
+                """, WorkflowHookProvider.class.getName(), InventoryProvider.class.getName()));
+        var archive = temp.resolve(SkillCatalog.DISTRIBUTION);
+        Files.createDirectories(archive.getParent());
+        try (var loader = loader(example, overlay)) {
+            Files.write(archive, SkillPackCompiler.compile(loader, List.of("compiled", "report-review")));
+        }
+        Files.writeString(temp.resolve("orders.yaml"), "orders");
+        Files.writeString(temp.resolve("coverage.tsv"), "integration\n");
+        Path input = Files.writeString(temp.resolve("input.json"), HOOK_INPUT);
+        String[] invoke = {"hook", "--id", COVERAGE, "--input", "input.json"};
+        String pending = assertCli(1, temp, temp, invoke);
+        assertEquals("needs-input", SkillCatalog.JSON.readTree(pending).path("status").asText());
+        Files.writeString(temp.resolve("pending.json"), pending);
+        for (String answer : List.of("unit", "integration", "rewrite")) {
+            Files.writeString(input, HOOK_INPUT.replace("\"sources\"", "\"answer\":\"" + answer + "\",\"sources\""));
+            String output = assertCli(answer.equals("integration") ? 0 : 1, temp, temp, "hook", "--id", COVERAGE,
+                    "--input", "input.json", "--resume", "pending.json");
+            if (answer.equals("rewrite")) {
+                assertTrue(output.contains("artifacts"), output);
+            } else {
+                var result = SkillCatalog.JSON.readTree(output);
+                assertEquals(answer.equals("integration") ? "passed" : "failed", result.path("status").asText());
+                assertEquals("provider/inventory", result.at("/request/handler").asText());
+            }
+        }
+        assertTrue(
+                assertCli(1, temp, temp, "hook", "--id", COVERAGE, "--input", "input.json", "--result", "forged.json")
+                        .contains("requires Java dispatch"));
     }
 
     private Path pack(String id, String yaml) throws IOException {

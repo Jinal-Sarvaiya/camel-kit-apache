@@ -16,6 +16,7 @@ retains its single CLI invocation with the supplied options.
   - [camel-kit doctor](#camel-kit-doctor)
   - [camel-kit graph](#camel-kit-graph)
   - [camel-kit doc](#camel-kit-doc)
+  - [camel-kit hook](#camel-kit-hook)
   - [camel-kit nextId](#camel-kit-nextid)
 - [Slash Commands](#slash-commands)
   - [/camel-start](#camel-start)
@@ -416,6 +417,13 @@ camel-kit graph migration-context processOrders
 # Expand to depth 5 for complex route dependencies
 camel-kit graph migration-context processOrders --depth 5
 ```
+
+### camel-kit hook
+
+Run `camel-kit hook --id <step-contribution> --input <caller.json>` from the project root.
+For a skill handler, pass the emitted request to the selected skill and submit its response with
+`--result <skill-result.json>`. Java handlers return their response directly. To relay a developer answer, supply the prior pending output with `--resume <pending.json>`. A verified pass exits zero.
+See the [workflow hook guide](modules/ROOT/pages/skills.adoc#workflow-hooks).
 
 ### camel-kit nextId
 

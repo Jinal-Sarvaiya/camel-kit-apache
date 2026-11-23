@@ -9,7 +9,7 @@ CLI, "Use the `/camel-start` skill" in GitHub Copilot CLI, `/skill:camel-start` 
 [[cli]]
 == CLI commands
 
-Development builds use Aesh for one-shot execution. Use `-h`/`--help` on the root, `init`, `doctor` or `ship`,
+Development builds use Aesh for one-shot execution. Use `-h`/`--help` on the root, `init`, `doctor`, `hook` or `ship`,
 and the `help` subcommand for `doc`, `graph` and `plan`. Use `-V`/`--version`
 at the CLI root for the Kit version. See xref:getting-started.adoc#cli-host[development host compatibility].
 `init -p one=1 two=2` accepts several property values; Ship's `-p` consumes one value per occurrence.
@@ -170,6 +170,18 @@ camel-kit doc stale --reason "design spec was amended" --cascade \
   docs/camel-kit/001-order-processing/implementation-plan.md
 camel-kit doc unstale docs/camel-kit/001-order-processing/implementation-plan.md
 ----
+
+[[hook]]
+=== hook
+
+Run a required assistant workflow contribution from the project root.
+
+----
+camel-kit hook --id <step-contribution> --input <caller.json> [--resume <pending.json>] [--result <skill-result.json>]
+----
+
+The CLI prints a JSON request for an installed skill or invokes the bundled Java provider. Only a verified
+`passed` result exits zero. See xref:skills.adoc#workflow-hooks[responding to a question or failed check].
 
 [[graph]]
 === graph

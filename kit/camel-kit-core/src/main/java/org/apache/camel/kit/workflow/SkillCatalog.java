@@ -13,6 +13,7 @@ import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 
@@ -28,8 +29,15 @@ public final class SkillCatalog {
     public record Provider(String service, String implementation) {
     }
 
-    public record Binding(String pack, int contract, List<String> requires, String path, Provider provider) {
+    public record Binding(String pack, int contract, List<String> requires, String path, Provider provider,
+            @JsonInclude(JsonInclude.Include.NON_NULL) WorkflowHook hook,
+            @JsonInclude(JsonInclude.Include.NON_EMPTY) List<String> handles) {
+        public Binding(String pack, int contract, List<String> requires, String path, Provider provider) {
+            this(pack, contract, requires, path, provider, null, List.of());
+        }
+
         public Binding {
+            handles = handles == null ? List.of() : List.copyOf(handles);
             requires = List.copyOf(requires);
         }
     }
@@ -42,10 +50,11 @@ public final class SkillCatalog {
         }
     }
 
+    private final String archiveSha256;
     private final Manifest manifest;
     private final Map<String, byte[]> files;
 
-    SkillCatalog(Manifest manifest, Map<String, byte[]> files) throws IOException {
+    SkillCatalog(Manifest manifest, Map<String, byte[]> files, String archiveSha256) throws IOException {
         if (manifest.contract() != 1) {
             throw new IOException("Unsupported skill catalog contract: " + manifest.contract());
         }
@@ -61,8 +70,28 @@ public final class SkillCatalog {
             Binding binding = entry.getValue();
             if (binding.contract() != 1 || !manifest.packs().contains(binding.pack())
                     || !manifest.contributions().keySet().containsAll(binding.requires())
-                    || (binding.provider() == null ? !files.containsKey(binding.path()) : binding.path() != null)) {
+                    || (binding.provider() == null
+                            ? binding.path() == null || !files.containsKey(binding.path()) : binding.path() != null)) {
                 throw new IOException("Invalid bundled contribution " + binding.pack() + ": " + entry.getKey());
+            }
+            if (!binding.handles().isEmpty() && (!(entry.getKey().startsWith("skill/")
+                    || entry.getKey().startsWith("provider/") && binding.provider() != null
+                            && WorkflowHookProvider.class.getName().equals(binding.provider().service()))
+                    || binding.handles().stream().anyMatch(key -> !key.matches(WorkflowHook.STEP))
+                    || Set.copyOf(binding.handles()).size() != binding.handles().size())) {
+                throw new IOException(binding.pack() + ": invalid handles declaration on " + entry.getKey());
+            }
+            WorkflowHook hook = binding.hook();
+            if (hook != null) {
+                hook.validate(entry.getKey());
+                String stage = entry.getKey().split("/")[1];
+                boolean atStage = manifest.workflow().stages().stream().anyMatch(s -> s.id().equals(stage)
+                        && (s.skill() + "/SKILL.md").equals(binding.path()));
+                if (!atStage || !binding.requires().contains(hook.handler())
+                        || !hook.supports(entry.getKey(), manifest.contributions().get(hook.handler()), skills)) {
+                    throw new IOException(
+                            binding.pack() + ": " + entry.getKey() + ": unsupported hook handler " + hook.handler());
+                }
             }
         }
         // All supported hosts must agree on whether a destination is a file or directory, including on Windows.
@@ -88,8 +117,13 @@ public final class SkillCatalog {
                 }
             }
         }
+        this.archiveSha256 = archiveSha256;
         this.manifest = manifest;
         this.files = Collections.unmodifiableMap(new TreeMap<>(files));
+    }
+
+    String archiveSha256() {
+        return archiveSha256;
     }
 
     public Manifest manifest() {
@@ -127,7 +161,8 @@ public final class SkillCatalog {
         if (urls.size() != 1) {
             throw new IOException("Expected one assembled Camel Kit skill catalog, found " + urls);
         }
-        try (var stream = new ZipInputStream(urls.get(0).openStream())) {
+        try (var archive = WorkflowHookProvider.Revision.hashing(urls.getFirst().openStream());
+             var stream = new ZipInputStream(archive)) {
             Manifest manifest = null;
             Map<String, byte[]> files = new TreeMap<>();
             for (ZipEntry entry; (entry = stream.getNextEntry()) != null;) {
@@ -142,7 +177,8 @@ public final class SkillCatalog {
             if (manifest == null) {
                 throw new IOException("Missing " + MANIFEST + " in " + urls);
             }
-            return new SkillCatalog(manifest, files);
+            return new SkillCatalog(
+                    manifest, files, WorkflowHookProvider.Revision.finishDigest(archive));
         }
     }
 }

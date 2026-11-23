@@ -228,6 +228,11 @@ This graph-aware context complements file analysis with a bounded topology view 
 
 ## 3. The Orchestration Model
 
+A pack can bind a named step to a skill or a Java provider. Both receive the same versioned request and
+return observations for required checks. The CLI binds acceptance to the current source and artifact bytes.
+The caller handles pending decisions and ordinary stage sequencing. See the
+[workflow hook contract](modules/ROOT/pages/contributing.adoc#implement-hook).
+
 ### Pipeline
 
 The end-to-end pipeline follows a strict phase progression:

@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Run a distribution's required workflow hooks with `camel-kit hook` or `camel kit hook`. Bundled skills and Java
+  providers share a versioned result contract, including developer questions and checks bound to file revisions (#196).
+
 - **Build-time skill pack composition (#192)** — a distribution can add or replace skills, resources, Java provider
   bindings and instructions at named workflow steps. Installation, command generation, routing and Doctor use the
   assembled catalog. After successful generation, reinitialization removes matching retired files, recognizes Git

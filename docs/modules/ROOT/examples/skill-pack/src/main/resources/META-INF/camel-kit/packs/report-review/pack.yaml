@@ -5,3 +5,17 @@ add:
   step/validate/report/review:
     contract: 1
     resource: review.md
+  skill/camel-review-coverage:
+    contract: 1
+    resource: coverage.md
+    handles: [step/validate/report/coverage]
+    requires: [resource/camel-review-coverage/guides/coverage.py]
+  resource/camel-review-coverage/guides/coverage.py:
+    contract: 1
+    resource: coverage.py
+  step/validate/report/coverage:
+    contract: 1
+    hook:
+      handler: skill/camel-review-coverage
+      targets: [quarkus, spring-boot]
+      checks: {route-coverage: inventory}

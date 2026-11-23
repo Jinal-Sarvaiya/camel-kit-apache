@@ -109,7 +109,9 @@ public final class SkillPackCompiler {
                     }
                     path = skill + "/SKILL.md";
                     steps.computeIfAbsent(parts[0] + "/" + parts[1], unused -> new ArrayList<>())
-                            .add(new String(resources.get(d), StandardCharsets.UTF_8).strip());
+                            .add(d.entry().hook() == null
+                                    ? new String(resources.get(d), StandardCharsets.UTF_8).strip()
+                                    : d.entry().hook().instructions(d.key()));
                 }
                 case "provider" -> path = null;
                 default -> throw d.error("unknown contribution kind");
@@ -119,17 +121,21 @@ public final class SkillPackCompiler {
                 SkillPack.requireContribution(d, key, entries, packs);
             }
             bindings.put(d.key(),
-                    new SkillCatalog.Binding(d.pack(), d.entry().contract(), requires, path, d.entry().provider()));
+                    new SkillCatalog.Binding(
+                            d.pack(), d.entry().contract(), requires, path, d.entry().provider(), d.entry().hook(),
+                            d.entry().handles()));
         }
         WorkflowManifest effective = composeWorkflow(workflow, entries, definitions, steps);
         bindSteps(stageSkills, files, steps, entries);
         var manifest = new SkillCatalog.Manifest(1, List.copyOf(packs.keySet()), effective, bindings);
-        return archive(new SkillCatalog(manifest, files));
+        return archive(new SkillCatalog(manifest, files, null));
     }
 
     private List<String> requirements(Declaration declaration, String path, Map<String, Declaration> definitions) {
         var requires = new TreeSet<>(declaration.entry().requires());
-        if (path != null && path.endsWith(".md")) {
+        if (declaration.entry().hook() != null) {
+            requires.add(declaration.entry().hook().handler());
+        } else if (path != null && path.endsWith(".md")) {
             String owner = path.substring(0, path.indexOf('/'));
             Matcher links = GUIDE_REFERENCE.matcher(new String(resources.get(declaration), StandardCharsets.UTF_8));
             while (links.find()) {
@@ -235,7 +241,7 @@ public final class SkillPackCompiler {
                     }
                     requires = skill.requires();
                 }
-                var d = new Declaration("core", key, new Entry(1, "skills/" + path, null, requires));
+                var d = new Declaration("core", key, new Entry(1, "skills/" + path, null, requires, null, List.of()));
                 base.put(key, d);
                 resources.put(d, Files.readAllBytes(file));
             }
@@ -251,6 +257,13 @@ public final class SkillPackCompiler {
             Entry e = d.entry();
             if (e.contract() != 1) {
                 throw d.error("unsupported contribution contract " + e.contract() + " (expected 1)");
+            }
+            if (e.hook() != null) {
+                e.hook().validate(d.key());
+                if (e.resource() != null || e.provider() != null) {
+                    throw d.error("hook takes the place of step instruction resources");
+                }
+                continue;
             }
             String id = SkillPack.ID;
             if (d.key().matches("provider/" + id)) {

@@ -81,9 +81,13 @@ composed instructions at the declared step. Public pack skills appear in the ins
 tree and in host instructions that list direct commands. Doctor checks the commands, skills and supporting files
 against the same catalog. The default selection exposes
 the existing nine public commands and keeps the four internal skills available to their callers.
-A provider entry identifies a Java service and implementation for consumers. Instructions at a step are read by
-the assistant. Executable provider dispatch and result verification are tracked in
-https://github.com/apache/camel-kit/issues/196[#196].
+An executable step names one bundled skill or Java provider, the supported targets and its required checks.
+The assistant supplies the source scope, selected target and evidence paths. Kit resolves the handler and binds
+the request to the SHA-256 of each file. Both kinds of handler use the same request and result.
+The provider chooses its helper calls and their order. Kit checks the returned binding and required evidence
+against the caller's current files. The assistant uses that outcome to sequence ordinary stages.
+A direct call returns to its caller. Ship's controller owns its durable state and stage transitions.
+See xref:skills.adoc#workflow-hooks[handling a pending or failed hook].
 
 The committed ownership ledger records the installed content after host-specific changes. A catalog switch retires
 matching files after generating the replacement assets. An owned file can become a directory of guides or a

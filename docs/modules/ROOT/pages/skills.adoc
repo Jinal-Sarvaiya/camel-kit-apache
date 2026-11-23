@@ -35,6 +35,40 @@ the composition primitives the stages assemble. `camel-ship` is the outlier of i
 delegate that invokes the registered `camel-kit ship` command once and does not follow the guide-based structure
 described below.
 
+[[workflow-hooks]]
+== Running a required workflow hook
+
+When an installed stage names a hook, use the CLI invocation in that step with the distribution that installed it.
+From the project root, write the caller's input file with the complete list of in-scope source files, the selected
+target and the existing evidence file for each named artifact role. Keep the input under the caller's control.
+
+[source,json]
+----
+{"sources":["routes/orders.yaml"],"target":"quarkus","artifacts":{"inventory":"coverage.tsv"}}
+----
+
+[source,shell]
+----
+camel-kit hook --id step/validate/report/coverage --input input.json
+----
+
+* On `invoke-skill`, pass the emitted `request` object to the named installed skill. The `implementation` path
+  is relative to the host's skills directory. Submit the returned JSON using the same command with
+  `--result result.json`. Kit dispatches a Java handler directly.
+* On `needs-input`, save the CLI's pending output in a separate file. Ask the developer its `question`, put the confirmed
+  answer in the input's `answer` string and invoke the same hook with `--resume pending.json`. Keep that option
+  when submitting the skill result. Kit checks the pending request against the current binding and includes
+  the question and answer in the provider's `decisions` list. Save each new pending output separately if more
+  questions follow. If the binding changes, start a fresh request and confirm the decision for the new inputs.
+* On `failed`, inspect the named checks and their observations. Correct the source or evidence and rerun.
+  For a missing check, return an observation for the required ID. For a stale request, obtain a fresh request and
+  repeat the check against the current files. For an unsupported target or handler, check the distribution's pack declaration.
+* Only exit code zero with `passed` satisfies this contribution. Return the outcome to the calling skill or
+  developer. The assistant decides when the ordinary stage's other requirements are also complete.
+
+The verifier checks the provider's observations for completeness and binds them to the selected files.
+The provider performs the domain check. See xref:contributing.adoc#implement-hook[implementing a handler].
+
 [[shared-guides]]
 == Shared guides
 

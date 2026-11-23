@@ -52,7 +52,7 @@ final class ReleasedCatalog {
                 return configuredAgent != null && !configuredAgent.isBlank();
             }
         } catch (IOException | IllegalArgumentException e) {
-            throw new InvalidAgentConfigurationException("Cannot read " + config + ": " + e.getMessage(), e);
+            throw InvalidAgentConfigurationException.cannotRead(config, e);
         }
     }
 

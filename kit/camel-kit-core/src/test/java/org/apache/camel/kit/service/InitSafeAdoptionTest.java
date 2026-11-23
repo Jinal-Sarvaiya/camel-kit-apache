@@ -29,6 +29,8 @@ import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Initialization inside an existing application must not replace files the application already owns, and
@@ -211,6 +213,32 @@ class InitSafeAdoptionTest {
             settings.load(in);
         }
         assertEquals("André", settings.getProperty("team.owner"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {".camel-kit/config.properties", ".camel-kit/config.yaml", ManagedFiles.LEDGER})
+    @Tag("cli-compat")
+    void deniedWorkspaceFileReadsExplainHowToRetryWithoutChangingTheProject(String relativePath) throws Exception {
+        assumeTrue(Files.getFileStore(tempDir).supportsFileAttributeView("posix"));
+        Path file = tempDir.resolve(relativePath);
+        Files.createDirectories(file.getParent());
+        Files.createFile(file);
+        var original = snapshot(tempDir);
+        var permissions = Files.getPosixFilePermissions(file);
+        var service = new InitService();
+        var init = request(tempDir, "claude");
+        try {
+            Files.setPosixFilePermissions(file, Set.of());
+            assumeFalse(Files.isReadable(file), "The current user can bypass read permissions");
+            String expected = "Permission denied reading " + file + ". Restore read access and retry.";
+            assertEquals(expected, assertThrows(InvalidAgentConfigurationException.class,
+                    () -> service.preview(init)).getMessage());
+            assertEquals(expected, assertThrows(InvalidAgentConfigurationException.class,
+                    () -> service.initialize(init)).getMessage());
+        } finally {
+            Files.setPosixFilePermissions(file, permissions);
+        }
+        assertEquals(original, snapshot(tempDir));
     }
 
     @ParameterizedTest

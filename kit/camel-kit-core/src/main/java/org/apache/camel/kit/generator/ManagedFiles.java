@@ -196,7 +196,7 @@ public final class ManagedFiles {
                 }
             }
         } catch (IOException | IllegalArgumentException e) {
-            throw new InvalidAgentConfigurationException("Cannot read " + ledgerFile + ": " + e.getMessage(), e);
+            throw InvalidAgentConfigurationException.cannotRead(ledgerFile, e);
         }
         // Validate the configuration before any writes, even when the ledger already records first adoption.
         boolean configured = agentName != null && ReleasedCatalog.hasWorkspaceConfiguration(root);

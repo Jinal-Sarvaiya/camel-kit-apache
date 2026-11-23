@@ -263,12 +263,14 @@ regular file. On reinitialization, properties you added to `.camel-kit/config.pr
 Camel Kit records the hash of each tracked file it wrote in `.camel-kit/managed-files.properties`; commit it with
 the project.
 
+[[_upgrading_from_0_4_1_and_earlier]]
 ==== Upgrading from 0.4.1 and earlier
 
 If the workspace has lost its Kit configuration, restore the original from version control or a backup *before*
 the first upgrade. Releases 0.4.x used `.camel-kit/config.properties`. Earlier releases used `.camel-kit/config.yaml`.
 When both files exist, Kit reads the properties file. If the active file is malformed, both `--dry-run` and `init`
 report the path before writing anything. Repair or restore that file and retry.
+If Kit reports a permission error reading the configuration or the ledger, restore read access to the named file and retry.
 
 From the project root, run `camel-kit init --here --ai claude --force`, substituting your assistant's name.
 In a shared workspace, run this command once for each assistant, in any order.
@@ -382,6 +384,8 @@ camel-kit doctor --json   # for automation
 permission fields, the project graph, the command prefix, the prerequisites and common stale generated references. It
 prints `PASS`, `WARN` and `FAIL` findings with remediation text. Missing external tools such as JBang are warnings;
 broken generated workspace files are failures.
+If Doctor cannot load the workspace configuration, it reports the cause and still checks the graph, prerequisites
+and stale references in project-level instructions.
 
 [[first-command]]
 == Run the first command

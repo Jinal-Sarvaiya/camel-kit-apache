@@ -3,8 +3,11 @@ package org.apache.camel.kit.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -74,11 +77,16 @@ public class DoctorService {
         List<DoctorFinding> findings = new ArrayList<>();
 
         Properties config = checkConfig(root, findings);
-        AgentConfig agent = checkAgentConfig(config, findings);
-        checkGeneratedWorkspace(root, agent, findings);
-        checkMcp(root, config, findings);
+        AgentConfig agent = null;
+        if (config != null) {
+            agent = checkAgentConfig(config, findings);
+            checkGeneratedWorkspace(root, agent, findings);
+            checkMcp(root, config, findings);
+        }
         checkGraph(root, findings);
-        checkCommandPrefix(config, findings);
+        if (config != null) {
+            checkCommandPrefix(config, findings);
+        }
         checkPrerequisites(root, findings);
         checkStaleReferences(root, agent, findings);
 
@@ -86,34 +94,40 @@ public class DoctorService {
     }
 
     private Properties checkConfig(Path root, List<DoctorFinding> findings) {
-        Path configFile = root.resolve(".camel-kit/config.properties");
-        if (!Files.isRegularFile(configFile)) {
-            findings.add(DoctorFinding.fail("config", relativize(root, configFile),
-                    ".camel-kit/config.properties is missing",
-                    "Restore any lost Kit configuration before upgrading an existing workspace. "
-                                                               + "Run camel-kit init --here --ai <agent> from the workspace root."));
-            return new Properties();
-        }
-
+        String path = ".camel-kit/config.properties";
+        Path configFile = root.resolve(path);
         Properties config = new Properties();
-        try (InputStream in = Files.newInputStream(configFile)) {
-            config.load(in);
+        try {
+            if (!Files.readAttributes(configFile, BasicFileAttributes.class).isRegularFile()) {
+                throw new IOException("Expected a regular file");
+            }
+            try (InputStream in = Files.newInputStream(configFile)) {
+                config.load(in);
+            }
+        } catch (NoSuchFileException e) {
+            findings.add(DoctorFinding.fail("config", path, path + " is missing",
+                    "Restore any lost Kit configuration before upgrading an existing workspace. "
+                                                                                  + "Run camel-kit init --here --ai <agent> from the workspace root."));
+            return null;
+        } catch (AccessDeniedException e) {
+            findings.add(DoctorFinding.fail("config", path, "Permission denied reading " + path,
+                    "Restore read access and re-run camel-kit doctor."));
+            return null;
         } catch (IOException | IllegalArgumentException e) {
-            findings.add(DoctorFinding.fail("config", relativize(root, configFile),
-                    "Could not read .camel-kit/config.properties: " + e.getMessage(),
+            findings.add(DoctorFinding.fail("config", path, "Could not read " + path + ": " + e.getMessage(),
                     "Repair the file or restore it from source control before running init."));
-            return new Properties();
+            return null;
         }
 
         List<String> missing = REQUIRED_CONFIG_KEYS.stream()
                 .filter(key -> config.getProperty(key, "").isBlank())
                 .toList();
         if (missing.isEmpty()) {
-            findings.add(DoctorFinding.pass("config", relativize(root, configFile),
+            findings.add(DoctorFinding.pass("config", path,
                     ".camel-kit/config.properties contains the required keys",
                     "No action required."));
         } else {
-            findings.add(DoctorFinding.fail("config", relativize(root, configFile),
+            findings.add(DoctorFinding.fail("config", path,
                     ".camel-kit/config.properties is missing keys: " + String.join(", ", missing),
                     "Restore the missing keys or re-run camel-kit init --here --ai <agent> --force."));
         }

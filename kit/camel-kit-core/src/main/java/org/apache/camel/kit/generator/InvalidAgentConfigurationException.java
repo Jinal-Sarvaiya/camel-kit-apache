@@ -19,6 +19,13 @@ public final class InvalidAgentConfigurationException extends IOException {
         super(message, cause);
     }
 
+    static InvalidAgentConfigurationException cannotRead(Path file, Exception cause) {
+        String message = cause instanceof AccessDeniedException
+                ? "Permission denied reading " + file + ". Restore read access and retry."
+                : "Cannot read " + file + ": " + cause.getMessage();
+        return new InvalidAgentConfigurationException(message, cause);
+    }
+
     public static InvalidAgentConfigurationException unreadableDirectory(AccessDeniedException cause) {
         String path = cause.getFile();
         Path parent = path == null ? null : Path.of(path).getParent();

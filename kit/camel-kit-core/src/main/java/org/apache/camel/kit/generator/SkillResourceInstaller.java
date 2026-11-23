@@ -23,11 +23,6 @@ class SkillResourceInstaller {
 
     private static final Pattern EMPHASIS_TOKENS = Pattern.compile("\\\\[\\\\*]|\\*++|\\R");
 
-    private static final List<String> RETIRED_SHIP_GUIDES = List.of(
-            "auto-fix-loop.md",
-            "oversight-matrix.md",
-            "state-management.md");
-
     /** Agents whose generated Ship entry point relays controller tasks to a read-only native subagent. */
     static final Set<String> NATIVE_SHIP_AGENTS = Set.of(
             AgentGeneratorStrategy.BOB2.descriptorValue(),
@@ -67,10 +62,9 @@ class SkillResourceInstaller {
         if (!failures.isEmpty()) {
             throw new IOException("Failed to copy skill resources: " + String.join("; ", failures));
         }
-        try (var stream = Files.list(ctx.skillsDir())) {
-            ctx.printer().println(AnsiColors.green("✓") + " Copied " + catalog.paths().size() + " files in "
-                                  + stream.filter(Files::isDirectory).count() + " skill folders");
-        }
+        long folders = catalog.paths().stream().map(path -> path.substring(0, path.indexOf('/'))).distinct().count();
+        ctx.printer().println(AnsiColors.green("✓") + " Copied " + catalog.paths().size() + " files in "
+                              + folders + " skill folders");
     }
 
     private void copySkillFile(
@@ -122,13 +116,6 @@ class SkillResourceInstaller {
             if (codexInvocations != null) {
                 useCodexSkillInvocations(destination, codexInvocations);
             }
-        }
-    }
-
-    void removeRetiredShipGuides(InitContext ctx) throws IOException {
-        Path guides = ctx.skillsDir().resolve("camel-ship/guides");
-        for (String guide : RETIRED_SHIP_GUIDES) {
-            GeneratedAssetCleaner.deleteRegularFile(ctx, guides.resolve(guide));
         }
     }
 

@@ -12,6 +12,7 @@ import java.util.Set;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.output.Printer;
+import org.apache.camel.kit.output.SystemPrinter;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,6 +20,69 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 class CatalogUpdateTest {
+
+    @Test
+    void editDuringRenderingPreservesLiveBytesAndProposesTheCompletedBinary(@TempDir Path project) throws Exception {
+        var agent = AgentRegistry.get("bob2");
+        String path = agent.skillsDirectory() + "/shared/example.bin";
+        Path target = project.resolve(path);
+        Files.createDirectories(target.getParent());
+        Path ledger = project.resolve(ManagedFiles.LEDGER);
+        Files.createDirectories(ledger.getParent());
+        var files = ManagedFiles.open(project, Set.of());
+        var ctx = new InitContext(
+                agent, "bob2", project.resolve(agent.commandDirectory()), project.resolve(agent.skillsDirectory()),
+                project, "camel-kit", DistributionConfig.loadFromClasspathOrDefaults(), false, Printer.noop(), files);
+        var update = new CatalogUpdate(ctx, Set.of(path), List.of());
+        byte[] incoming = {0, (byte) 0xff, '\r', '\n'};
+        byte[] personal = {0, (byte) 0xfe, '\n'};
+        assertEquals(ManagedFiles.Action.CREATE, update.changes().getFirst().action());
+        update.generate(install -> {
+            Path rendered = install.skillFile("shared/example.bin");
+            Files.createDirectories(rendered.getParent());
+            Files.write(rendered, incoming);
+            Files.write(target, personal);
+        });
+        files.save();
+        assertArrayEquals(personal, Files.readAllBytes(target));
+        assertArrayEquals(incoming, Files.readAllBytes(project.resolve(ManagedFiles.PROPOSALS).resolve(path)));
+        assertFalse(Files.readString(ledger).contains("catalog/" + path));
+    }
+
+    @Test
+    void editAfterLayoutSwapKeepsTheGeneratedOwnershipHash(@TempDir Path project) throws Exception {
+        var agent = AgentRegistry.get("bob2");
+        Path skills = project.resolve(agent.skillsDirectory());
+        String path = agent.skillsDirectory() + "/shared/layout";
+        Path old = project.resolve(path).resolve("old.md");
+        Files.createDirectories(old.getParent());
+        Files.writeString(old, "Before");
+        Files.createDirectories(project.resolve(".camel-kit"));
+        var files = ManagedFiles.open(project, Set.of());
+        files.recordCatalogFile(old, Files.readAllBytes(old), ManagedFiles.Action.CREATE);
+        var printer = new SystemPrinter() {
+            @Override
+            public void println(String line) {
+                if (line.contains("Replaced catalog layout")) {
+                    assertDoesNotThrow(() -> Files.writeString(project.resolve(path), "Team edit"));
+                }
+            }
+        };
+        var ctx = new InitContext(
+                agent, "bob2", project.resolve(agent.commandDirectory()), skills, project,
+                "camel-kit", DistributionConfig.loadFromClasspathOrDefaults(), false, printer, files);
+        var update = new CatalogUpdate(
+                ctx, Set.of(path),
+                List.of(new ManagedFiles.Change(files.key(old), ManagedFiles.Action.REMOVE, null)));
+        update.generate(install -> {
+            Path target = install.skillFile("shared/layout");
+            Files.createDirectories(target.getParent());
+            Files.writeString(target, "After");
+        });
+
+        assertEquals("Team edit", Files.readString(project.resolve(path)));
+        assertEquals(ManagedFiles.Action.PRESERVE, files.planCatalogFile(project.resolve(path)).action());
+    }
 
     @Test
     void aFailedSecondLayoutReplacementRestoresBothOriginals(@TempDir Path project) throws Exception {

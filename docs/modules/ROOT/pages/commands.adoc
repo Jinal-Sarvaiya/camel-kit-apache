@@ -38,13 +38,11 @@ camel-kit init --here [options]
 | `--ai`, `-a` | `bob2` | Coding agent to configure: `bob2`, `antigravity`, `claude`, `codex`, `copilot`, `pi`,
   `qwen` or `opencode`
 | `--here` | `false` | Initialize in the current directory
-| `--force` | `false` | Reinitialize a project that already has `.camel-kit/`. Your content in shared files is
-  kept; see xref:getting-started.adoc#existing-project[Existing projects]
-| `--replace <path>` | none | Replace one existing shared file in full, such as `AGENTS.md` or `mvnw`, instead of
-  merging or preserving it. Repeatable; a path that is not a shared file written by `init` is rejected before
-  anything is written
-| `--dry-run` | `false` | Preview which shared files `init` would create, replace, merge or preserve and which retired
-  catalog files it would remove or preserve. Runs the same validation as `init`, so an existing MCP configuration that cannot be merged is
+| `--force` | `false` | Reinitialize a project that already has `.camel-kit/`. Preserves edits to shared files and catalog assets.
+  See xref:getting-started.adoc#existing-project[Existing projects]
+| `--replace <path>` | none | Accept the generated version of one shared file or one catalog file selected for this assistant.
+  Repeat the option to select more files. An ineligible path is rejected before generation
+| `--dry-run` | `false` | List the create, replace, merge, preserve and remove actions for shared and catalog files. Runs the same validation as `init`, so an existing MCP configuration that cannot be merged is
   rejected here too
 | `--replace-wrapper` | `false` | Replace the complete Maven wrapper; use `--replace <path>` to replace only one shared file
 | `--record-baseline` | `false` | Run the existing project's build and tests once to record baseline results; never runs during `--dry-run`
@@ -65,8 +63,10 @@ report the link and exit with code 1. If `init` reports `Cannot inspect`, restor
 the directory named in the message.
 
 When a new distribution drops a skill, guide or command stub, `init --force` removes the recorded, unmodified
-file in the selected assistant's directories. Git line-ending conversion is recognized for text resources.
-An edited or unrecorded skill can remain discoverable until you move or remove it manually.
+file in the selected assistant's directories. An edited or unrecorded file at a selected path stays in place.
+Compare it with `.camel-kit/conflicts/<path>`, or accept the generated version with `--force --replace <path>`.
+Git line-ending conversion is recognized for text resources. A retired entry point can remain discoverable until
+you move or remove it manually.
 See xref:getting-started.adoc#existing-project[reinitializing existing projects].
 
 Configuration is read in three layers, the later overriding the earlier: the built-in `distribution.properties`,
@@ -107,7 +107,7 @@ current filter and permission fields produce upgrade warnings; malformed current
 exist as skills but must not be exposed as command stubs. A missing catalog-selected file produces a
 `FAIL` finding that names its path and an exit code of 1. Doctor also fails if a symbolic link lies on the
 path from the workspace to the selected assistant's skills directory. It reports the recovery directory of
-an interrupted catalog update. See xref:getting-started.adoc#existing-project[recovery instructions].
+an interrupted catalog update and identifies retained, recorded skill entry points and legacy command stubs. See xref:getting-started.adoc#existing-project[recovery instructions].
 
 In the development snapshot, Citrus MCP configuration is optional. When the project has not opted in,
 `doctor` accepts a missing `citrus` entry; when opted in, a missing entry is a failure. Any existing Citrus

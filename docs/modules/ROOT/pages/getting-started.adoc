@@ -173,9 +173,8 @@ integrations. All pins live in `distribution.properties`.
 == Upgrading
 
 Reinstall the standalone CLI with `jbang app install --force` and the release alias above, or run the plugin
-installation again. To apply updated generated assets to an existing project, commit or back up customized generated
-files, then run `camel-kit init --here --ai <your-agent> --force` from the project root. This rewrites the generated
-assets, except shared files you changed (see <<existing-project>>).
+installation again. From the project root, preview the upgrade with `camel-kit init --here --ai <your-agent> --dry-run`,
+then use `--force` to apply it. Review any preserved skills, guides or commands using the procedure in <<existing-project>>.
 
 From 0.4.0::
 Camel Main, Camel Spring Boot and Camel MCP default to Camel {camel-version}; the supported older LTS patch is
@@ -264,11 +263,17 @@ regular file. On reinitialization, properties you added to `.camel-kit/config.pr
 Camel Kit records the hash of each tracked file it wrote in `.camel-kit/managed-files.properties`; commit it with
 the project. Known limits:
 
-* Each run regenerates the selected skills, subagents, personas and `.camel-kit/templates/`.
-  When switching distributions, `init --force` removes unmodified, recorded skills, guides and command stubs from
-  the selected assistant's directories after generating the replacement assets. Git conversions between LF and CRLF
+* For each selected skill, guide, binary resource or command stub, `init` creates a missing file and refreshes a
+  file that matches the last installation. If you edited it or its ownership record is missing, your file stays
+  in place. Compare it with the host-specific version under `.camel-kit/conflicts/<path>`. Merge changes by hand
+  to keep your customization, or accept the distribution's version for that path, for example
+  `camel-kit init --here --ai claude --force --replace .claude/skills/camel-validate/SKILL.md`.
+  This also records the accepted version for future upgrades. If an old file or directory blocks the proposal path,
+  preview and init identify it. Review it, move it aside, and retry. Subagents, personas and `.camel-kit/templates/` are regenerated.
+* When the distribution moves or drops a file, Kit removes the old copy only if it still matches its record.
+  An edited retired file stays in place and has no new version to merge. Git conversions between LF and CRLF
   count as the same content for the xref:contributing.adoc#skill-packs[supported text formats].
-  Use `--dry-run` to preview removals.
+  Use `--dry-run` to see the action for each path.
   Run init for each assistant you want to update. Codex and Antigravity share `.agents/skills/`, so updating either
   one also updates the skills the other discovers.
 * Switching between a file and a directory requires write access to the directories holding the old files.
@@ -276,10 +281,10 @@ the project. Known limits:
   a recovery directory, `init`, `--dry-run` and Doctor report its path. After any running init has finished,
   inspect its `previous` and `new` contents when present, move the directory outside the skills tree, and retry.
   If the directory cannot be inspected, restore read and search permissions first.
-* Older installations may have no catalog ownership record. Kit also keeps and reports edited retired files.
-  A retained `SKILL.md` remains discoverable even when Doctor passes. Review the skill folder and any associated
-  command stub, then move them outside the assistant's discovery directories or delete them if you want to retire
-  the skill. On hosts that use command stubs, Doctor reports any retained `camel-*` stub outside the selected command list.
+* A retained `SKILL.md` or command stub can still be discovered by the assistant. Doctor reports recorded retired
+  entry points and recognized legacy command stubs. Review the files and move them outside the assistant's discovery
+  directories to retire them. In an older workspace without a catalog ledger, review any additional skill folders
+  yourself.
 * A workspace initialized by an earlier Camel Kit has no ledger, and a missing record never counts as ownership.
   On its first reinitialization the unmarked instruction files get the block appended and the other shared files
   are preserved and reported, even if Camel Kit generated them. Replace those you want refreshed with

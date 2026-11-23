@@ -62,17 +62,17 @@ public class InitCommand extends CamelKitCommand {
     public boolean noFetch;
 
     @Option(parser = KitOptionParser.class, name = "force",
-            description = "Reinitialize an existing workspace, refreshing selected assets and preserving edits to shared files",
+            description = "Reinitialize an existing workspace, preserving edits to shared files and catalog assets",
             hasValue = false)
     public boolean force;
 
     @Option(parser = KitOptionParser.class, name = "dry-run",
-            description = "Preview changes to shared files and retired catalog assets without writing anything",
+            description = "Preview changes to shared files and catalog assets without writing anything",
             hasValue = false)
     public boolean dryRun;
 
     @OptionList(parser = KitOptionParser.class, name = "replace",
-                description = "Replace this existing shared file (for example AGENTS.md or mvnw) instead of "
+                description = "Replace this shared file or selected catalog asset instead of "
                               + "preserving it (repeatable)",
                 valueSeparator = OptionList.NO_SEPARATOR)
     public List<String> replace;
@@ -162,7 +162,7 @@ public class InitCommand extends CamelKitCommand {
             printer().println(dim("  Found:     ") + ".camel-kit/");
             printer().println();
             printer().println(dim("  To reinitialize: ") + bold("--force")
-                              + dim(" (refreshes selected assets and preserves edits to shared files)"));
+                              + dim(" (preserves edits to shared files and catalog assets)"));
             printer().println(dim("  Example:      ") + "camel-kit init " + projectName + " --ai " + ai + " --force");
             printer().println();
             return 1;
@@ -215,9 +215,9 @@ public class InitCommand extends CamelKitCommand {
         }
         printer().println(dim("  merge: Camel Kit's block or servers are added and your content is kept."));
         printer().println(
-                dim("  preserve: the file stays as it is. Use --replace <path> to overwrite an eligible shared file."));
+                dim("  preserve: the file stays as it is. Use --replace <path> to accept a shared file or selected catalog asset."));
         printer().println(dim(
-                "  remove: an unchanged catalog file is retired. Selected skills and other Kit assets are regenerated."));
+                "  remove: an unchanged catalog file is retired."));
         return 0;
     }
 

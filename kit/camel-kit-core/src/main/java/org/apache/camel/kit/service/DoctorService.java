@@ -24,6 +24,7 @@ import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.config.OpenCodeProjectConfig;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 import org.apache.camel.kit.generator.CatalogUpdate;
+import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.ParserDiagnostic;
@@ -179,6 +180,14 @@ public class DoctorService {
 
         try {
             CatalogUpdate.checkInterruptedUpdate(root, skillsDir);
+            for (String path : ManagedFiles.open(root, Set.of()).retiredEntryPoints(agentKey(agent))) {
+                // The command directory check already reports unexpected camel-* stubs on stub-based hosts.
+                if (agent.generatesCommandStubs() && path.startsWith(agent.commandDirectory() + "/camel-")) {
+                    continue;
+                }
+                findings.add(DoctorFinding.fail("workspace", path, "Retired catalog entry point is still installed",
+                        "Review this file and move it outside the assistant's discovery directories to retire it."));
+            }
         } catch (IOException e) {
             findings.add(DoctorFinding.fail("skills", relativize(root, skillsDir), e.getMessage(),
                     "Review the reported path before re-running init."));
@@ -219,14 +228,13 @@ public class DoctorService {
     }
 
     private void checkBobSkillVisibility(Path root, AgentConfig agent, List<DoctorFinding> findings) {
-        String remediation = "Use a build containing the Bob skill discovery fix, back up generated customizations, "
-                             + "then run camel-kit init --here --ai bob2 --force "
-                             + "(or camel kit init --here --ai bob2 --force).";
         for (String skill : expectations.publicSkills()) {
             Path skillFile = root.resolve(agent.skillsDirectory()).resolve(skill).resolve("SKILL.md");
             if (!Files.isRegularFile(skillFile)) {
                 continue; // Missing files are already reported by checkGeneratedWorkspace.
             }
+            String remediation = "Review the local file, then run camel-kit init --here --ai bob2 --force --replace "
+                                 + relativize(root, skillFile) + " to restore the public entry.";
             try {
                 String content = Files.readString(skillFile);
                 if (content.isBlank()) {

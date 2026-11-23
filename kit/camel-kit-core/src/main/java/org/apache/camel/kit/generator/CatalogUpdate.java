@@ -30,7 +30,8 @@ public final class CatalogUpdate {
     private final InitContext ctx;
     private final Path project;
     private final List<ManagedFiles.Change> retirements;
-    private final Set<Path> selected = new HashSet<>();
+    private final List<ManagedFiles.Change> changes;
+    private final Set<Path> selected = new TreeSet<>();
     private final Set<Path> removable = new HashSet<>();
     private final Set<Path> removableDirs;
     private final Set<Path> shapeChanges = new TreeSet<>();
@@ -57,6 +58,13 @@ public final class CatalogUpdate {
         for (Path root : shapeChanges) {
             removableTree(root, root);
         }
+        List<ManagedFiles.Change> planned = new ArrayList<>(retirements);
+        for (Path target : selected) {
+            planned.add(shapeChanges.contains(target)
+                    ? new ManagedFiles.Change(ctx.files().key(target), ManagedFiles.Action.REFRESH, null)
+                    : ctx.files().planCatalogFile(target));
+        }
+        changes = List.copyOf(planned);
     }
 
     private Set<Path> parents(Set<Path> files) {
@@ -72,6 +80,10 @@ public final class CatalogUpdate {
 
     public List<ManagedFiles.Change> retirements() {
         return retirements;
+    }
+
+    public List<ManagedFiles.Change> changes() {
+        return changes;
     }
 
     /** A previous run may already have installed the new layout when removal of its backup failed. */
@@ -141,10 +153,12 @@ public final class CatalogUpdate {
         }
     }
 
-    /** Only resources changing between a file and a directory need a temporary destination. */
+    /** Render skills, traits and stubs away from live files, then publish the final host-specific bytes. */
     public void generate(AgentGenerator generator) throws Exception {
         List<Replacement> replacements = new ArrayList<>();
-        try (Closeable cleanup = () -> discardStaging(replacements)) {
+        Path rendered = Files.createTempDirectory(project.resolve(".camel-kit"), STAGING_PREFIX);
+        try (Closeable cleanupRendered = () -> deleteGeneratedTree(rendered);
+             Closeable cleanup = () -> discardStaging(replacements)) {
             Map<Path, Path> outputs = new HashMap<>();
             for (Path root : shapeChanges) {
                 ConfinedPaths.requirePath(project, root);
@@ -158,11 +172,21 @@ public final class CatalogUpdate {
                     }
                 }
             }
+            for (Path file : selected) {
+                outputs.putIfAbsent(file, rendered.resolve(project.relativize(file)));
+            }
             ctx.files().stageCatalog(outputs);
             generator.generate(ctx);
             try {
                 for (Replacement replacement : replacements) {
                     removableTree(replacement.target(), replacement.target());
+                    for (Path file : selected) {
+                        if (file.startsWith(replacement.target())) {
+                            var action = file.equals(replacement.target())
+                                    ? ManagedFiles.Action.REFRESH : ManagedFiles.Action.CREATE;
+                            ctx.files().recordCatalogFile(file, Files.readAllBytes(outputs.get(file)), action);
+                        }
+                    }
                     Files.move(replacement.target(), replacement.previous());
                     Files.move(replacement.next(), replacement.target());
                 }
@@ -181,6 +205,12 @@ public final class CatalogUpdate {
                     Files.delete(entry);
                 }
                 ctx.printer().println("  Replaced catalog layout at " + ctx.files().key(replacement.target()));
+            }
+            for (Path file : selected) {
+                Path candidate = outputs.get(file);
+                if (candidate.startsWith(rendered)) {
+                    ctx.files().installCatalogFile(file, candidate);
+                }
             }
         } finally {
             ctx.files().stageCatalog(Map.of());
@@ -205,21 +235,25 @@ public final class CatalogUpdate {
         }
     }
 
+    private void deleteGeneratedTree(Path root) throws IOException {
+        ConfinedPaths.requireTree(project, root);
+        if (Files.exists(root, LinkOption.NOFOLLOW_LINKS)) {
+            List<Path> entries;
+            try (var tree = Files.walk(root)) {
+                entries = tree.sorted(Comparator.reverseOrder()).toList();
+            }
+            for (Path entry : entries) {
+                Files.delete(entry);
+            }
+        }
+    }
+
     private void discardStaging(List<Replacement> replacements) throws IOException {
         IOException failure = null;
         for (Replacement replacement : replacements) {
             try {
                 Path generated = replacement.scratch().resolve("new");
-                ConfinedPaths.requireTree(project, generated);
-                if (Files.exists(generated, LinkOption.NOFOLLOW_LINKS)) {
-                    List<Path> entries;
-                    try (var tree = Files.walk(generated)) {
-                        entries = tree.sorted(Comparator.reverseOrder()).toList();
-                    }
-                    for (Path entry : entries) {
-                        Files.delete(entry);
-                    }
-                }
+                deleteGeneratedTree(generated);
                 // If restoration failed, leave the original in its recovery directory.
                 Files.delete(replacement.scratch());
             } catch (IOException e) {

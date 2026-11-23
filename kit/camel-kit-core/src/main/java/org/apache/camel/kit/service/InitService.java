@@ -74,7 +74,7 @@ public class InitService {
             shared.add(targetDir.resolve(template.target()));
         }
         shared.add(targetDir.resolve("docs/constitution.md"));
-        List<ManagedFiles.Change> changes = new ArrayList<>(prepared.catalog().retirements());
+        List<ManagedFiles.Change> changes = new ArrayList<>(prepared.catalog().changes());
         for (Path file : shared) {
             if (files.isShared(file)) {
                 changes.add(change(targetDir, file, files.plan(file)));
@@ -98,7 +98,7 @@ public class InitService {
                 }
             }
         }
-        return ManagedFiles.open(request.targetDir(), replacements);
+        return ManagedFiles.open(request.targetDir(), replacements, request.agentName());
     }
 
     private static ManagedFiles.Change change(Path targetDir, Path file, ManagedFiles.Action action) {

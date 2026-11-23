@@ -50,13 +50,7 @@ public class DefaultGenerator implements AgentGenerator {
     @Override
     public void generate(InitContext ctx) throws Exception {
         WorkflowManifest workflow = WorkflowManifestLoader.loadDefault();
-        skillResourceInstaller.removeRetiredShipGuides(ctx);
-        for (WorkflowManifest.WorkflowCommand command : workflow.generatedCommandStubs()) {
-            if (command.isSkillOnly(ctx.agentName())) {
-                GeneratedAssetCleaner.deleteRegularFile(
-                        ctx, ctx.commandStub(command.name()));
-            }
-        }
+        ctx.files().cleanLegacyCatalogFiles(ctx);
         generateBaseAssets(ctx, workflow);
         beforeApplyTraits(ctx);
         applyTraits(ctx, workflow);

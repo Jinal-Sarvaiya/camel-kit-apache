@@ -3,6 +3,7 @@ package org.apache.camel.kit.service;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,6 +18,7 @@ import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.generator.ManagedFiles.Action;
 import org.apache.camel.kit.output.Printer;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -91,6 +93,83 @@ class InitSafeAdoptionTest {
         assertTrue(Files.isRegularFile(project.resolve("docs/constitution.md")));
         assertFalse(Files.exists(project.resolve(".camel-kit/conflicts")));
         assertTrue(ledger(project).containsKey("mvnw"));
+    }
+
+    @Test
+    void obstructedCatalogProposalIsReportedBeforeAnyWrites() throws Exception {
+        Path project = tempDir.resolve("orders");
+        var service = new InitService();
+        var init = request(project, "claude");
+        service.initialize(init);
+        String path = ".claude/skills/camel-validate/SKILL.md";
+        Files.writeString(project.resolve(path), "My validation rules");
+        Path proposal = project.resolve(ManagedFiles.PROPOSALS).resolve(path);
+        Files.createDirectories(proposal.getParent().getParent());
+        Files.writeString(proposal.getParent(), "Previous proposal at this path");
+        var before = snapshot(project);
+        for (var failure : List.of(
+                assertThrows(InvalidAgentConfigurationException.class, () -> service.preview(init)),
+                assertThrows(InvalidAgentConfigurationException.class, () -> service.initialize(init)))) {
+            assertTrue(failure.getMessage().contains(proposal.getParent().toString()), failure::getMessage);
+        }
+        assertEquals(before, snapshot(project));
+        Files.move(proposal.getParent(), project.resolve("previous-proposal"));
+        service.initialize(init);
+        assertEquals("My validation rules", Files.readString(project.resolve(path)));
+        assertTrue(Files.isRegularFile(proposal));
+    }
+
+    @ParameterizedTest
+    @MethodSource("agents")
+    @Tag("cli-compat")
+    void selectedCatalogFilesRequireOwnershipOrExplicitReplacement(String agentName) throws Exception {
+        Path project = tempDir.resolve(agentName);
+        var agent = AgentRegistry.get(agentName);
+        String skill = agent.skillsDirectory() + "/camel-validate/SKILL.md";
+        String guide = agent.skillsDirectory() + "/shared/iron-laws.md";
+        var paths = new ArrayList<>(List.of(skill, guide));
+        if (agent.generatesCommandStubs()) {
+            paths.add(agent.commandDirectory() + "/camel-validate." + agent.fileFormat());
+        }
+        var service = new InitService();
+        service.initialize(request(project, agentName));
+        var generated = new HashMap<String, String>();
+        for (String path : paths) {
+            generated.put(path, Files.readString(project.resolve(path)));
+            Files.writeString(project.resolve(path), "My " + path);
+        }
+        // This guide predates catalog tracking, so even subsequent runs must not claim it.
+        Properties original = ledger(project);
+        original.remove("catalog/" + guide);
+        try (var out = Files.newBufferedWriter(project.resolve(ManagedFiles.LEDGER))) {
+            original.store(out, null);
+        }
+        var before = snapshot(project);
+        var preview = service.preview(request(project, agentName));
+        assertEquals(before, snapshot(project));
+        for (String path : paths) {
+            assertTrue(preview.stream().anyMatch(c -> c.path().equals(path) && c.action() == Action.PRESERVE), path);
+        }
+
+        for (int run = 0; run < 2; run++) {
+            var result = service.initialize(request(project, agentName));
+            assertEquals(Set.copyOf(paths), result.conflicts().stream().map(ManagedFiles.Change::path)
+                    .collect(Collectors.toSet()));
+            for (String path : paths) {
+                assertEquals("My " + path, Files.readString(project.resolve(path)));
+                assertEquals(generated.get(path),
+                        Files.readString(project.resolve(ManagedFiles.PROPOSALS).resolve(path)));
+                assertEquals(original.getProperty("catalog/" + path), ledger(project).getProperty("catalog/" + path));
+            }
+        }
+        var replacement = request(project, agentName, List.of(skill));
+        assertTrue(service.preview(replacement).stream()
+                .anyMatch(c -> c.path().equals(skill) && c.action() == Action.REFRESH));
+        assertTrue(
+                service.initialize(replacement).warnings().stream().noneMatch(w -> w.message().contains("--replace")));
+        assertEquals(generated.get(skill), Files.readString(project.resolve(skill)));
+        assertFalse(Files.exists(project.resolve(ManagedFiles.PROPOSALS).resolve(skill)));
+        assertEquals("My " + guide, Files.readString(project.resolve(guide)));
     }
 
     @ParameterizedTest
@@ -415,7 +494,7 @@ class InitSafeAdoptionTest {
     }
 
     @Test
-    void userFilesNextToShippedSkillsSurviveWhileShippedSkillsAreRefreshed() throws Exception {
+    void editedSkillsAndNeighboringProjectFilesSurviveReinitialization() throws Exception {
         Path project = tempDir.resolve("orders");
         new InitService().initialize(request(project, "claude"));
         Path skills = project.resolve(".claude/skills");
@@ -428,7 +507,9 @@ class InitSafeAdoptionTest {
 
         new InitService().initialize(request(project, "claude"));
 
-        assertEquals(generated, Files.readString(shipped));
+        assertEquals("edited shipped skill\n", Files.readString(shipped));
+        assertEquals(generated,
+                Files.readString(project.resolve(ManagedFiles.PROPOSALS).resolve(project.relativize(shipped))));
         assertEquals("our notes\n", Files.readString(skills.resolve("camel-start/team-notes.md")));
         assertEquals("our own skill\n", Files.readString(skills.resolve("deploy-orders/SKILL.md")));
     }

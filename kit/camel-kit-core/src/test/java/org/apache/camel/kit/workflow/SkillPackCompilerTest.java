@@ -73,11 +73,15 @@ class SkillPackCompilerTest {
         Path workspace = Files.createDirectory(temp.resolve("workspace"));
         Path commands = Files.createDirectories(workspace.resolve(".claude/commands"));
         Files.writeString(commands.resolve("camel-inspect.md"), "My project command.");
-        Files.writeString(commands.resolve("camel-start.md"), "Retired Kit stub.");
+        Files.writeString(commands.resolve("camel-start.md"), "My command at a former Kit path.");
         assertCli(0, distribution, workspace, "init", "--here", "--ai", "claude", "--no-fetch");
         assertEquals("My project command.", Files.readString(commands.resolve("camel-inspect.md")));
-        assertFalse(Files.exists(commands.resolve("camel-start.md")));
+        assertEquals("My command at a former Kit path.", Files.readString(commands.resolve("camel-start.md")));
         assertTrue(Files.isRegularFile(workspace.resolve(".claude/skills/camel-inspect/SKILL.md")));
+        String doctor = assertCli(1, distribution, workspace, "doctor");
+        assertTrue(doctor.contains(".claude/commands/camel-start.md"), doctor);
+        Files.delete(commands.resolve("camel-start.md"));
+        assertCli(0, distribution, workspace, "doctor");
     }
 
     @ParameterizedTest
@@ -314,12 +318,63 @@ class SkillPackCompilerTest {
         assertTrue(Files.isRegularFile(temp.resolve("bob2/.bob/agents/camel-ship-worker.md")));
     }
 
+    @Test
+    @Tag("cli-compat")
+    void allHostsReconcilePublicAndInternalPackEntriesOnUpgrade() throws Exception {
+        String entries = """
+                add:
+                  skill/camel-inspect: {contract: 1, resource: entry.md}
+                  skill/camel-reader: {contract: 1, resource: reader.md}
+                  resource/camel-reader/guides/GUIDE.md: {contract: 1, resource: guide.md}
+                """;
+        for (String version : List.of("first", "second")) {
+            Path pack = pack(version, entries.replace("GUIDE", version));
+            write(version, "entry.md", SKILL.replace("Original", version));
+            write(version, "reader.md", SKILL.replace("camel-inspect", "camel-reader").replace("true", "false"));
+            write(version, "guide.md", version);
+            Path distribution = distribution(pack, version);
+            assertJava(0, distribution, temp, InstallAgents.class.getName(), "--force");
+            for (String name : AgentRegistry.names()) {
+                var agent = AgentRegistry.get(name);
+                Path workspace = temp.resolve(name);
+                Path skills = workspace.resolve(agent.skillsDirectory());
+                assertTrue(
+                        Files.readString(skills.resolve("camel-inspect/SKILL.md")).contains(version + " instructions."),
+                        name);
+                assertEquals(version, Files.readString(skills.resolve("camel-reader/guides/" + version + ".md")), name);
+                if (version.equals("second")) {
+                    assertFalse(Files.exists(skills.resolve("camel-reader/guides/first.md")), name);
+                }
+                var header = SkillPack.YAML.readTree(FrontmatterHandler.extractFrontmatterYaml(
+                        Files.readString(skills.resolve("camel-reader/SKILL.md"))));
+                assertTrue(header.has("user_invocable") && !header.get("user_invocable").booleanValue(), name);
+                if (Set.of("claude", "copilot", "pi").contains(name)) {
+                    assertFalse(header.get("user-invocable").booleanValue(), name);
+                    assertTrue(header.get("disable-model-invocation").booleanValue(), name);
+                }
+                if (agent.generatesCommandStubs()) {
+                    Path commands = workspace.resolve(agent.commandDirectory());
+                    String stub = Files.readString(commands.resolve("camel-inspect." + agent.fileFormat()));
+                    assertTrue(stub.contains(agent.skillsDirectory() + "/camel-inspect/SKILL.md"), name);
+                    if (agent.argPlaceholder() != null) {
+                        assertTrue(stub.contains(agent.argPlaceholder()), name);
+                    }
+                    assertFalse(Files.exists(commands.resolve("camel-reader." + agent.fileFormat())), name);
+                }
+            }
+        }
+    }
+
     /** All hosts use one JVM and one assembled catalog, isolated from the default catalog in the test runner. */
     public static class InstallAgents {
         public static void main(String[] args) {
             for (String agent : AgentRegistry.names()) {
-                String[] init = {"init", agent, "--ai", agent, "--no-fetch"};
+                var options = new ArrayList<>(List.of("init", agent, "--ai", agent, "--no-fetch"));
+                options.addAll(List.of(args));
+                String[] init = options.toArray(String[]::new);
                 assertEquals(0, CamelKitMain.commandLine(new CamelKitMain(), init).execute(init), agent);
+                String[] doctor = {"doctor", "--project-dir", agent};
+                assertEquals(0, CamelKitMain.commandLine(new CamelKitMain(), doctor).execute(doctor), agent);
             }
         }
     }
@@ -425,6 +480,33 @@ class SkillPackCompilerTest {
             assertEquals("My own guide.", Files.readString(skill.resolve("guides/user.md")));
         }
         assertCli(0, after, workspace, "doctor");
+    }
+
+    @Test
+    @Tag("cli-compat")
+    void doctorIdentifiesARetainedRetiredNativeSkillAlongsidePersonalSkills() throws Exception {
+        Path pack = pack("inspect", "add: {skill/camel-inspect: {contract: 1, resource: inspect.md}}");
+        write("inspect", "inspect.md", SKILL);
+        Path before = distribution(pack, "inspect");
+        Path workspace = Files.createDirectory(temp.resolve("workspace"));
+        assertCli(0, before, workspace, "init", "--here", "--ai", "claude", "--no-fetch");
+        String retired = ".claude/skills/camel-inspect/SKILL.md";
+        Path entry = workspace.resolve(retired);
+        Files.writeString(entry, Files.readString(entry) + "Team instructions.");
+        Path personal = Files.createDirectories(workspace.resolve(".claude/skills/team")).resolve("SKILL.md");
+        Files.writeString(personal, "Our team skill.");
+        String init = assertCli(0, temp, workspace, "init", "--here", "--ai", "claude", "--force", "--no-fetch");
+        assertTrue(init.contains(retired), init);
+        String doctor = assertCli(1, temp, workspace, "doctor");
+        assertTrue(doctor.contains(retired), doctor);
+        assertTrue(doctor.contains("Retired catalog entry point"), doctor);
+        String invalid
+                = assertCli(1, temp, workspace, "init", "--here", "--ai", "claude", "--force", "--replace", retired);
+        assertTrue(invalid.contains(retired), invalid);
+        assertTrue(Files.readString(entry).endsWith("Team instructions."));
+        Files.move(entry, workspace.resolve("archived-skill.md"));
+        assertCli(0, temp, workspace, "doctor");
+        assertEquals("Our team skill.", Files.readString(personal));
     }
 
     private static void assertPreview(String preview, String action, String path) {

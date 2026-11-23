@@ -6,6 +6,7 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.apache.camel.kit.config.AgentDescriptor;
 import org.apache.camel.kit.config.AgentRegistry;
@@ -22,9 +23,9 @@ public class ClaudeGenerator extends DefaultGenerator {
 
     private static final String LEGACY_COMMAND_DIR = ".claude/commands";
     // These files were generated before Claude switched to native skills. New commands have never owned this path.
-    private static final Set<String> LEGACY_COMMAND_STUBS = Set.of("camel-start.md", "camel-brainstorm.md",
-            "camel-migrate.md", "camel-plan.md", "camel-execute.md", "camel-validate.md", "camel-debug.md",
-            "camel-knowledge.md", "camel-ship.md");
+    static final Set<String> LEGACY_COMMAND_STUBS = Set.of("camel-start", "camel-brainstorm", "camel-migrate",
+            "camel-plan", "camel-execute", "camel-validate", "camel-debug", "camel-knowledge", "camel-ship")
+            .stream().map(name -> LEGACY_COMMAND_DIR + "/" + name + ".md").collect(Collectors.toUnmodifiableSet());
 
     @Override
     public void preflight(InitContext ctx) throws Exception {
@@ -48,22 +49,9 @@ public class ClaudeGenerator extends DefaultGenerator {
     @Override
     public void generate(InitContext ctx) throws Exception {
         super.generate(ctx);
-        removeLegacyCommandStubs(ctx);
         generateClaudeMd(ctx);
         generateSettings(ctx);
         generateSubagents(ctx);
-    }
-
-    private void removeLegacyCommandStubs(InitContext ctx) throws IOException {
-        Path legacyDir = ctx.projectDir().resolve(LEGACY_COMMAND_DIR);
-        if (!Files.isDirectory(legacyDir)) {
-            return;
-        }
-        try (var files = Files.list(legacyDir)) {
-            for (Path file : files.filter(f -> LEGACY_COMMAND_STUBS.contains(f.getFileName().toString())).toList()) {
-                GeneratedAssetCleaner.deleteRegularFile(ctx, file);
-            }
-        }
     }
 
     /** Installs the registry-declared project subagents, currently the read-only Ship worker. */

@@ -3,7 +3,9 @@ package org.apache.camel.kit.service;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -12,6 +14,7 @@ import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.generator.InvalidAgentConfigurationException;
+import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.output.Printer;
 
 import org.junit.jupiter.api.Test;
@@ -1551,52 +1554,29 @@ class InitServiceTest {
     }
 
     @Test
-    void reinitUpdatesSkillManifestsAndGuides() throws Exception {
-        // Setup: Init once
+    void reinitPreservesEditedSkillManifestsAndGuides() throws Exception {
         Path targetDir = tempDir.resolve("skill-update-test");
-        Files.createDirectories(targetDir);
-        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+        var init = request(targetDir, "claude", InitProgress.noop(), InitReporter.noop());
+        var service = new InitService();
+        service.initialize(init);
 
-        // Find a SKILL.md file
-        Path skillManifest = targetDir.resolve(".claude/skills/camel-start/SKILL.md");
-        assertTrue(Files.exists(skillManifest), "SKILL.md should exist after first init");
-        String originalSkillContent = Files.readString(skillManifest);
-
-        // Find a guide file
-        Path guideFile = targetDir.resolve(".claude/skills/camel-brainstorm/guides/version-selection.md");
-        if (Files.exists(guideFile)) {
-            String originalGuideContent = Files.readString(guideFile);
-
-            // Modify both files to simulate old versions
-            Files.writeString(skillManifest, "# OLD VERSION\n" + originalSkillContent);
-            Files.writeString(guideFile, "# OLD GUIDE\n" + originalGuideContent);
-
-            // Act: Reinit
-            new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
-
-            // Assert: SKILL.md and guide files are updated (not preserved)
-            String updatedSkillContent = Files.readString(skillManifest);
-            assertFalse(updatedSkillContent.contains("# OLD VERSION"),
-                    "SKILL.md should be updated on reinit, not preserved");
-
-            String updatedGuideContent = Files.readString(guideFile);
-            assertFalse(updatedGuideContent.contains("# OLD GUIDE"),
-                    "Guide files should be updated on reinit, not preserved");
-        }
-
-        // Create a custom file in skills directory (not SKILL.md or guide)
+        Path manifest = Path.of(".claude/skills/camel-start/SKILL.md");
+        Path guide = Path.of(".claude/skills/camel-brainstorm/guides/version-selection.md");
+        String shippedManifest = Files.readString(targetDir.resolve(manifest));
+        String shippedGuide = Files.readString(targetDir.resolve(guide));
+        Files.writeString(targetDir.resolve(manifest), "# Team skill\n" + shippedManifest);
+        Files.writeString(targetDir.resolve(guide), "# Team guide\n" + shippedGuide);
         Path customFile = targetDir.resolve(".claude/skills/camel-start/my-custom-notes.md");
-        String customContent = "# My Custom Notes\n\nThese are my project-specific notes.";
-        Files.writeString(customFile, customContent);
+        Files.writeString(customFile, "Project notes");
 
-        // Act: Reinit again
-        new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
+        service.initialize(init);
 
-        // Assert: Custom files are preserved (not overwritten)
-        assertTrue(Files.exists(customFile), "Custom skill file should be preserved on reinit");
-        String preservedCustomContent = Files.readString(customFile);
-        assertEquals(customContent, preservedCustomContent,
-                "Custom skill files should be preserved exactly, not overwritten on reinit");
+        assertEquals("# Team skill\n" + shippedManifest, Files.readString(targetDir.resolve(manifest)));
+        assertEquals("# Team guide\n" + shippedGuide, Files.readString(targetDir.resolve(guide)));
+        assertEquals("Project notes", Files.readString(customFile));
+        Path proposals = targetDir.resolve(ManagedFiles.PROPOSALS);
+        assertEquals(shippedManifest, Files.readString(proposals.resolve(manifest)));
+        assertEquals(shippedGuide, Files.readString(proposals.resolve(guide)));
     }
 
     /**
@@ -1635,7 +1615,7 @@ class InitServiceTest {
     }
 
     @Test
-    void reinitRefreshesSharedSkillResourcesAndKeepsUserOwnedFiles() throws Exception {
+    void reinitRefreshesRecordedSharedSkillResourcesAndKeepsUserOwnedFiles() throws Exception {
         Path targetDir = tempDir.resolve("shared-refresh");
         Files.createDirectories(targetDir);
         new InitService().initialize(request(targetDir, "claude", InitProgress.noop(), InitReporter.noop()));
@@ -1643,7 +1623,18 @@ class InitServiceTest {
         Path shared = targetDir.resolve(".claude/skills/shared/context-authority.md");
         assertTrue(Files.exists(shared), "the shared resource must be installed");
         String shipped = Files.readString(shared);
-        Files.writeString(shared, "# STALE SHARED COPY\n" + shipped);
+        Files.writeString(shared, "Previous distribution's context guide.");
+        Path ledger = targetDir.resolve(ManagedFiles.LEDGER);
+        var records = new Properties();
+        try (var in = Files.newInputStream(ledger)) {
+            records.load(in);
+        }
+        String previousHash
+                = HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(shared)));
+        records.setProperty("catalog/.claude/skills/shared/context-authority.md", previousHash);
+        try (var out = Files.newOutputStream(ledger)) {
+            records.store(out, null);
+        }
         Path userFile = targetDir.resolve(".claude/skills/shared/my-team-notes.md");
         Files.writeString(userFile, "# mine\n");
 

@@ -5,6 +5,11 @@ demand. Skills are not code: they are structured prompts with step-by-step proce
 and shared guide imports. They live in `kit/camel-kit-core/src/main/resources/skills/` and `init` copies them, adapted to
 the agent, into the project.
 
+During an upgrade, `init --dry-run` lists the selected and retired files for that assistant. `init --force` refreshes
+unmodified skills and guides. For each local conflict it keeps your file and saves the proposed version under
+`.camel-kit/conflicts/`, including the assistant's invocation metadata and traits. See
+xref:getting-started.adoc#existing-project[how to compare or accept a proposed file].
+
 [[tiers]]
 == Thirteen skills in four tiers
 

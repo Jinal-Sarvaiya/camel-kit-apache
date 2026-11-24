@@ -1,6 +1,8 @@
 # Shared discovery and completeness semantics
 
-Use these semantics for both standalone `camel-brainstorm` interviews and controller-bounded Ship discovery.
+Use these semantics for both standalone `camel-brainstorm` interviews and controller-bounded Ship discovery. Ship DISCOVERY
+tasks must include these interface contract rules in the controller-issued prompt, preserving Ship's grouped questions
+and controller-owned oversight.
 
 1. Analyze every supplied requirements source before asking the first question. Separate facts, explicit decisions,
    conflicting claims, assumptions, recommendations, and material unknowns. Preserve where each item came from.
@@ -11,10 +13,12 @@ Use these semantics for both standalone `camel-brainstorm` interviews and contro
 4. Ask exactly one highest-priority blocking question at a time. Record the answer before recomputing the remaining
    gaps. Useful options and a recommendation are welcome, but free-form answers and explicit not-applicable answers
    remain valid.
-5. Cover business purpose, actors and flows, triggers/sources/destinations, message contracts and transformations,
-   routing rules, runtime and versions, deployment, route DSL and expression language, Java policy, failure handling,
-   security, observability, acceptance criteria, the required integration-test approach, and any test-framework release
-   or dependency constraints applicable to the workflow.
+5. Cover business purpose, actors and flows, triggers/sources/destinations, interface contracts (existing, pending,
+   or newly designed; ask one endpoint at a time; read supplied artifacts first; record pending contracts as explicit
+   dependencies without inventing placeholders; propose new contracts for user-controlled endpoints only), message
+   contracts and transformations, routing rules, runtime and versions, deployment, route DSL and expression language,
+   Java policy, failure handling, security, observability, acceptance criteria, the required integration-test approach,
+   and any test-framework release or dependency constraints applicable to the workflow.
 6. Resolve runtime, Camel version, and applicable platform versions before using runtime-sensitive Camel catalog
    results. A later runtime/version change invalidates those results.
 7. Discovery completion means no blocking ambiguity, conflict, unconfirmed assumption, or untaken material decision

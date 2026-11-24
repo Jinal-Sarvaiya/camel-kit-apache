@@ -164,9 +164,127 @@ If "none"/passthrough: skip Question 7a.
 
 Record: `flow.transformations[]`
 
+### Question 7b: Source Interface Contract (per flow)
+
+Analyze supplied material first. If the user already provided a source contract artifact (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, documented message contract), read it, record the status as "existing", extract constraints, and skip this question for the source.
+
+```
+For flow "[flow-name]" source (where data comes from):
+
+Do you have an interface definition, will you provide one later, should we design it, or is it not applicable?
+
+a) Existing definition available now — I'll provide it
+b) Definition will be supplied later
+c) We should design it together
+d) Not applicable (no formal contract needed)
+```
+
+**For "existing definition available now":**
+```
+Please provide the contract artifact:
+- File path, URL, or inline content
+- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
+- Any compatibility constraints or version requirements
+```
+
+Read the supplied contract and establish:
+- Schema version and compatibility requirements
+- Required vs. optional fields
+- Data type constraints
+- Breaking vs. non-breaking change policies
+
+**For "definition will be supplied later":**
+```
+Noted. The source contract is pending.
+
+This means:
+- Detailed field-level design decisions will remain open
+- The implementation plan will record this dependency
+- You'll need to provide the contract before execution begins
+```
+
+Record the dependency without inventing a placeholder contract. If DataMapper is needed (Question 7a), defer it until the pending contract arrives.
+
+**For "we should design it together":**
+```
+I'll propose a [contract-type] definition based on your requirements.
+
+This will be included in the design specification for your approval before implementation.
+Since this is a source you control, we can design it to fit the integration needs.
+```
+
+Note: Only propose designing contracts for systems under your control. External system interfaces cannot be redesigned.
+
+**For "not applicable":**
+```
+Understood — no formal contract needed for this source.
+```
+
+Record: `flow.contracts.source` with status (existing/pending/designed/na), artifact reference, constraints, and dependencies
+
+### Question 7c: Destination Interface Contract (per flow)
+
+Analyze supplied material first. If the user already provided a destination contract artifact, read it, record status as "existing", extract constraints, and skip this question for the destination.
+
+```
+For flow "[flow-name]" destination (where data goes):
+
+Do you have an interface definition, will you provide one later, should we design it, or is it not applicable?
+
+a) Existing definition available now — I'll provide it
+b) Definition will be supplied later
+c) We should design it together
+d) Not applicable (no formal contract needed)
+```
+
+**For "existing definition available now":**
+```
+Please provide the contract artifact:
+- File path, URL, or inline content
+- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
+- Any compatibility constraints or version requirements
+```
+
+Read the supplied contract and establish:
+- Schema version and compatibility requirements
+- Required vs. optional fields
+- Data type constraints
+- Breaking vs. non-breaking change policies
+
+**For "definition will be supplied later":**
+```
+Noted. The destination contract is pending.
+
+This means:
+- Detailed field-level design decisions will remain open
+- The implementation plan will record this dependency
+- You'll need to provide the contract before execution begins
+```
+
+Record the dependency without inventing a placeholder contract. If DataMapper is needed (Question 7a), defer it until the pending contract arrives.
+
+**For "we should design it together":**
+```
+I'll propose a [contract-type] definition based on your requirements.
+
+This will be included in the design specification for your approval before implementation.
+Since this is a destination you control, we can design it to fit the integration needs.
+```
+
+Note: Only propose designing contracts for systems under your control. External system interfaces cannot be redesigned.
+
+**For "not applicable":**
+```
+Understood — no formal contract needed for this destination.
+```
+
+Record: `flow.contracts.destination` with status (existing/pending/designed/na), artifact reference, constraints, and dependencies
+
 ### Question 7a: Data Transformation Detail (conditional)
 
-ONLY if field mapping needed AND format pair is XML/JSON combinations.
+ONLY if field mapping needed AND format pair is XML/JSON combinations AND neither source nor destination contract is pending.
+
+If either contract status is "pending", defer this question. Note in the design spec that field mapping depends on the pending contract and will be resolved when the artifact arrives.
 
 ```
 For the data transformation in "[flow-name]":
@@ -182,6 +300,71 @@ Or if you have example source and target messages, share those.
 Load `camel-design/guides/datamapper-interview.md` and `shared/datamapper-canonicalize.md` for detailed field mapping.
 
 Record: `flow.datamapper.mappings[]`
+
+### Question 7b: Interface Contracts (per flow)
+
+```
+For flow "[flow-name]":
+
+Do you have an interface definition for the source or destination, or should we design one?
+
+Interface definitions include OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, or documented message contracts.
+
+For the **source** (where data comes from):
+a) Existing definition available now — I'll provide it
+b) Definition will be supplied later
+c) We should design it together
+d) Not applicable (no formal contract needed)
+
+For the **destination** (where data goes):
+a) Existing definition available now — I'll provide it
+b) Definition will be supplied later
+c) We should design it together
+d) Not applicable (no formal contract needed)
+```
+
+**For each "existing definition available now" answer:**
+```
+Please provide:
+- The contract artifact (file path, URL, or inline content)
+- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
+- Any compatibility constraints or version requirements
+```
+
+Read the supplied contract and establish:
+- Schema version and compatibility requirements
+- Required vs. optional fields
+- Data type constraints
+- Any breaking vs. non-breaking change policies
+
+**For each "definition will be supplied later" answer:**
+```
+Noted. The [source/destination] contract is pending.
+
+This means:
+- Detailed field-level design decisions will remain open
+- The implementation plan will record this dependency
+- You'll need to provide the contract before execution begins
+```
+
+Record the dependency without inventing a placeholder contract.
+
+**For each "we should design it together" answer:**
+```
+I'll propose a [contract-type] definition based on your requirements.
+
+This will be included in the design specification for your approval before implementation.
+Since this is a [source/destination] you control, we can design it to fit the integration needs.
+```
+
+Note: Only propose designing contracts for systems under the user's control. External system interfaces cannot be redesigned.
+
+**For "not applicable" answer:**
+```
+Understood — no formal contract needed for this [source/destination].
+```
+
+Record: `flow.contracts.source`, `flow.contracts.destination` with status (existing/pending/designed/na), artifact references, constraints, and dependencies
 
 ### Question 8: Sink System (per flow)
 

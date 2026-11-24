@@ -52,10 +52,14 @@ material you provide first and does not ask about facts that are already establi
 clarification at all. Open points are asked one at a time, never in batches, in three groups:
 
 . *Project questions*: name, business purpose, systems landscape, integration goals or flow names.
-. *Per-flow questions*: intent and data, source, transformations, sink and error handling, with field-mapping,
-  multi-path routing and resilience follow-ups only when triggered.
+. *Per-flow questions*: intent and data, source, transformations, interface contracts (asked separately for source and
+  destination), sink and error handling, with field-mapping, multi-path routing and resilience follow-ups only when
+  triggered.
 . *Cross-cutting questions*: performance, security and monitoring when relevant, then remaining constraints and the
   deliberate scope exclusions. A category that does not apply is recorded as not applicable with the reason.
+
+NOTE: Interface contract discovery is available in development snapshots only (0.5.0-SNAPSHOT and later). Released
+versions (0.4.x) do not include this feature.
 
 .Topics the interview can cover, with example exchanges
 [%collapsible]
@@ -72,6 +76,15 @@ Data formats::
 Input and output formats, schemas, and whether a field-level mapping is needed. For a complex mapping the agent
 offers DataMapper, which uses inline Groovy when both schemas are absent or the mapping has fewer than 20 leaf fields
 and XSLT only with at least 20 leaf fields and at least one schema.
+
+Interface contracts::
+"For the source/destination, do you have an interface definition, will you provide one later, should we design it, or
+is it not applicable?" Supported artifacts include OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD and documented message
+contracts. The agent asks separately for source and destination, inspecting supplied material first. Three scenarios
+are handled: existing contracts (read and establish compatibility constraints), contracts to be supplied later (record
+as explicit dependencies without inventing placeholders), and new contracts for user-controlled endpoints (propose in
+the design specification for approval before implementation). Example: existing source OpenAPI spec + newly designed
+destination JSON Schema awaiting approval.
 
 Processing requirements::
 Validations, business rules, calculations and enrichments, and conditional routing when several destinations are

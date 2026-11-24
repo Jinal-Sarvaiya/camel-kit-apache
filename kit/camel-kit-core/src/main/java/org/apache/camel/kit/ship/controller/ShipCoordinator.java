@@ -738,6 +738,33 @@ public final class ShipCoordinator {
             }
         }
 
+        // For DISCOVERY stage, include interface contract discovery rules
+        if (attempt.stage().stage() == Stage.DISCOVERY) {
+            text.append("\n## Interface Contract Discovery\n\n");
+            try (InputStream resource = getClass().getResourceAsStream(
+                    "/skills/shared/interface-contract-briefing.md")) {
+                if (resource != null) {
+                    byte[] briefingContent = resource.readAllBytes();
+                    text.append(new String(briefingContent, StandardCharsets.UTF_8))
+                            .append('\n');
+                } else {
+                    // Fallback: minimal inline guidance if resource not found
+                    text.append("For each integration boundary (source and destination), ")
+                            .append("establish the interface contract status separately:\n\n")
+                            .append("- Ask one boundary at a time (source, then destination)\n")
+                            .append("- Analyze supplied material first (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD)\n")
+                            .append("- Four statuses: existing, pending, designed, not-applicable\n")
+                            .append("- Record pending contracts as dependencies (do NOT invent placeholders)\n")
+                            .append("- Propose new contracts only for user-controlled endpoints\n")
+                            .append("- Defer DataMapper if either contract is pending\n\n");
+                }
+            } catch (IOException e) {
+                // If we can't load the briefing, continue without it
+                // The shared discovery-completeness.md will still apply
+            }
+            requireBriefingSize(text);
+        }
+
         for (Stage stage : Stage.values()) {
             if (stage.ordinal() >= attempt.stage().stage().ordinal()) {
                 break;

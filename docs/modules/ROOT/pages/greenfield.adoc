@@ -37,10 +37,20 @@ one at a time, in three groups:
 
 * *Project questions* establish the name, the business purpose, the systems landscape and the integration goals or
   flow names.
-* *Per-flow questions* cover each flow's intent and data, source, transformations, sink and error handling, with
-  field-mapping, routing and resilience follow-ups only when needed.
+* *Per-flow questions* cover each flow's intent and data, source, transformations, interface contracts (asked
+  separately for source and destination), sink and error handling, with field-mapping, routing and resilience
+  follow-ups only when needed.
 * *Cross-cutting questions* cover performance, security, monitoring, remaining constraints and deliberate scope
   exclusions; a category that does not apply is recorded with a rationale.
+
+For interface contracts (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD or documented message contracts), the agent asks
+separately about the source and destination. Each can have an existing definition, will have one supplied later, or
+should be designed together. Supplied contracts are inspected for compatibility constraints before asking the next
+question; pending contracts are recorded as explicit dependencies without placeholder definitions; new contracts for
+user-controlled endpoints are proposed in the design specification for approval before implementation.
+
+NOTE: Interface contract discovery is available in development snapshots only (0.5.0-SNAPSHOT and later). Released
+versions (0.4.x) do not include this feature.
 
 .Example exchanges from the interview
 [%collapsible]
@@ -53,6 +63,21 @@ You:   Process incoming orders from an HTTP API, validate them, enrich them with
 Agent: Where does the data come from and where does it go?
 You:   Orders arrive as JSON on POST /api/orders. Customer data is in PostgreSQL.
        Validated orders go to the Kafka topic "fulfillment.orders".
+
+Agent: For the source, do you have an interface definition, will you provide one
+       later, should we design it, or is it not applicable?
+You:   The source has an existing OpenAPI spec.
+
+Agent: Please provide the contract artifact.
+You:   [provides openapi.yaml file with type: OpenAPI 3.0.1]
+
+Agent: For the destination, do you have an interface definition, will you provide
+       one later, should we design it, or is it not applicable?
+You:   We should design it together — it's our internal event schema.
+
+Agent: I'll propose a JSON Schema definition based on your requirements. This will
+       be included in the design specification for your approval before
+       implementation.
 
 Agent: How should the integration handle errors?
 You:   Invalid orders go to the Kafka topic "orders.invalid" with the validation

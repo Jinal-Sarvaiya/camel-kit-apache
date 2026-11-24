@@ -216,6 +216,12 @@ it. If the user identified no exclusions, write
 - **Constraints:** [Technical constraints that influenced this choice]
 - Trigger: [description]
 - Endpoint options: [key options from MCP catalog]
+- **Interface Contract:** [from flow.contracts.source]
+  - Status: [existing / pending / designed / not-applicable]
+  - [If existing] Artifact: [file path or URL]; Type: [OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other]; Constraints: [compatibility requirements]
+  - [If pending] **Dependency:** Source contract must be provided before execution. Field-level design decisions remain open.
+  - [If designed] Proposed [contract-type] definition (see Appendix or inline below for the proposed schema awaiting approval)
+  - [If not-applicable] No formal contract required
 
 **Rationale examples (good):**
 - "Chose `camel-kafka` over `camel-jms` because the source system is Kafka and direct consumption avoids message format translation overhead."
@@ -247,6 +253,12 @@ it. If the user identified no exclusions, write
 - **Constraints:** [Technical constraints that influenced this choice]
 - Action: [description]
 - Endpoint options: [key options from MCP catalog]
+- **Interface Contract:** [from flow.contracts.destination]
+  - Status: [existing / pending / designed / not-applicable]
+  - [If existing] Artifact: [file path or URL]; Type: [OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other]; Constraints: [compatibility requirements]
+  - [If pending] **Dependency:** Destination contract must be provided before execution. Field-level design decisions remain open.
+  - [If designed] Proposed [contract-type] definition (see Appendix or inline below for the proposed schema awaiting approval)
+  - [If not-applicable] No formal contract required
 
 **Error Handling:**
 - Strategy: [DLQ / Retry+DLQ / Log+Continue / Stop]

@@ -1112,6 +1112,18 @@ class SkillPackCompilerTest {
         }
     }
 
+    public static class FirstSummary extends FailingSummary {
+        @Override
+        public int summaryOrder() {
+            return -2;
+        }
+
+        @Override
+        public Optional<String> summarize(ProjectGraph graph) {
+            return Optional.of("Custom inventory");
+        }
+    }
+
     public static class ConflictingAdapter extends FailingSummary {
         @Override
         public Map<String, NodeType> nodeTypes() {
@@ -1130,8 +1142,9 @@ class SkillPackCompilerTest {
                 add:
                   provider/aaa: {contract: 1, provider: {service: %1$s, implementation: %2$s}}
                   provider/broken: {contract: 1, provider: {service: %1$s, implementation: %3$s}}
+                  provider/zz: {contract: 1, provider: {service: %1$s, implementation: %4$s}}
                 """, GraphTypeAdapter.class.getName(), ConflictingAdapter.class.getName(),
-                FailingSummary.class.getName());
+                FailingSummary.class.getName(), FirstSummary.class.getName());
         Path dist = distribution(pack("custom", descriptor), "custom");
         Path project = Files.createDirectory(temp.resolve("mixed-project"));
         Files.writeString(project.resolve("mule.xml"),
@@ -1149,7 +1162,7 @@ class SkillPackCompilerTest {
         assertTrue(init.contains("Graph summary unavailable for provider/aaa") && init.contains("from provider/mule"),
                 init);
         assertTrue(init.contains("Graph summary failed for provider/broken: java.lang.IllegalStateException"), init);
-        assertTrue(init.contains("MuleSoft Mule (1 flows, 0 sub-flows), Microsoft BizTalk"), init);
+        assertTrue(init.contains("Custom inventory, MuleSoft Mule (1 flows, 0 sub-flows), Microsoft BizTalk"), init);
         assertFalse(init.contains("Could not build project graph"), init);
         assertTrue(
                 Files.readString(project.resolve(".camel-kit/config.properties")).contains("project.runtime=quarkus"));
@@ -1160,7 +1173,8 @@ class SkillPackCompilerTest {
         assertTrue(assertCli(0, dist, project, "graph", "find", "--type", "EXAMPLE_NODE")
                 .contains("Invalid node type: EXAMPLE_NODE"));
         assertTrue(assertCli(1, dist, project, "graph", "analyze", "aaa").contains("from provider/mule"));
-        assertTrue(assertCli(1, dist, project, "graph", "analyze", "broken").contains("IllegalStateException"));
+        assertEquals("Graph summary failed for provider/broken: java.lang.IllegalStateException",
+                assertCli(1, dist, project, "graph", "analyze", "broken").strip());
         Path legacy = Files.writeString(project.resolve("legacy.json"),
                 "{\"version\":\"1.0\",\"nodes\":{\"flow\":{\"type\":\"MULE_FLOW\"}},\"edges\":[]}");
         assertEquals(1, SkillCatalog.JSON.readTree(assertCli(0, dist, project, "graph", "find", "--type", "mule:flow",

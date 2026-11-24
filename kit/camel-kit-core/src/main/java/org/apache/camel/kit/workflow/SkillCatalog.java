@@ -173,9 +173,9 @@ public final class SkillCatalog {
 
     public GraphTypeRegistry graphTypes() throws IOException {
         var bindings = providers(GraphTypeAdapter.class);
-        // Core owns its legacy aliases. Descending namespace order preserves the mixed-project init summary.
+        // Register core aliases before optional packs, with a stable namespace order within each group.
         var order = Comparator.<String, Boolean>comparing(id -> !"core".equals(bindings.get(id).pack()))
-                .thenComparing(Comparator.reverseOrder());
+                .thenComparing(Comparator.naturalOrder());
         Map<String, GraphTypeAdapter> adapters = new TreeMap<>(order);
         Map<String, String> unavailable = new TreeMap<>();
         for (var entry : bindings.entrySet()) {

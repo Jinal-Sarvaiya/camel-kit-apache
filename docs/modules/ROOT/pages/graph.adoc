@@ -90,6 +90,7 @@ camel-kit graph analyze mule --graph-file .camel-kit/project-graph.json
 
 `analyze` returns the adapter's summary, or `matched: false` when its rules find no matching project.
 If the adapter is missing, the command identifies the unavailable provider and exits with status 1.
+If its summary fails, the command names the provider, reports the cause and exits with status 1.
 A workflow that requires this analysis must leave its step incomplete. Generic commands such as
 `find`, `neighbors`, `stats` and `visualize` still work with the recorded type names. A library caller
 can read, traverse, write and reload such a graph, including its properties and relationships.

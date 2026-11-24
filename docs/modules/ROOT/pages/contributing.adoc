@@ -326,14 +326,16 @@ contribution with contract 1. Its `nodeTypes()` and `edgeTypes()` map wire names
 identifiers. Register a new type under its own name. For a legacy type, register the uppercase
 alias as the key and the canonical type as the value. Kit registers both names and rejects aliases
 that conflict with another mapping or a core type of the same kind. Kit registers core providers
-first. A conflicting or malformed adapter becomes unavailable as a whole. An alias conflict identifies
+first and uses ascending namespace order within the core and optional groups. A conflicting or malformed adapter becomes unavailable as a whole. An alias conflict identifies
 both providers or the reserved core type. Other adapters and generic graph queries remain available.
 During `init`, an adapter failure produces a warning. Kit still saves the graph, reports the other
 summaries and detects the runtime. A pack can declare only types in its provider namespace. Both parts of `namespace:type` start with a lowercase ASCII letter and
 may contain lowercase letters, digits and hyphens.
 
 Implement `summarize` using the pack's domain rules. Return an empty optional for a graph
-without matching evidence. Java callers migrating from the enum API must recompile.
+without matching evidence. To set the position of a matching summary in the `init` output, override
+`summaryOrder()`. Lower values appear first. The default is zero, and ties retain registration order.
+Java callers migrating from the enum API must recompile.
 Replace enum switches and identity comparisons with value comparisons using `equals`.
 Resolve filter strings with `registry.nodeType(name)` or `registry.edgeType(name)`.
 The registry's `nodeNames()` and `edgeNames()` list registered names and aliases.

@@ -44,8 +44,10 @@ public final class GraphTypeRegistry {
             Map<String, T> declarations) {
         Map<String, T> result = new TreeMap<>();
         declarations.forEach((alias, type) -> {
-            if (!type.name().startsWith(id + ":")
-                    || (!alias.equals(type.name()) && !GraphType.LEGACY.matcher(alias).matches())) {
+            if (!type.name().startsWith(id + ":")) {
+                throw new IllegalArgumentException("Graph type " + type + " must use namespace '" + id + "'");
+            }
+            if (!alias.equals(type.name()) && !GraphType.LEGACY.matcher(alias).matches()) {
                 throw new IllegalArgumentException("Invalid graph type mapping " + alias + " -> " + type);
             }
             T existing = registered.get(alias);

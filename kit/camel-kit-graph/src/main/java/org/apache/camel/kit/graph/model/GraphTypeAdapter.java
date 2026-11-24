@@ -12,6 +12,11 @@ public interface GraphTypeAdapter {
 
     Map<String, EdgeType> edgeTypes();
 
+    /** Init lists matching summaries in ascending order. Equal values retain registration order. */
+    default int summaryOrder() {
+        return 0;
+    }
+
     /** Describe the migration evidence in the graph. Empty means the adapter found no matching project. */
     Optional<String> summarize(ProjectGraph graph);
 }

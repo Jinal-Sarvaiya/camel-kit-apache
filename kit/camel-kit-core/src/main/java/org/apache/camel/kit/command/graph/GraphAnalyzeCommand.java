@@ -12,11 +12,16 @@ public class GraphAnalyzeCommand extends GraphQueryCommand {
 
     @Override
     protected String execute(ProjectGraph graph) {
-        var summary = types.requireAdapter(namespace).summarize(graph);
+        var adapter = types.requireAdapter(namespace);
         var result = GraphJsonWriter.createObject();
         result.put("adapter", namespace);
-        result.put("matched", summary.isPresent());
-        summary.ifPresent(text -> result.put("summary", text));
+        try {
+            var summary = adapter.summarize(graph);
+            result.put("matched", summary.isPresent());
+            summary.ifPresent(text -> result.put("summary", text));
+        } catch (RuntimeException | LinkageError e) {
+            throw new IllegalStateException("Graph summary failed for provider/" + namespace + ": " + e, e);
+        }
         return GraphJsonWriter.toJson(result);
     }
 }

@@ -44,6 +44,12 @@ public final class MuleGraphAdapter implements GraphTypeAdapter {
     }
 
     @Override
+    public int summaryOrder() {
+        // Keep the historical Mule-first summary for mixed migration projects.
+        return -1;
+    }
+
+    @Override
     public Optional<String> summarize(ProjectGraph graph) {
         int flows = graph.findByType(FLOW).size();
         if (flows > 0) {

@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.camel.kit.catalog.CitrusSchemaDownloader;
@@ -777,13 +778,16 @@ public class InitService {
             var registry = SkillCatalog.bundled().graphTypes();
             registry.unavailable().forEach((id, reason) -> reportWarning(request, warnings,
                     "Graph summary unavailable for provider/" + id + ": " + reason));
+            var summaries = new TreeMap<Integer, List<String>>();
             registry.adapters().forEach((id, adapter) -> {
                 try {
-                    adapter.summarize(graph).ifPresent(types::add);
+                    adapter.summarize(graph).ifPresent(summary -> summaries
+                            .computeIfAbsent(adapter.summaryOrder(), order -> new ArrayList<>()).add(summary));
                 } catch (RuntimeException | LinkageError e) {
                     reportWarning(request, warnings, "Graph summary failed for provider/" + id + ": " + e);
                 }
             });
+            summaries.values().forEach(types::addAll);
         } catch (IOException e) {
             reportWarning(request, warnings, "Could not load graph adapters: " + e);
         }

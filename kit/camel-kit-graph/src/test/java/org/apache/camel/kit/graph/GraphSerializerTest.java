@@ -161,9 +161,10 @@ class GraphSerializerTest {
     @Test
     void schemaRegistrationRejectsAnotherNamespaceAndReservedNames() {
         var adapter = new MuleGraphAdapter();
-        assertTrue(assertThrows(IllegalArgumentException.class,
-                () -> new GraphTypeRegistry(Map.of("other", adapter)).requireAdapter("other")).getMessage()
-                .contains("provider/other"));
+        String failure = assertThrows(IllegalArgumentException.class,
+                () -> new GraphTypeRegistry(Map.of("other", adapter)).requireAdapter("other")).getMessage();
+        assertTrue(failure.contains("provider/other") && failure.contains("Graph type mule:")
+                && failure.endsWith("must use namespace 'other'"), failure);
         GraphTypeAdapter conflict = new GraphTypeAdapter() {
             public Map<String, NodeType> nodeTypes() {
                 return Map.of("CLASS", new NodeType("example:class"));

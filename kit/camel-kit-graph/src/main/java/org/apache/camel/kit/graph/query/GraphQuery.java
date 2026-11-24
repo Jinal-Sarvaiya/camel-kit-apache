@@ -30,7 +30,7 @@ public class GraphQuery {
         Pattern pattern = Pattern.compile(query);
         // First pass: exact match on name or fqn properties
         List<GraphNode> byProperty = graph.getNodes().values().stream()
-                .filter(node -> typeFilter == null || node.type() == typeFilter)
+                .filter(node -> typeFilter == null || node.type().equals(typeFilter))
                 .filter(node -> {
                     String name = node.properties().get("name");
                     if (name != null && pattern.matcher(name).matches())
@@ -45,7 +45,7 @@ public class GraphQuery {
         }
         // Second pass: substring search on node id
         return graph.getNodes().values().stream()
-                .filter(node -> typeFilter == null || node.type() == typeFilter)
+                .filter(node -> typeFilter == null || node.type().equals(typeFilter))
                 .filter(node -> pattern.matcher(node.id()).find())
                 .limit(MAX_RESULTS)
                 .collect(Collectors.toList());
@@ -71,7 +71,7 @@ public class GraphQuery {
 
             List<GraphEdge> adjacent = getEdges(current, direction);
             for (GraphEdge edge : adjacent) {
-                if (edgeType != null && edge.type() != edgeType)
+                if (edgeType != null && !edge.type().equals(edgeType))
                     continue;
 
                 String neighbor = edge.from().equals(current) ? edge.to() : edge.from();
@@ -240,12 +240,12 @@ public class GraphQuery {
 
                 // Interface boundary crossing: if this is an IMPLEMENTS edge, also find USES_TYPE predecessors
                 // Only cross to consumers when traversing "in" or "both"
-                if (edge.type() == EdgeType.IMPLEMENTS && !"out".equals(direction)) {
+                if (edge.type().equals(EdgeType.IMPLEMENTS) && !"out".equals(direction)) {
                     String interfaceNode = edge.to(); // The interface being implemented
                     List<GraphEdge> usesTypeEdges = graph.getIncomingEdges(interfaceNode);
 
                     for (GraphEdge usesEdge : usesTypeEdges) {
-                        if (usesEdge.type() == EdgeType.USES_TYPE) {
+                        if (usesEdge.type().equals(EdgeType.USES_TYPE)) {
                             String user = usesEdge.from();
 
                             if (!visited.contains(user) && !user.equals(nodeId)) {

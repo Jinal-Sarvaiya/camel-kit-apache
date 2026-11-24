@@ -13,7 +13,7 @@
     <name>Camel Kit :: Core</name>
 
     <properties>
-        <camel.kit.packs></camel.kit.packs>
+        <camel.kit.packs>mule-graph,biztalk-graph</camel.kit.packs>
     </properties>
 
     <dependencies>

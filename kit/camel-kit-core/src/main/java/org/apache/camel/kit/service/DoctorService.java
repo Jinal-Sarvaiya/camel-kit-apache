@@ -30,6 +30,7 @@ import org.apache.camel.kit.generator.CatalogUpdate;
 import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphBuilder;
+import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ParserDiagnostic;
 import org.apache.camel.kit.util.PrerequisiteChecker;
 import org.apache.camel.kit.util.ProcessRunner;
@@ -1364,13 +1365,13 @@ public class DoctorService {
         Path graphFile = root.resolve(".camel-kit/project-graph.json");
         if (Files.isRegularFile(graphFile)) {
             try {
-                MAPPER.readTree(graphFile.toFile());
+                GraphSerializer.read(graphFile);
                 findings.add(DoctorFinding.pass("graph", relativize(root, graphFile),
-                        ".camel-kit/project-graph.json exists and is valid JSON",
+                        ".camel-kit/project-graph.json uses a supported graph format",
                         "No action required."));
             } catch (IOException e) {
                 findings.add(DoctorFinding.fail("graph", relativize(root, graphFile),
-                        ".camel-kit/project-graph.json is not valid JSON: " + e.getMessage(),
+                        ".camel-kit/project-graph.json is invalid: " + e.getMessage(),
                         "Run camel-kit graph generate --project-dir " + root + " to regenerate it."));
             }
             return;

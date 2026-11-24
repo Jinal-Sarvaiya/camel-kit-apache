@@ -15,10 +15,9 @@ import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamReader;
 
 import org.apache.camel.kit.graph.ProjectGraph;
-import org.apache.camel.kit.graph.model.EdgeType;
+import org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter;
 import org.apache.camel.kit.graph.model.GraphEdge;
 import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 
 /**
  * Parser for BizTalk ODX (orchestration) files.
@@ -177,7 +176,7 @@ public class BizTalkOdxParser {
                         nodeProps.put("name", orchestrationName);
                         nodeProps.put("namespace", namespace);
 
-                        GraphNode orchNode = new GraphNode(orchId, NodeType.BIZTALK_ORCHESTRATION, nodeProps);
+                        GraphNode orchNode = new GraphNode(orchId, BizTalkGraphAdapter.ORCHESTRATION, nodeProps);
                         graph.addNode(orchNode);
                     }
                 } else if ("Element".equals(localName)) {
@@ -294,14 +293,14 @@ public class BizTalkOdxParser {
                 nodeProps.put("direction", direction);
             }
 
-            GraphNode messageNode = new GraphNode(messageId, NodeType.BIZTALK_MESSAGE, nodeProps);
+            GraphNode messageNode = new GraphNode(messageId, BizTalkGraphAdapter.MESSAGE, nodeProps);
             graph.addNode(messageNode);
 
             // Create BIZTALK_ORCHESTRATION_CONTAINS edge
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("order", String.valueOf(order));
             GraphEdge containsEdge = new GraphEdge(
-                    orchId, messageId, EdgeType.BIZTALK_ORCHESTRATION_CONTAINS,
+                    orchId, messageId, BizTalkGraphAdapter.ORCHESTRATION_CONTAINS,
                     edgeProps);
             graph.addEdge(containsEdge);
 
@@ -312,10 +311,10 @@ public class BizTalkOdxParser {
                 // Create schema node before wiring edge
                 Map<String, String> schemaProps = new HashMap<>();
                 schemaProps.put("name", type);
-                GraphNode schemaNode = new GraphNode(schemaId, NodeType.BIZTALK_SCHEMA, schemaProps);
+                GraphNode schemaNode = new GraphNode(schemaId, BizTalkGraphAdapter.SCHEMA, schemaProps);
                 graph.addNode(schemaNode);
 
-                GraphEdge schemaEdge = new GraphEdge(messageId, schemaId, EdgeType.BIZTALK_USES_SCHEMA, Map.of());
+                GraphEdge schemaEdge = new GraphEdge(messageId, schemaId, BizTalkGraphAdapter.USES_SCHEMA, Map.of());
                 graph.addEdge(schemaEdge);
             }
 
@@ -379,13 +378,14 @@ public class BizTalkOdxParser {
                 nodeProps.put("address", address);
             }
 
-            GraphNode portNode = new GraphNode(portId, NodeType.BIZTALK_PORT, nodeProps);
+            GraphNode portNode = new GraphNode(portId, BizTalkGraphAdapter.PORT, nodeProps);
             graph.addNode(portNode);
 
             // Create BIZTALK_ORCHESTRATION_CONTAINS edge
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("order", String.valueOf(order));
-            GraphEdge containsEdge = new GraphEdge(orchId, portId, EdgeType.BIZTALK_ORCHESTRATION_CONTAINS, edgeProps);
+            GraphEdge containsEdge
+                    = new GraphEdge(orchId, portId, BizTalkGraphAdapter.ORCHESTRATION_CONTAINS, edgeProps);
             graph.addEdge(containsEdge);
 
             order++;
@@ -445,13 +445,14 @@ public class BizTalkOdxParser {
                 nodeProps.put(key.toLowerCase(java.util.Locale.ROOT), properties.get(key));
             }
 
-            GraphNode shapeNode = new GraphNode(shapeId, NodeType.BIZTALK_SHAPE, nodeProps);
+            GraphNode shapeNode = new GraphNode(shapeId, BizTalkGraphAdapter.SHAPE, nodeProps);
             graph.addNode(shapeNode);
 
             // Create BIZTALK_ORCHESTRATION_CONTAINS edge
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("order", String.valueOf(order));
-            GraphEdge containsEdge = new GraphEdge(orchId, shapeId, EdgeType.BIZTALK_ORCHESTRATION_CONTAINS, edgeProps);
+            GraphEdge containsEdge
+                    = new GraphEdge(orchId, shapeId, BizTalkGraphAdapter.ORCHESTRATION_CONTAINS, edgeProps);
             graph.addEdge(containsEdge);
 
             // For Transform shapes, create BIZTALK_USES_MAP edge
@@ -465,7 +466,7 @@ public class BizTalkOdxParser {
                         shortMapName = mapClassName.substring(lastDot + 1);
                     }
                     String mapId = "biztalk-map:" + shortMapName;
-                    GraphEdge mapEdge = new GraphEdge(shapeId, mapId, EdgeType.BIZTALK_USES_MAP, Map.of());
+                    GraphEdge mapEdge = new GraphEdge(shapeId, mapId, BizTalkGraphAdapter.USES_MAP, Map.of());
                     graph.addEdge(mapEdge);
                 }
             }

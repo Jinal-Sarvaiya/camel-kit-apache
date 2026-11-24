@@ -17,10 +17,9 @@ import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamReader;
 
 import org.apache.camel.kit.graph.ProjectGraph;
-import org.apache.camel.kit.graph.model.EdgeType;
+import org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter;
 import org.apache.camel.kit.graph.model.GraphEdge;
 import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.graph.parser.GraphParser;
 
 /**
@@ -205,35 +204,35 @@ public class BizTalkBtmParser {
         }
         mapProps.put("functoidCount", String.valueOf(functoidCount));
 
-        GraphNode mapNode = new GraphNode(mapId, NodeType.BIZTALK_MAP, mapProps);
+        GraphNode mapNode = new GraphNode(mapId, BizTalkGraphAdapter.MAP, mapProps);
         nodes.add(mapNode);
 
         // Create schema nodes and edges
         if (sourceSchema != null) {
             String sourceSchemaId = "biztalk-schema:" + sourceSchema;
-            GraphNode sourceSchemaNode = new GraphNode(sourceSchemaId, NodeType.BIZTALK_SCHEMA, Map.of());
+            GraphNode sourceSchemaNode = new GraphNode(sourceSchemaId, BizTalkGraphAdapter.SCHEMA, Map.of());
             nodes.add(sourceSchemaNode);
 
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("role", "source");
-            GraphEdge sourceEdge = new GraphEdge(mapId, sourceSchemaId, EdgeType.BIZTALK_USES_SCHEMA, edgeProps);
+            GraphEdge sourceEdge = new GraphEdge(mapId, sourceSchemaId, BizTalkGraphAdapter.USES_SCHEMA, edgeProps);
             edges.add(sourceEdge);
         }
 
         if (targetSchema != null) {
             String targetSchemaId = "biztalk-schema:" + targetSchema;
-            GraphNode targetSchemaNode = new GraphNode(targetSchemaId, NodeType.BIZTALK_SCHEMA, Map.of());
+            GraphNode targetSchemaNode = new GraphNode(targetSchemaId, BizTalkGraphAdapter.SCHEMA, Map.of());
             nodes.add(targetSchemaNode);
 
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("role", "target");
-            GraphEdge targetEdge = new GraphEdge(mapId, targetSchemaId, EdgeType.BIZTALK_USES_SCHEMA, edgeProps);
+            GraphEdge targetEdge = new GraphEdge(mapId, targetSchemaId, BizTalkGraphAdapter.USES_SCHEMA, edgeProps);
             edges.add(targetEdge);
         }
 
         // Create edges from map to functoids
         for (String functoidId : functoidData.values()) {
-            GraphEdge edge = new GraphEdge(mapId, functoidId, EdgeType.BIZTALK_FUNCTOID_CHAIN, Map.of());
+            GraphEdge edge = new GraphEdge(mapId, functoidId, BizTalkGraphAdapter.FUNCTOID_CHAIN, Map.of());
             edges.add(edge);
         }
 
@@ -308,7 +307,7 @@ public class BizTalkBtmParser {
             props.put("scriptLanguage", scriptLanguage);
         }
 
-        GraphNode functoidNode = new GraphNode(nodeId, NodeType.BIZTALK_FUNCTOID, props);
+        GraphNode functoidNode = new GraphNode(nodeId, BizTalkGraphAdapter.FUNCTOID, props);
         nodes.add(functoidNode);
 
         functoidData.put(functoidId, nodeId);

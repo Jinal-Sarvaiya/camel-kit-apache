@@ -990,7 +990,8 @@ class SkillPackCompilerTest {
         Path dist = Files.createDirectory(temp.resolve("distribution"));
         assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null,
                 "-classpath", System.getProperty("java.class.path"), "-d", dist.toString(),
-                example.resolve("java/example/LegacyFlowParser.java").toString()));
+                example.resolve("java/example/LegacyFlowParser.java").toString(),
+                example.resolve("java/example/LegacyGraphAdapter.java").toString()));
         Path archive = dist.resolve(SkillCatalog.DISTRIBUTION);
         Files.createDirectories(archive.getParent());
         try (var loader = loader(dist, example.resolve("resources"))) {
@@ -1032,6 +1033,24 @@ class SkillPackCompilerTest {
         assertEquals("mule.xml", result.getNode("mule-flow:orders").properties().get("file"));
         assertFalse(result.hasNode("legacy-flow:ignored.txt"));
 
+        String analyze = step.lines().filter(line -> line.startsWith("Run `graph analyze ")).findFirst().orElseThrow();
+        assertTrue(step.contains("If analysis fails, report the diagnostic and leave the inventory incomplete"), step);
+        String[] analysis = analyze.substring(analyze.indexOf('`') + 1, analyze.lastIndexOf('`')).split(" ");
+        assertEquals(List.of("graph", "analyze", "legacy", "--graph-file", "GRAPH"), List.of(analysis));
+        analysis[4] = graph.toString();
+        assertEquals("Legacy flow inventory (flows=1, source files=1)",
+                SkillCatalog.JSON.readTree(assertCli(0, dist, workspace, analysis)).required("summary").textValue());
+        assertEquals("legacy:flow", result.getNode("legacy-flow:orders.flow").type().name());
+        var edge = result.getOutgoingEdges("legacy-flow:orders.flow").getFirst();
+        assertEquals("legacy:declared-in", edge.type().name());
+        assertEquals("legacy-file:orders.flow", edge.to());
+
+        // The default distribution has neither the example catalog entry nor its implementation.
+        Path plain = Files.createDirectory(temp.resolve("plain"));
+        assertTrue(assertCli(1, plain, workspace, analysis).contains("analysis unavailable for provider/legacy"));
+        assertTrue(assertCli(0, plain, workspace, "graph", "neighbors", edge.from(), "--edge-type", edge.type().name(),
+                "--graph-file", graph.toString()).contains(edge.to()));
+
         byte[] saved = Files.readAllBytes(graph);
         try (var file = new java.io.RandomAccessFile(project.resolve("large.flow").toFile(), "rw")) {
             file.setLength(GraphParser.MAX_SOURCE_BYTES + 1L);
@@ -1040,6 +1059,11 @@ class SkillPackCompilerTest {
         assertTrue(oversized.contains("Graph input exceeds") && oversized.contains("large.flow"), oversized);
         assertArrayEquals(saved, Files.readAllBytes(graph));
         Files.delete(project.resolve("large.flow"));
+        Files.delete(dist.resolve("example/LegacyGraphAdapter.class"));
+        assertTrue(assertCli(1, dist, workspace, analysis).contains("example.LegacyGraphAdapter"));
+        assertTrue(assertCli(0, dist, workspace, "graph", "find", "--type", "legacy:flow", "--graph-file",
+                graph.toString())
+                .contains("legacy-flow:orders.flow"));
         Files.delete(dist.resolve("example/LegacyFlowParser.class"));
         String missing = assertCli(1, dist, workspace, args);
         assertTrue(missing.contains("provider/legacy-flow") && missing.contains("example.LegacyFlowParser"), missing);

@@ -1,6 +1,6 @@
 # BizTalk Migration Graph Analysis Guide
 
-> **Context:** Loaded by `migration-discovery.md` when `.camel-kit/project-graph.json` exists and contains `BIZTALK_ORCHESTRATION` nodes.
+> **Context:** Loaded by `migration-discovery.md` when `.camel-kit/project-graph.json` exists and contains `biztalk:orchestration` nodes.
 > **Purpose:** Accelerate BizTalk inventory with graph queries, then reconcile it with the bounded source and deployment
 > evidence required for migration conclusions.
 > **Output:** A source-reconciled `.camel-kit/project-snapshot.md` + pre-populated analysis summary for user confirmation.
@@ -38,7 +38,7 @@ Run the argv array:
 [*COMMAND_PREFIX_ARGV, "graph", "stats", "--graph-file", GRAPH_FILE]
 ```
 
-This returns JSON with the project's structural summary. For a BizTalk project, expect node types like `BIZTALK_ORCHESTRATION`, `BIZTALK_SHAPE`, `BIZTALK_MAP`, `BIZTALK_FUNCTOID`, `BIZTALK_SCHEMA`, `BIZTALK_PIPELINE`, `BIZTALK_PIPELINE_COMPONENT`, `BIZTALK_PORT`, `BIZTALK_ADAPTER`, and `BIZTALK_MESSAGE`.
+This returns JSON with the project's structural summary. For a BizTalk project, expect node types like `biztalk:orchestration`, `biztalk:shape`, `biztalk:map`, `biztalk:functoid`, `biztalk:schema`, `biztalk:pipeline`, `biztalk:pipeline-component`, `biztalk:port`, `biztalk:adapter`, and `biztalk:message`.
 
 Record:
 - Total node and edge counts
@@ -52,15 +52,15 @@ Record:
 
 Run the argv array:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "BIZTALK_ORCHESTRATION", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "biztalk:orchestration", "--graph-file", GRAPH_FILE]
 ```
 
 For each orchestration, bind its returned full node ID to `ORCHESTRATION_NODE_ID` and query its children:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", ORCHESTRATION_NODE_ID, "--direction", "out", "--edge-type", "BIZTALK_ORCHESTRATION_CONTAINS", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", ORCHESTRATION_NODE_ID, "--direction", "out", "--edge-type", "biztalk:orchestration-contains", "--graph-file", GRAPH_FILE]
 ```
 
-This returns `BIZTALK_SHAPE`, `BIZTALK_PORT`, and `BIZTALK_MESSAGE` nodes. For each orchestration, list:
+This returns `biztalk:shape`, `biztalk:port`, and `biztalk:message` nodes. For each orchestration, list:
 - Orchestration name and source file
 - Shapes in order (Receive, Send, Decide, Transform, Construct Message, Expression, Loop, etc.)
 - Ports (Receive Ports, Send Ports) with adapter types
@@ -76,23 +76,23 @@ until the mismatch is explained.
 
 Run the argv array:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "BIZTALK_MAP", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "biztalk:map", "--graph-file", GRAPH_FILE]
 ```
 
 For each map, bind its returned full node ID to `MAP_NODE_ID` and query its schema references and functoid chains:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", MAP_NODE_ID, "--direction", "out", "--edge-type", "BIZTALK_USES_SCHEMA", "--graph-file", GRAPH_FILE]
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", MAP_NODE_ID, "--direction", "out", "--edge-type", "BIZTALK_FUNCTOID_CHAIN", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", MAP_NODE_ID, "--direction", "out", "--edge-type", "biztalk:uses-schema", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", MAP_NODE_ID, "--direction", "out", "--edge-type", "biztalk:functoid-chain", "--graph-file", GRAPH_FILE]
 ```
 
 List all schemas:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "BIZTALK_SCHEMA", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "biztalk:schema", "--graph-file", GRAPH_FILE]
 ```
 
 For each map, record:
 - Source schema and target schema
-- Functoids used (from `BIZTALK_FUNCTOID` nodes)
+- Functoids used (from `biztalk:functoid` nodes)
 - Complexity rating:
   - Simple: No functoids (direct links only)
   - Medium: Basic functoids (String, Math, Logical)
@@ -100,7 +100,7 @@ For each map, record:
 
 Which orchestration shapes reference each map:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", MAP_NODE_ID, "--direction", "in", "--edge-type", "BIZTALK_USES_MAP", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", MAP_NODE_ID, "--direction", "in", "--edge-type", "biztalk:uses-map", "--graph-file", GRAPH_FILE]
 ```
 
 Reconcile every result against the bounded `.btm`, schema, and ODX Transform-shape sources. Missing targets are
@@ -113,12 +113,12 @@ is `Unknown`.
 
 Run the argv array:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "BIZTALK_PIPELINE", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "biztalk:pipeline", "--graph-file", GRAPH_FILE]
 ```
 
 For each pipeline, bind its returned full node ID to `PIPELINE_NODE_ID` and query its stages and components:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", PIPELINE_NODE_ID, "--direction", "out", "--edge-type", "BIZTALK_PIPELINE_STAGE", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", PIPELINE_NODE_ID, "--direction", "out", "--edge-type", "biztalk:pipeline-stage", "--graph-file", GRAPH_FILE]
 ```
 
 Record:
@@ -135,20 +135,20 @@ unparsable pipeline source or binding evidence is `Unknown`.
 
 Run the argv array:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "BIZTALK_PORT", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "biztalk:port", "--graph-file", GRAPH_FILE]
 ```
 
 Run the argv array:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "BIZTALK_ADAPTER", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "biztalk:adapter", "--graph-file", GRAPH_FILE]
 ```
 
 For each port, bind its returned full node ID to `PORT_NODE_ID` and check its adapter bindings:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", PORT_NODE_ID, "--direction", "out", "--edge-type", "BIZTALK_PORT_BINDING", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", PORT_NODE_ID, "--direction", "out", "--edge-type", "biztalk:port-binding", "--graph-file", GRAPH_FILE]
 ```
 
-This query is only a hint. Absence of a `BIZTALK_PORT_BINDING` edge proves nothing. Independently inspect all deployment
+This query is only a hint. Absence of a `biztalk:port-binding` edge proves nothing. Independently inspect all deployment
 binding files in the selected boundary and reconcile Receive Locations, Receive Ports, Send Ports, adapter transports,
 addresses, pipelines, enabled state, and their application/orchestration references. If bindings or referenced
 assemblies are missing or fail to parse, affected entry-root and reachability results are `Unknown`. Direct Binding and
@@ -165,15 +165,15 @@ Record:
 
 Check for inter-orchestration calls:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "BIZTALK_ORCHESTRATION", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "biztalk:orchestration", "--graph-file", GRAPH_FILE]
 ```
 
 For each orchestration, check outbound call edges:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", ORCHESTRATION_NODE_ID, "--direction", "out", "--edge-type", "BIZTALK_CALLS_ORCHESTRATION", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", ORCHESTRATION_NODE_ID, "--direction", "out", "--edge-type", "biztalk:calls-orchestration", "--graph-file", GRAPH_FILE]
 ```
 
-Do not infer a missing call from the absence of a `BIZTALK_CALLS_ORCHESTRATION` edge. Independently inspect every `.odx`
+Do not infer a missing call from the absence of a `biztalk:calls-orchestration` edge. Independently inspect every `.odx`
 file for Call Orchestration and Start Orchestration shapes, resolve each constant target against the bounded source and
 referenced assemblies, and preserve whether the invocation is synchronous (`Call`) or asynchronous (`Start`). Dynamic
 .NET calls, failed parses, incomplete resolution, and targets outside the boundary are `Unknown`. A supported constant
@@ -229,7 +229,7 @@ validation obligations.
 - **Source-retirement candidates:** Only `Retirement candidate` results backed by complete relevant ODX, binding, and
   assembly coverage; never describe them as dead or safe to remove.
 - **Complex maps:** Maps with Scripting functoids or Database Lookup (require manual conversion)
-- **Custom pipeline components:** `BIZTALK_PIPELINE_COMPONENT` nodes not matching standard BizTalk components
+- **Custom pipeline components:** `biztalk:pipeline-component` nodes not matching standard BizTalk components
 - **Broken references:** Supported ODX, map, pipeline, or binding references whose targets are confirmed absent after
   complete target-resolution closure; partial or out-of-bound target coverage remains `Unknown`
 - **Evidence gaps:** Every `Unknown`, including missing bindings/assemblies, unresolved Direct Binding or subscription

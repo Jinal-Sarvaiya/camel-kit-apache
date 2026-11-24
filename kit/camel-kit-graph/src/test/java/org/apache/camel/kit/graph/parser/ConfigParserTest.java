@@ -174,10 +174,10 @@ class ConfigParserTest {
 
         ProjectGraph built = new GraphBuilder().build(root);
 
-        assertTrue(built.getEdges().stream().anyMatch(e -> e.type() == EdgeType.CONFIGURES
+        assertTrue(built.getEdges().stream().anyMatch(e -> e.type().equals(EdgeType.CONFIGURES)
                 && e.from().equals("config:timer.name") && e.to().startsWith("endpoint:timer")),
                 "a default YAML property must keep its CONFIGURES edge");
-        assertTrue(built.getEdges().stream().anyMatch(e -> e.type() == EdgeType.CONFIGURES
+        assertTrue(built.getEdges().stream().anyMatch(e -> e.type().equals(EdgeType.CONFIGURES)
                 && e.from().equals("config:kafka.topic:profile=prod") && e.to().startsWith("endpoint:kafka")),
                 "a property defined only in a profile document must still be linked");
     }

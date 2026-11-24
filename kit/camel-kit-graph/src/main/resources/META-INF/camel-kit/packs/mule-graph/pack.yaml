@@ -1,0 +1,8 @@
+id: mule-graph
+schema: 1
+add:
+  provider/mule:
+    contract: 1
+    provider:
+      service: org.apache.camel.kit.graph.model.GraphTypeAdapter
+      implementation: org.apache.camel.kit.graph.adapter.mule.MuleGraphAdapter

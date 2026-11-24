@@ -2,7 +2,9 @@ package org.apache.camel.kit.command.graph;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 import org.apache.camel.kit.CommandRunner;
 
@@ -11,6 +13,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,6 +34,28 @@ class GraphParameterizedCommandsTest {
         JsonNode r = MAPPER.readTree(run(new GraphFindCommand(), "--type", "CAMEL_ROUTE"));
         assertTrue(r.get("found").asBoolean());
         assertEquals(2, r.get("total").asInt());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "mule, MULE_FLOW, mule:flow, MULE_CALLS_SUBFLOW, mule:calls-subflow",
+            "biztalk, BIZTALK_ORCHESTRATION, biztalk:orchestration, BIZTALK_USES_MAP, biztalk:uses-map"
+    })
+    void legacyGraphAndFiltersUseTheBundledAdapter(
+            String adapter, String oldNode, String nodeType,
+            String oldEdge, String edgeType)
+            throws Exception {
+        Files.writeString(graphFile, String.format(Locale.ROOT, """
+                {"version":"1.0","nodes":{"a":{"type":"%s"},"b":{"type":"RESOURCE_FILE"}},
+                 "edges":[{"from":"a","to":"b","type":"%s"}]}
+                """, oldNode, oldEdge));
+        var found = MAPPER.readTree(run(new GraphFindCommand(), "--type", oldNode)).required("nodes");
+        assertEquals(nodeType, found.required(0).required("type").textValue());
+        assertEquals(found, MAPPER.readTree(run(new GraphFindCommand(), "--type", nodeType)).required("nodes"));
+        var neighbors = MAPPER.readTree(run(new GraphNeighborsCommand(), "a", "--edge-type", oldEdge));
+        assertEquals(edgeType, neighbors.required("edges").required(0).required("type").textValue());
+        assertEquals("b", neighbors.required("nodes").required(0).required("id").textValue());
+        assertTrue(MAPPER.readTree(run(new GraphAnalyzeCommand(), adapter)).required("matched").booleanValue());
     }
 
     @Test

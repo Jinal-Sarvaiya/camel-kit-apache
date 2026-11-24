@@ -548,6 +548,10 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
    phase only *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*; YAML routes and configuration use Jackson's tree model, DataWeave and properties are
    regular-expression scans *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*. `GraphBuilder` applies a 60-second timeout to every parser, including the POM parser.
    The distribution's compiled catalog selects trusted migration parser classes on the Kit runtime classpath.
+   The same catalog selects graph type adapters for alias resolution and migration summaries. A graph file
+   supplies only record IDs, types, properties and relationships to these operations. Type strings never name
+   classes to load. A step requiring a specialized summary checks the exit status of `graph analyze` even
+   when generic traversal succeeds.
    A required parser ID is looked up in that catalog. Analyzed projects cannot register providers. Registered
    file extensions count toward the shared discovery budget before content inspection and parsing. A step's
    `requires` declaration checks the dependency at build time. Its shipped instructions must invoke the installed

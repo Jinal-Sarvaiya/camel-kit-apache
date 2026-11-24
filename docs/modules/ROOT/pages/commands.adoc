@@ -189,6 +189,7 @@ The CLI prints a JSON request for an installed skill or invokes the bundled Java
 Builds and queries the project's property graph, persisted at `.camel-kit/project-graph.json`.
 
 ----
+camel-kit graph analyze mule                  # summarize the graph with the Mule adapter
 camel-kit graph generate                      # build or rebuild the graph
 camel-kit graph generate --require-parser mule-xml  # require the bundled Mule parser
 camel-kit graph stats                         # availability, node and edge counts

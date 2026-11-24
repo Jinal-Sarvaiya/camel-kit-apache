@@ -6,10 +6,9 @@ import java.nio.file.Paths;
 import java.util.List;
 
 import org.apache.camel.kit.graph.ProjectGraph;
-import org.apache.camel.kit.graph.model.EdgeType;
+import org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter;
 import org.apache.camel.kit.graph.model.GraphEdge;
 import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +37,7 @@ class BizTalkBtpParserTest {
         // Verify pipeline node
         GraphNode pipelineNode = graph.getNode("biztalk-pipeline:XMLReceive");
         assertNotNull(pipelineNode, "Pipeline node should exist");
-        assertEquals(NodeType.BIZTALK_PIPELINE, pipelineNode.type());
+        assertEquals(BizTalkGraphAdapter.PIPELINE, pipelineNode.type());
         assertEquals("XMLReceive", pipelineNode.properties().get("name"));
         assertEquals("f66b9f5e-43ff-4f5f-ba46-885348ae1b4e", pipelineNode.properties().get("categoryId"));
         assertEquals("receive", pipelineNode.properties().get("direction"));
@@ -47,7 +46,7 @@ class BizTalkBtpParserTest {
         // Verify component nodes
         GraphNode component1 = graph.getNode("biztalk-pipeline:XMLReceive:component:XMLdisassembler:0");
         assertNotNull(component1, "Component 1 should exist");
-        assertEquals(NodeType.BIZTALK_PIPELINE_COMPONENT, component1.type());
+        assertEquals(BizTalkGraphAdapter.PIPELINE_COMPONENT, component1.type());
         assertEquals("XML disassembler", component1.properties().get("componentName"));
         assertEquals("Microsoft.BizTalk.Component.XmlDasmComp", component1.properties().get("typeName"));
         assertEquals("1.0", component1.properties().get("version"));
@@ -55,7 +54,7 @@ class BizTalkBtpParserTest {
 
         GraphNode component2 = graph.getNode("biztalk-pipeline:XMLReceive:component:XMLvalidator:1");
         assertNotNull(component2, "Component 2 should exist");
-        assertEquals(NodeType.BIZTALK_PIPELINE_COMPONENT, component2.type());
+        assertEquals(BizTalkGraphAdapter.PIPELINE_COMPONENT, component2.type());
         assertEquals("XML validator", component2.properties().get("componentName"));
         assertEquals("Microsoft.BizTalk.Component.XmlValidator", component2.properties().get("typeName"));
         assertEquals("1.0", component2.properties().get("version"));
@@ -63,7 +62,7 @@ class BizTalkBtpParserTest {
 
         // Verify pipeline stage edges
         List<GraphEdge> stageEdges = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_PIPELINE_STAGE)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.PIPELINE_STAGE))
                 .toList();
         assertEquals(2, stageEdges.size(), "Should have 2 pipeline stage edges");
 
@@ -123,14 +122,14 @@ class BizTalkBtpParserTest {
         parser.parse(btpFile, graph);
 
         // Verify total counts
-        long pipelineNodes = graph.findByType(NodeType.BIZTALK_PIPELINE).size();
+        long pipelineNodes = graph.findByType(BizTalkGraphAdapter.PIPELINE).size();
         assertEquals(1, pipelineNodes, "Should have 1 pipeline node");
 
-        long componentNodes = graph.findByType(NodeType.BIZTALK_PIPELINE_COMPONENT).size();
+        long componentNodes = graph.findByType(BizTalkGraphAdapter.PIPELINE_COMPONENT).size();
         assertEquals(2, componentNodes, "Should have 2 pipeline component nodes");
 
         long stageEdges = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_PIPELINE_STAGE)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.PIPELINE_STAGE))
                 .count();
         assertEquals(2, stageEdges, "Should have 2 pipeline stage edges");
     }
@@ -142,7 +141,7 @@ class BizTalkBtpParserTest {
         parser.parse(btpFile, graph);
 
         List<GraphEdge> stageEdges = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_PIPELINE_STAGE)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.PIPELINE_STAGE))
                 .sorted((e1, e2) -> {
                     int order1 = Integer.parseInt(e1.properties().get("order"));
                     int order2 = Integer.parseInt(e2.properties().get("order"));

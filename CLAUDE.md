@@ -79,6 +79,7 @@ Governance:
 
 - Implement migration parsers with the versioned `MigrationParser` interface. Register each one as a
   `provider/<id>` entry in its pack descriptor. See the worked example in `docs/modules/ROOT/pages/contributing.adoc`.
+- Register migration graph schemas and summaries with `GraphTypeAdapter` in the pack catalog. Keep legacy type aliases with their owner.
 - Parser test data: `src/test/resources/{platform-name}/`.
 
 ## Definition of done

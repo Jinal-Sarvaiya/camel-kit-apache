@@ -36,7 +36,7 @@ public class GraphRouteContextCommand extends GraphQueryCommand {
         GraphQuery.NeighborResult nb = query.neighbors(routeId, "out", null, 1);
         List<String> internal = new ArrayList<>(), infra = new ArrayList<>(), api = new ArrayList<>();
         for (GraphNode n : nb.nodes()) {
-            if (n.type() != NodeType.CAMEL_ENDPOINT)
+            if (!n.type().equals(NodeType.CAMEL_ENDPOINT))
                 continue;
             String scheme = n.properties().getOrDefault("scheme", "");
             String uri = n.properties().getOrDefault("uri", n.id());

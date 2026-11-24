@@ -228,8 +228,8 @@ class MigrationOperationsContractTest {
                 .replaceAll("\\s+", " ");
         assertContainsAll(bizTalkGraph,
                 "Absence of a graph node or edge never proves absence in the application",
-                "Absence of a `BIZTALK_PORT_BINDING` edge proves nothing",
-                "absence of a `BIZTALK_CALLS_ORCHESTRATION` edge",
+                "Absence of a `biztalk:port-binding` edge proves nothing",
+                "absence of a `biztalk:calls-orchestration` edge",
                 "inspect every `.odx` file for Call Orchestration and Start Orchestration shapes",
                 "a reachable orchestration can coexist with a broken-reference row",
                 "never describe them as dead or safe to remove");

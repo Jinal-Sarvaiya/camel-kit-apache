@@ -138,9 +138,9 @@ The `camel-kit-graph` module builds a property graph of the project structure by
 | `XmlRouteParser` | `.camel.xml` | `CAMEL_ROUTE`, `CAMEL_ENDPOINT`, `CAMEL_PROCESSOR` | After PomParser |
 | `YamlRouteParser` | `.camel.yaml` | `CAMEL_ROUTE`, `CAMEL_ENDPOINT`, `CAMEL_PROCESSOR` | After PomParser |
 | `ConfigParser` | `application.properties` | `CONFIG_PROPERTY` | After PomParser |
-| `MuleXmlFlowParser` | MuleSoft XML configs (`*.xml` with `mulesoft.org/schema/mule` namespace) | `MULE_FLOW`, `MULE_SUB_FLOW`, `MULE_CONNECTOR`, `MULE_ENDPOINT`, `MULE_PROCESSOR`, `MULE_TRANSFORM`, `MULE_ERROR_HANDLER` | After PomParser |
-| `DataWeaveParser` | `.dwl` files | `DATAWEAVE_SCRIPT` | After PomParser |
-| `BizTalkParser` | BizTalk artifacts (`.odx`, `.btm`, `.btp`, binding `.xml`) | `BIZTALK_ORCHESTRATION`, `BIZTALK_SHAPE`, `BIZTALK_MAP`, `BIZTALK_FUNCTOID`, `BIZTALK_SCHEMA`, `BIZTALK_PIPELINE`, `BIZTALK_PIPELINE_COMPONENT`, `BIZTALK_PORT`, `BIZTALK_ADAPTER`, `BIZTALK_MESSAGE` | After PomParser (hybrid parser delegating to 4 internal StAX-based parsers) |
+| `MuleXmlFlowParser` | MuleSoft XML configs (`*.xml` with `mulesoft.org/schema/mule` namespace) | `mule:flow`, `mule:sub-flow`, `mule:connector`, `mule:endpoint`, `mule:processor`, `mule:transform`, `mule:error-handler` | After PomParser |
+| `DataWeaveParser` | `.dwl` files | `mule:dataweave-script` | After PomParser |
+| `BizTalkParser` | BizTalk artifacts (`.odx`, `.btm`, `.btp`, binding `.xml`) | `biztalk:orchestration`, `biztalk:shape`, `biztalk:map`, `biztalk:functoid`, `biztalk:schema`, `biztalk:pipeline`, `biztalk:pipeline-component`, `biztalk:port`, `biztalk:adapter`, `biztalk:message` | After PomParser (hybrid parser delegating to 4 internal StAX-based parsers) |
 | `CrossLinker` | Graph topology | Creates cross-references and shortcuts | After all content parsers (post-processor) |
 | `PropertyBindingParser` | `CONFIG_PROPERTY` values | Extracts bean/type/property references | After CrossLinker (post-processor) |
 
@@ -165,17 +165,17 @@ The `camel-kit-graph` module builds a property graph of the project structure by
 | `REFERENCES_BEAN` | A CONFIG_PROPERTY references a bean via `#bean:`, `#autowired`, or `#type:` syntax | `PropertyBindingParser` |
 | `REFERENCES_PROPERTY` | A CONFIG_PROPERTY references another property via `#property:` syntax | `PropertyBindingParser` |
 | `DEPENDS_ON_VIA_INTERFACE` | A class depends on another class via an interface | `CrossLinker` |
-| `MULE_FLOW_CONTAINS` | A Mule flow or sub-flow contains a processor, transform, or endpoint | `MuleXmlFlowParser` |
-| `MULE_CALLS_SUBFLOW` | A flow-ref element invokes a sub-flow by name | `MuleXmlFlowParser` |
-| `MULE_USES_CONNECTOR` | A flow element uses a connector configuration | `MuleXmlFlowParser` |
-| `MULE_REFERENCES_DWL` | A transform step references an external DataWeave script | `MuleXmlFlowParser` |
-| `BIZTALK_ORCHESTRATION_CONTAINS` | Orchestration contains shape, port, or message | `BizTalkParser` |
-| `BIZTALK_USES_MAP` | Transform shape uses a BizTalk map | `BizTalkParser` |
-| `BIZTALK_USES_SCHEMA` | Message or map references an XSD schema | `BizTalkParser` |
-| `BIZTALK_CALLS_ORCHESTRATION` | Call/start shape invokes another orchestration | `BizTalkParser` |
-| `BIZTALK_PORT_BINDING` | Port uses adapter configuration | `BizTalkParser` |
-| `BIZTALK_FUNCTOID_CHAIN` | Map contains functoid | `BizTalkParser` |
-| `BIZTALK_PIPELINE_STAGE` | Pipeline contains component | `BizTalkParser` |
+| `mule:flow-contains` | A Mule flow or sub-flow contains a processor, transform, or endpoint | `MuleXmlFlowParser` |
+| `mule:calls-subflow` | A flow-ref element invokes a sub-flow by name | `MuleXmlFlowParser` |
+| `mule:uses-connector` | A flow element uses a connector configuration | `MuleXmlFlowParser` |
+| `mule:references-dwl` | A transform step references an external DataWeave script | `MuleXmlFlowParser` |
+| `biztalk:orchestration-contains` | Orchestration contains shape, port, or message | `BizTalkParser` |
+| `biztalk:uses-map` | Transform shape uses a BizTalk map | `BizTalkParser` |
+| `biztalk:uses-schema` | Message or map references an XSD schema | `BizTalkParser` |
+| `biztalk:calls-orchestration` | Call/start shape invokes another orchestration | `BizTalkParser` |
+| `biztalk:port-binding` | Port uses adapter configuration | `BizTalkParser` |
+| `biztalk:functoid-chain` | Map contains functoid | `BizTalkParser` |
+| `biztalk:pipeline-stage` | Pipeline contains component | `BizTalkParser` |
 
 **Parser execution order:** PomParser runs first (synchronously) to ensure `MAVEN_ARTIFACT` nodes are available for runtime detection and dependency allowlist construction. All other parsers run in parallel after PomParser completes. CrossLinker runs after all content parsers finish, and PropertyBindingParser runs last to analyze the complete CONFIG_PROPERTY graph.
 

@@ -17,10 +17,9 @@ import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamReader;
 
 import org.apache.camel.kit.graph.ProjectGraph;
-import org.apache.camel.kit.graph.model.EdgeType;
+import org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter;
 import org.apache.camel.kit.graph.model.GraphEdge;
 import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.graph.parser.GraphParser;
 
 /**
@@ -174,7 +173,7 @@ public class BizTalkBtpParser {
         }
         pipelineProps.put("direction", direction);
 
-        GraphNode pipelineNode = new GraphNode(pipelineId, NodeType.BIZTALK_PIPELINE, pipelineProps);
+        GraphNode pipelineNode = new GraphNode(pipelineId, BizTalkGraphAdapter.PIPELINE, pipelineProps);
         graph.addNode(pipelineNode);
 
         // Now emit all component nodes and edges using the final pipeline name
@@ -194,12 +193,13 @@ public class BizTalkBtpParser {
                 componentProps.put("description", comp.description());
             }
 
-            GraphNode componentNode = new GraphNode(componentId, NodeType.BIZTALK_PIPELINE_COMPONENT, componentProps);
+            GraphNode componentNode
+                    = new GraphNode(componentId, BizTalkGraphAdapter.PIPELINE_COMPONENT, componentProps);
             graph.addNode(componentNode);
 
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("order", String.valueOf(comp.order()));
-            GraphEdge edge = new GraphEdge(pipelineId, componentId, EdgeType.BIZTALK_PIPELINE_STAGE, edgeProps);
+            GraphEdge edge = new GraphEdge(pipelineId, componentId, BizTalkGraphAdapter.PIPELINE_STAGE, edgeProps);
             graph.addEdge(edge);
         }
     }

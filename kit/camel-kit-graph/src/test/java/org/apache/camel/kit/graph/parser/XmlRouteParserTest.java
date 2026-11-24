@@ -45,7 +45,7 @@ class XmlRouteParserTest {
     @Test
     void createsRoutesFromEdge() {
         List<GraphEdge> routesFrom = graph.getOutgoingEdges("route:xmlFileRoute").stream()
-                .filter(e -> e.type() == EdgeType.ROUTES_FROM)
+                .filter(e -> e.type().equals(EdgeType.ROUTES_FROM))
                 .toList();
         assertEquals(1, routesFrom.size());
         assertEquals("endpoint:file:input", routesFrom.get(0).to());
@@ -54,7 +54,7 @@ class XmlRouteParserTest {
     @Test
     void createsRoutesToEdge() {
         List<GraphEdge> routesTo = graph.getOutgoingEdges("route:xmlFileRoute").stream()
-                .filter(e -> e.type() == EdgeType.ROUTES_TO)
+                .filter(e -> e.type().equals(EdgeType.ROUTES_TO))
                 .toList();
         assertEquals(1, routesTo.size());
     }
@@ -62,7 +62,7 @@ class XmlRouteParserTest {
     @Test
     void parsesEipProcessors() {
         List<GraphEdge> processors = graph.getOutgoingEdges("route:xmlFileRoute").stream()
-                .filter(e -> e.type() == EdgeType.PROCESSES)
+                .filter(e -> e.type().equals(EdgeType.PROCESSES))
                 .toList();
         assertTrue(processors.size() >= 1); // at least filter
     }

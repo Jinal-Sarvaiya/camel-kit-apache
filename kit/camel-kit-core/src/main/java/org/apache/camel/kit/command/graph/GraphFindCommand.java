@@ -1,8 +1,6 @@
 package org.apache.camel.kit.command.graph;
 
-import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
@@ -28,12 +26,12 @@ public class GraphFindCommand extends GraphQueryCommand {
         NodeType nodeType = null;
         if (type != null) {
             try {
-                nodeType = NodeType.valueOf(type);
+                nodeType = types.nodeType(type);
             } catch (IllegalArgumentException e) {
                 ObjectNode error = GraphJsonWriter.createObject();
                 error.put("error", "Invalid node type: " + type);
                 error.put("validTypes",
-                        Arrays.stream(NodeType.values()).map(Enum::name).collect(Collectors.joining(", ")));
+                        String.join(", ", types.nodeNames()));
                 return GraphJsonWriter.toJson(error);
             }
         }

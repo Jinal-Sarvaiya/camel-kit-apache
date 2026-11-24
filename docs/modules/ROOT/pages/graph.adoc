@@ -67,6 +67,35 @@ between the Camel XML and DataWeave fragments. If two migration providers produc
 the later provider replaces the earlier node and the build reports a warning naming both providers. The xref:contributing.adoc#migration-parser[worked parser pack]
 adds a file format and a private source model through the same interface.
 
+[[graph-format]]
+== Reading a saved graph
+
+Kit writes JSON format `1.1` and reads both `1.0` and `1.1`. A node's object key is its ID.
+An edge records its `from` and `to` IDs. Both records have a `type` and may have a `properties`
+object containing string values. IDs must contain a non-whitespace character. An edge can point to
+an external ID, such as a superclass outside the project. Duplicate JSON keys, malformed records
+and unsupported versions produce a diagnostic. Older Kit versions that only read `1.0` need a graph
+generated with that version.
+
+Common types keep their existing names, including `CAMEL_ROUTE` and `ROUTES_TO`. Migration types
+use a provider namespace, for example `mule:flow`, `mule:flow-contains` or `biztalk:orchestration`.
+The default distribution selects the `mule-graph` and `biztalk-graph` packs. Their adapters map
+old names in saved graphs and query filters to the same types. For example, `graph find --type MULE_FLOW`
+and `graph find --type mule:flow` return the same nodes with canonical types.
+
+[source,shell]
+----
+camel-kit graph analyze mule --graph-file .camel-kit/project-graph.json
+----
+
+`analyze` returns the adapter's summary, or `matched: false` when its rules find no matching project.
+If the adapter is missing, the command identifies the unavailable provider and exits with status 1.
+A workflow that requires this analysis must leave its step incomplete. Generic commands such as
+`find`, `neighbors`, `stats` and `visualize` still work with the recorded type names. A library caller
+can read, traverse, write and reload such a graph, including its properties and relationships.
+Unmapped legacy names retain their spelling until a reader has the corresponding adapter.
+See xref:contributing.adoc#graph-adapter[registering a graph adapter].
+
 [[commands]]
 == Commands
 
@@ -75,6 +104,7 @@ adds a file format and a private source model through the same interface.
 | Command | Purpose
 
 2+| *Analysis*
+| `analyze <namespace>` | Run the migration pack's graph summary
 | `stats` | `available`, node and edge totals, nodes by type
 | `find` | Nodes by type, with a regular expression on the name or fully qualified name, falling back to the node ID
 | `neighbors` | Incoming, outgoing or both directions, optionally filtered by edge type and depth

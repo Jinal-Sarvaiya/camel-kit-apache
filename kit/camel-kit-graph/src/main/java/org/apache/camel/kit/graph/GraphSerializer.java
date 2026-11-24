@@ -3,11 +3,12 @@ package org.apache.camel.kit.graph;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import org.apache.camel.kit.graph.model.*;
 
-import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
@@ -17,8 +18,10 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 public final class GraphSerializer {
 
     private static final ObjectMapper MAPPER = new ObjectMapper()
-            .enable(SerializationFeature.INDENT_OUTPUT);
-    private static final String FORMAT_VERSION = "1.0";
+            .enable(SerializationFeature.INDENT_OUTPUT)
+            .enable(DeserializationFeature.FAIL_ON_READING_DUP_TREE_KEY,
+                    DeserializationFeature.FAIL_ON_TRAILING_TOKENS);
+    private static final String FORMAT_VERSION = "1.1";
 
     private GraphSerializer() {
     }
@@ -35,60 +38,85 @@ public final class GraphSerializer {
 
         ObjectNode nodesObj = root.putObject("nodes");
         for (GraphNode node : graph.getNodes().values()) {
-            ObjectNode nodeObj = nodesObj.putObject(node.id());
-            nodeObj.put("type", node.type().name());
-            if (!node.properties().isEmpty()) {
-                ObjectNode props = nodeObj.putObject("properties");
-                node.properties().forEach(props::put);
-            }
+            requireId(node.id(), "node ID");
+            writeRecord(nodesObj.putObject(node.id()), node.type(), node.properties(), "node '" + node.id() + "'");
         }
 
         ArrayNode edgesArr = root.putArray("edges");
         for (GraphEdge edge : graph.getEdges()) {
             ObjectNode edgeObj = edgesArr.addObject();
-            edgeObj.put("from", edge.from());
-            edgeObj.put("to", edge.to());
-            edgeObj.put("type", edge.type().name());
-            if (!edge.properties().isEmpty()) {
-                ObjectNode props = edgeObj.putObject("properties");
-                edge.properties().forEach(props::put);
-            }
+            edgeObj.put("from", requireId(edge.from(), "edge source"));
+            edgeObj.put("to", requireId(edge.to(), "edge target"));
+            writeRecord(edgeObj, edge.type(), edge.properties(),
+                    "edge from '" + edge.from() + "' to '" + edge.to() + "'");
         }
 
         MAPPER.writeValue(file.toFile(), root);
     }
 
+    private static void writeRecord(ObjectNode record, GraphType type, Map<String, String> properties, String location)
+            throws IOException {
+        if (type == null || properties == null) {
+            throw new IOException("Malformed graph: " + location + " requires a type and properties map");
+        }
+        record.put("type", type.name());
+        if (!properties.isEmpty()) {
+            ObjectNode props = record.putObject("properties");
+            for (var entry : properties.entrySet()) {
+                if (entry.getKey() == null || entry.getValue() == null) {
+                    throw new IOException(
+                            "Malformed graph: " + location + " properties require string keys and values");
+                }
+                props.put(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    private static String requireId(String id, String location) throws IOException {
+        if (id == null || id.isBlank()) {
+            throw new IOException("Malformed graph: blank " + location);
+        }
+        return id;
+    }
+
     public static ProjectGraph read(Path file) throws IOException {
+        return read(file, new GraphTypeRegistry(Map.of()));
+    }
+
+    public static ProjectGraph read(Path file, GraphTypeRegistry types) throws IOException {
         ProjectGraph graph = new ProjectGraph();
         JsonNode root = MAPPER.readTree(file.toFile());
         String version = requiredText(root, "version", "root");
-        if (!FORMAT_VERSION.equals(version)) {
-            throw new IOException("Unsupported graph format version '" + version + "'; expected " + FORMAT_VERSION);
+        if (!FORMAT_VERSION.equals(version) && !"1.0".equals(version)) {
+            throw new IOException(
+                    "Unsupported graph format version '" + version + "'; expected 1.0 or " + FORMAT_VERSION);
         }
 
         JsonNode nodesObj = requiredObject(root, "nodes", "root");
-        nodesObj.fieldNames().forEachRemaining(id -> {
-            JsonNode nodeObj = nodesObj.get(id);
-            NodeType type = nodeType(requiredTextUnchecked(nodeObj, "type", "node " + id));
-            Map<String, String> props = Map.of();
-            if (nodeObj.has("properties")) {
-                props = MAPPER.convertValue(nodeObj.get("properties"), new TypeReference<>() {
-                });
+        for (var entry : nodesObj.properties()) {
+            String id = requireId(entry.getKey(), "node ID");
+            String location = "node '" + id + "'";
+            JsonNode node = entry.getValue();
+            String type = requiredText(node, "type", location);
+            try {
+                graph.addNode(new GraphNode(id, types.nodeType(type), properties(node, location)));
+            } catch (IllegalArgumentException e) {
+                throw new IOException("Malformed graph: " + location + ": " + e.getMessage(), e);
             }
-            graph.addNode(new GraphNode(id, type, props));
-        });
+        }
 
-        JsonNode edgesArr = requiredArray(root, "edges", "root");
-        for (JsonNode edgeObj : edgesArr) {
-            String from = requiredText(edgeObj, "from", "edge");
-            String to = requiredText(edgeObj, "to", "edge");
-            EdgeType type = edgeType(requiredText(edgeObj, "type", "edge"));
-            Map<String, String> props = Map.of();
-            if (edgeObj.has("properties")) {
-                props = MAPPER.convertValue(edgeObj.get("properties"), new TypeReference<>() {
-                });
+        JsonNode edges = requiredArray(root, "edges", "root");
+        int index = 0;
+        for (JsonNode edge : edges) {
+            String location = "edge[" + index++ + "]";
+            String from = requiredText(edge, "from", location);
+            String to = requiredText(edge, "to", location);
+            String type = requiredText(edge, "type", location);
+            try {
+                graph.addEdge(new GraphEdge(from, to, types.edgeType(type), properties(edge, location)));
+            } catch (IllegalArgumentException e) {
+                throw new IOException("Malformed graph: " + location + ": " + e.getMessage(), e);
             }
-            graph.addEdge(new GraphEdge(from, to, type, props));
         }
 
         return graph;
@@ -111,35 +139,25 @@ public final class GraphSerializer {
     }
 
     private static String requiredText(JsonNode parent, String field, String location) throws IOException {
-        JsonNode node = parent.get(field);
-        if (node == null || !node.isTextual()) {
+        JsonNode node = parent == null ? null : parent.get(field);
+        if (node == null || !node.isTextual() || node.textValue().isBlank()) {
             throw new IOException("Malformed graph: " + location + " is missing text field '" + field + "'");
         }
         return node.asText();
     }
 
-    private static String requiredTextUnchecked(JsonNode parent, String field, String location) {
-        JsonNode node = parent.get(field);
-        if (node == null || !node.isTextual()) {
-            throw new IllegalArgumentException(
-                    "Malformed graph: " + location + " is missing text field '" + field + "'");
+    private static Map<String, String> properties(JsonNode record, String location) throws IOException {
+        if (!record.has("properties")) {
+            return Map.of();
         }
-        return node.asText();
-    }
-
-    private static NodeType nodeType(String value) {
-        try {
-            return NodeType.valueOf(value);
-        } catch (IllegalArgumentException e) {
-            throw new IllegalArgumentException("Malformed graph: unknown node type '" + value + "'", e);
+        Map<String, String> properties = new LinkedHashMap<>();
+        for (var entry : requiredObject(record, "properties", location).properties()) {
+            if (!entry.getValue().isTextual()) {
+                throw new IOException(
+                        "Malformed graph: " + location + " property '" + entry.getKey() + "' must be a string");
+            }
+            properties.put(entry.getKey(), entry.getValue().textValue());
         }
-    }
-
-    private static EdgeType edgeType(String value) throws IOException {
-        try {
-            return EdgeType.valueOf(value);
-        } catch (IllegalArgumentException e) {
-            throw new IOException("Malformed graph: unknown edge type '" + value + "'", e);
-        }
+        return properties;
     }
 }

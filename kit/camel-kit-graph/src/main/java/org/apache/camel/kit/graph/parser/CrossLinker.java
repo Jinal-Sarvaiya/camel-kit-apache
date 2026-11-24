@@ -46,13 +46,13 @@ public class CrossLinker {
 
             // Find all routes that produce to this endpoint (ROUTES_TO)
             List<String> producers = graph.getIncomingEdges(endpointId).stream()
-                    .filter(edge -> edge.type() == EdgeType.ROUTES_TO)
+                    .filter(edge -> edge.type().equals(EdgeType.ROUTES_TO))
                     .map(GraphEdge::from)
                     .toList();
 
             // Find all routes that consume from this endpoint (ROUTES_FROM)
             List<String> consumers = graph.getIncomingEdges(endpointId).stream()
-                    .filter(edge -> edge.type() == EdgeType.ROUTES_FROM)
+                    .filter(edge -> edge.type().equals(EdgeType.ROUTES_FROM))
                     .map(GraphEdge::from)
                     .toList();
 
@@ -136,7 +136,7 @@ public class CrossLinker {
     public void expandInterfaces(ProjectGraph graph) {
         // Find all USES_TYPE edges pointing to interfaces
         List<GraphEdge> usesTypeEdges = graph.getEdges().stream()
-                .filter(edge -> edge.type() == EdgeType.USES_TYPE)
+                .filter(edge -> edge.type().equals(EdgeType.USES_TYPE))
                 .toList();
 
         for (GraphEdge usesTypeEdge : usesTypeEdges) {
@@ -151,7 +151,7 @@ public class CrossLinker {
 
             // Find all implementors of this interface
             List<String> implementors = graph.getIncomingEdges(interfaceId).stream()
-                    .filter(edge -> edge.type() == EdgeType.IMPLEMENTS)
+                    .filter(edge -> edge.type().equals(EdgeType.IMPLEMENTS))
                     .map(GraphEdge::from)
                     .toList();
 

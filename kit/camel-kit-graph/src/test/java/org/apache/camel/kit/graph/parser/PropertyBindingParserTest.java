@@ -44,7 +44,7 @@ class PropertyBindingParserTest {
     @Test
     void createsInstantiatesEdgeForClassPrefix() {
         var edges = graph.getOutgoingEdges("config:camel.component.jms.connection-factory").stream()
-                .filter(e -> e.type() == EdgeType.INSTANTIATES)
+                .filter(e -> e.type().equals(EdgeType.INSTANTIATES))
                 .toList();
         assertEquals(1, edges.size());
         assertEquals("class:com.example.MyFactory", edges.get(0).to());
@@ -53,7 +53,7 @@ class PropertyBindingParserTest {
     @Test
     void createsReferencesBeanEdgeForBeanPrefix() {
         var edges = graph.getOutgoingEdges("config:camel.component.xslt.saxon-extension-functions").stream()
-                .filter(e -> e.type() == EdgeType.REFERENCES_BEAN)
+                .filter(e -> e.type().equals(EdgeType.REFERENCES_BEAN))
                 .toList();
         assertEquals(1, edges.size());
         assertEquals("class:com.example.SaxonFactory", edges.get(0).to());
@@ -62,7 +62,7 @@ class PropertyBindingParserTest {
     @Test
     void skipsPlainValues() {
         var edges = graph.getOutgoingEdges("config:camel.component.kafka.brokers").stream()
-                .filter(e -> e.type() == EdgeType.INSTANTIATES || e.type() == EdgeType.REFERENCES_BEAN)
+                .filter(e -> e.type().equals(EdgeType.INSTANTIATES) || e.type().equals(EdgeType.REFERENCES_BEAN))
                 .toList();
         assertTrue(edges.isEmpty(), "Plain string values should not create INSTANTIATES or REFERENCES_BEAN edges");
     }
@@ -72,7 +72,7 @@ class PropertyBindingParserTest {
         assertNotNull(graph.getNode("synthetic:javax.sql.DataSource"),
                 "Should create synthetic DataSource node for spring.datasource.* properties");
         var edges = graph.getOutgoingEdges("config:spring.datasource.url").stream()
-                .filter(e -> e.type() == EdgeType.CONFIGURES)
+                .filter(e -> e.type().equals(EdgeType.CONFIGURES))
                 .toList();
         assertFalse(edges.isEmpty(), "spring.datasource.url should CONFIGURES the synthetic DataSource");
     }
@@ -90,7 +90,7 @@ class PropertyBindingParserTest {
         new PropertyBindingParser().parse(g, null);
 
         var edges = g.getOutgoingEdges("config:test.prop").stream()
-                .filter(e -> e.type() == EdgeType.REFERENCES_BEAN)
+                .filter(e -> e.type().equals(EdgeType.REFERENCES_BEAN))
                 .toList();
         assertEquals(1, edges.size(), "Should match hyphenated bean name");
         assertEquals("class:MyFactory", edges.get(0).to());
@@ -106,7 +106,7 @@ class PropertyBindingParserTest {
         new PropertyBindingParser().parse(g, null);
 
         var edges = g.getOutgoingEdges("config:test.auto").stream()
-                .filter(e -> e.type() == EdgeType.REFERENCES_BEAN)
+                .filter(e -> e.type().equals(EdgeType.REFERENCES_BEAN))
                 .toList();
         assertEquals(1, edges.size());
         assertTrue(edges.get(0).to().contains("synthetic:autowired:"));
@@ -125,7 +125,7 @@ class PropertyBindingParserTest {
         new PropertyBindingParser().parse(g, null);
 
         var edges = g.getOutgoingEdges("config:test.ref").stream()
-                .filter(e -> e.type() == EdgeType.REFERENCES_PROPERTY)
+                .filter(e -> e.type().equals(EdgeType.REFERENCES_PROPERTY))
                 .toList();
         assertEquals(1, edges.size());
         assertEquals("config:other.key", edges.get(0).to());
@@ -141,7 +141,7 @@ class PropertyBindingParserTest {
         new PropertyBindingParser().parse(g, null);
 
         var edges = g.getOutgoingEdges("config:test.typed").stream()
-                .filter(e -> e.type() == EdgeType.REFERENCES_BEAN)
+                .filter(e -> e.type().equals(EdgeType.REFERENCES_BEAN))
                 .toList();
         assertEquals(1, edges.size());
         assertTrue(edges.get(0).to().contains("MyConverter"));

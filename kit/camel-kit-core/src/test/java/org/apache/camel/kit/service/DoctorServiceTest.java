@@ -1687,7 +1687,8 @@ class DoctorServiceTest {
                 agent.name=%s
                 agent.folder=%s
                 """, agentName, agent.folder()));
-        Files.writeString(root.resolve(".camel-kit/project-graph.json"), "{}");
+        Files.writeString(root.resolve(".camel-kit/project-graph.json"),
+                "{\"version\":\"1.0\",\"nodes\":{},\"edges\":[]}");
         Files.writeString(root.resolve("mvnw"), "#!/bin/sh\n");
         Path commands = agent.generatesCommandStubs()
                 ? root.resolve(agent.commandDirectory())
@@ -1711,7 +1712,8 @@ class DoctorServiceTest {
                 citrus.mcp.enabled=true
                 citrus.mcp.version=5.0.1
                 """, agentName, agent.folder()));
-        Files.writeString(root.resolve(".camel-kit/project-graph.json"), "{}");
+        Files.writeString(root.resolve(".camel-kit/project-graph.json"),
+                "{\"version\":\"1.0\",\"nodes\":{},\"edges\":[]}");
         Files.writeString(root.resolve("mvnw"), "#!/bin/sh\n");
         Path commands = agent.generatesCommandStubs()
                 ? root.resolve(agent.commandDirectory())

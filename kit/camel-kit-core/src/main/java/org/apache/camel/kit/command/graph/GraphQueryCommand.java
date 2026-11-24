@@ -1,5 +1,6 @@
 package org.apache.camel.kit.command.graph;
 
+import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,7 +9,9 @@ import org.apache.camel.kit.command.CliCommand;
 import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.graph.GraphSerializer;
+import org.apache.camel.kit.graph.GraphTypeRegistry;
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.workflow.SkillCatalog;
 
 import org.aesh.command.option.Option;
 import org.aesh.command.option.OptionVisibility;
@@ -22,6 +25,8 @@ public abstract class GraphQueryCommand extends CliCommand {
             converter = PathConverter.class)
     protected Path graphFile;
 
+    protected GraphTypeRegistry types;
+
     @Override
     public Integer call() {
         if (!Files.exists(graphFile)) {
@@ -29,11 +34,18 @@ public abstract class GraphQueryCommand extends CliCommand {
             return 1;
         }
         try {
-            ProjectGraph graph = GraphSerializer.read(graphFile);
+            types = SkillCatalog.bundled().graphTypes();
+            ProjectGraph graph;
+            try {
+                graph = GraphSerializer.read(graphFile, types);
+            } catch (IOException e) {
+                err("Invalid graph file: " + graphFile + ". " + e.getMessage() + ". Regenerate with 'graph generate'.");
+                return 1;
+            }
             out(execute(graph));
             return 0;
         } catch (Exception e) {
-            err("Invalid graph file: " + graphFile + ". Regenerate with 'graph generate'.");
+            err(e.getMessage());
             return 1;
         }
     }

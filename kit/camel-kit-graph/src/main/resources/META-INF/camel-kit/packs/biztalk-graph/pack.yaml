@@ -1,0 +1,8 @@
+id: biztalk-graph
+schema: 1
+add:
+  provider/biztalk:
+    contract: 1
+    provider:
+      service: org.apache.camel.kit.graph.model.GraphTypeAdapter
+      implementation: org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter

@@ -6,6 +6,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -269,25 +271,47 @@ class GraphBuilderTest {
                 error::getMessage);
     }
 
-    @Test
-    void migrationTimeoutReportsOnlySelectedInputs(@TempDir Path root) throws Exception {
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    void migrationTimeoutReportsOnlySelectedInputs(boolean duringSelection, @TempDir Path root) throws Exception {
         Files.writeString(root.resolve("pom.xml"), "<project/>");
         Files.writeString(root.resolve("flow.xml"), "<mule xmlns='http://www.mulesoft.org/schema/mule/core'/>");
+        var phaseReached = new CompletableFuture<Void>();
         var parser = new MuleXmlFlowParser() {
             @Override
+            public boolean acceptsContent(Path file) {
+                if (duringSelection) {
+                    awaitCancellation();
+                }
+                return super.acceptsContent(file);
+            }
+
+            @Override
             public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+                awaitCancellation();
+            }
+
+            private void awaitCancellation() {
+                phaseReached.complete(null);
                 try {
                     new CountDownLatch(1).await();
                 } catch (InterruptedException e) {
                     Thread.currentThread().interrupt();
+                    throw new CancellationException();
                 }
             }
         };
-        GraphBuildResult result = new GraphBuilder(new EmptyParser(), List.of(parser), 1, TimeUnit.SECONDS)
-                .buildWithDiagnostics(root);
-        ParserDiagnostic diagnostic = result.failedDiagnostics().getFirst();
+        var builder = new GraphBuilder(new EmptyParser(), List.of(parser), 1, TimeUnit.MINUTES) {
+            @Override
+            long remainingParserNanos(long submittedAt) {
+                // Expire the deadline only after the worker reaches the phase under test.
+                phaseReached.orTimeout(1, TimeUnit.MINUTES).join();
+                return 0;
+            }
+        };
+        var diagnostic = findDiagnostic(builder.buildWithDiagnostics(root), parser.getClass().getName());
         assertTrue(diagnostic.timedOut());
-        assertEquals(List.of("flow.xml"), diagnostic.scannedFiles());
+        assertEquals(duringSelection ? List.of() : List.of("flow.xml"), diagnostic.scannedFiles());
     }
 
     @Test

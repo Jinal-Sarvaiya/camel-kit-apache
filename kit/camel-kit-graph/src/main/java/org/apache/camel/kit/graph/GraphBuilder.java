@@ -156,9 +156,8 @@ public class GraphBuilder {
             for (int i = 0; i < futures.size(); i++) {
                 ParserFuture parserFuture = futures.get(i);
                 try {
-                    long remaining = parserTimeoutUnit.toNanos(parserTimeout)
-                                     - (System.nanoTime() - parserFuture.submittedAt());
-                    ParserRun parserRun = parserFuture.future().get(Math.max(0, remaining), TimeUnit.NANOSECONDS);
+                    long remaining = remainingParserNanos(parserFuture.submittedAt());
+                    ParserRun parserRun = parserFuture.future().get(remaining, TimeUnit.NANOSECONDS);
                     ParserDiagnostic diagnostic = parserRun.diagnostic();
                     if (diagnostic.successful()) {
                         var provider = migrationProviders.get(parserFuture.task().parser());
@@ -525,6 +524,11 @@ public class GraphBuilder {
             return parser.getClass().getName();
         }
         return simpleName;
+    }
+
+    long remainingParserNanos(long submittedAt) {
+        long elapsed = System.nanoTime() - submittedAt;
+        return Math.max(0, parserTimeoutUnit.toNanos(parserTimeout) - elapsed);
     }
 
     private long elapsedMillis(long startedAt) {

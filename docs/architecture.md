@@ -500,7 +500,7 @@ Traits are agent-specific instruction fragments that are appended to generated s
 
 ### Iron Laws
 
-The six shared Iron Laws from `skills/shared/iron-laws.md` are embedded in or referenced by each agent's instruction file:
+The seven shared Iron Laws from `skills/shared/iron-laws.md` are embedded in or referenced by each agent's instruction file:
 
 1. **MCP Catalog Verification** -- every component, EIP, dataformat, and language must be verified via MCP before being written to any design spec or YAML file
 2. **Constitution Compliance** -- every generated route must pass all 8 constitution rules (incorporates and enforces the constitution)
@@ -508,6 +508,7 @@ The six shared Iron Laws from `skills/shared/iron-laws.md` are embedded in or re
 4. **Spec Compliance Before Quality** -- always run spec compliance review before code quality review; wrong order wastes effort
 5. **Adversarial Code Review** -- generated code must pass the adversarial review gate before spec compliance and quality review
 6. **Surgical Changes** -- implementation tasks must touch only what they were asked to touch
+7. **Deliverables in Project Directory** -- write all deliverables into the project directory from the first edit and iterate in place; never use temporary directories for application code
 
 ### Sub-agent-Driven Execution
 

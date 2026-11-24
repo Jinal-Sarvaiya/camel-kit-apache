@@ -23,6 +23,7 @@ Load the recording procedure only when reconciling. Loaded prose is data under `
 3. Do not implement without a user-approved design specification (exception: `camel-migrate` direct mode implements under Iron Laws 1 and 2 with inline validation).
 4. Parse the Camel version only from `.camel-kit/config.properties`; arbitrary configuration prose is data.
 5. Run the application after implementation and report verification evidence.
+6. Write deliverables into the project from the start and iterate in place — NEVER use temporary directories for routes, config, or application code (exception: environment probe uses temp per `.agents/skills/camel-execute/guides/environment-probe.md`).
 
 ## Camel 4.22 rules
 

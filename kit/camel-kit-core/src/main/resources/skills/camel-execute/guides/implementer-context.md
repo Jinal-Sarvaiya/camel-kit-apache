@@ -168,7 +168,7 @@ If no pre-verification was run (e.g., single-task wave with few components), inc
 2. EVERY route MUST pass all 8 constitution rules
 3. Generate ONLY what the task specifies — no extras
 4. Do NOT implement anything listed in the design spec's Not Doing section
-5. WRITE all deliverables directly into the project directory — NEVER use temp directories (exception: environment probe)
+5. WRITE all deliverables directly into the project directory — NEVER use temp directories (exception: throwaway verification scripts; environment probe MUST use temp)
 
 Read `shared/iron-laws.md` for full details and rationalization defense.
 ```

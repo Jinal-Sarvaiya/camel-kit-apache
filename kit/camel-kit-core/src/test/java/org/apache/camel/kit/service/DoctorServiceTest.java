@@ -1118,6 +1118,20 @@ class DoctorServiceTest {
     }
 
     @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void doctorFailsOnASymlinkedSkillsDirectory() throws Exception {
+        createHealthyWorkspace(tempDir, CLAUDE);
+        Path skills = tempDir.resolve(".claude/skills");
+        Path stored = Files.move(skills, tempDir.resolve("stored-skills"));
+        Files.createSymbolicLink(skills, stored);
+
+        DoctorResult result = new DoctorService().inspect(new DoctorRequest(tempDir));
+
+        assertTrue(hasFinding(result, DoctorFinding.Status.FAIL, "skills",
+                "symbolic link", "Review the reported path"), result.findings().toString());
+    }
+
+    @Test
     @EnabledOnOs(OS.LINUX)
     void doctorReadsASymlinkedOpenCodeConfig() throws Exception {
         createHealthyWorkspace(tempDir, OPENCODE);

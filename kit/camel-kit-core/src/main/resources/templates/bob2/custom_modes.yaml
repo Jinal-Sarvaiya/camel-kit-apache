@@ -1,5 +1,5 @@
 customModes:
-  - slug: camel-ship-mode
+{#if HAS_SHIP}  - slug: camel-ship-mode
     name: "Camel Ship (Technology Preview)"
     description: "Technology Preview: relay controller-issued Ship tasks to read-only Bob subagents."
     roleDefinition: >
@@ -19,7 +19,7 @@ customModes:
       - subagent
     allowedSubagents: [camel-ship-worker]
 
-  - slug: camel-brainstorm-mode
+{/if}  - slug: camel-brainstorm-mode
     name: "Camel Brainstorm"
     description: "Design Camel integrations and migrations without implementation edits."
     roleDefinition: >

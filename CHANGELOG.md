@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve local changes to catalog skills, guides and command stubs during initialization and upgrades (#193).
+  Upgrades from pre-ledger releases refresh stock assets and remove stock retired commands for each assistant in
+  a shared workspace. Preview changed paths with `--dry-run`, compare `.proposed` copies under
+  `.camel-kit/conflicts/catalog/`, and accept files or catalog directories with `--replace <path>`. Doctor
+  identifies retired entry points and accepts personal skills that reuse a historical name. Init preserves Latin-1
+  configuration properties and reports malformed properties or legacy YAML before recording ownership or writing files.
 - Align Main environment probes, recovery guidance, direct migration and generated `AGENTS.md` with the JBang alias
   and the project's Camel version, matching generated `run.sh` (#110). Report incompatible local JBang plugins as
   environment failures. Correct the environment probe's YAML step nesting so its sample route can start.
@@ -49,6 +55,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   verification loop.
 
 ### Added
+
+- Run a distribution's required workflow hooks with `camel-kit hook` or `camel kit hook`. Bundled skills and Java
+  providers share a versioned result contract, including developer questions and checks bound to file revisions (#196).
+
+- **Build-time skill pack composition (#192)** — a distribution can add or replace skills, resources, Java provider
+  bindings and instructions at named workflow steps. Installation, command generation, routing and Doctor use the
+  assembled catalog. After successful generation, reinitialization removes matching retired files, recognizes Git
+  line-ending conversion for text and preserves edited or unrecorded files. Init and Doctor report recovery
+  directories left by interrupted catalog updates. Doctor also flags symbolic links on the path to the
+  selected assistant's skills directory.
 
 - **Current documentation and ADR history (#182)** — shared lifecycle across design, execution, validation,
   migration, debug and Ship; documentation-only reconciliation through `camel-start`; neutral-context ADR guidance

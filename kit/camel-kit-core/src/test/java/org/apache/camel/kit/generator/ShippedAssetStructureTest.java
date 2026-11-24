@@ -994,7 +994,7 @@ class ShippedAssetStructureTest {
         Path guidesDir = ctx.skillsDir().resolve("camel-ship/guides");
         for (String guide : RETIRED_SHIP_GUIDES) {
             assertFalse(Files.exists(guidesDir.resolve(guide)),
-                    agentName + " re-init must remove retired Ship guide " + guide);
+                    agentName + " unrestricted generator must remove retired Ship guide " + guide);
         }
         assertTrue(Files.isRegularFile(guidesDir.resolve("keep.md")),
                 agentName + " re-init must preserve unrelated neighboring files");

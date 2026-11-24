@@ -1,6 +1,7 @@
 package org.apache.camel.kit.util;
 
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
 import java.nio.file.Path;
@@ -38,6 +39,8 @@ public final class ConfinedPaths {
                 while (iterator.hasNext()) {
                     requirePath(destination, iterator.next());
                 }
+            } catch (UncheckedIOException e) {
+                throw e.getCause();
             }
         }
     }

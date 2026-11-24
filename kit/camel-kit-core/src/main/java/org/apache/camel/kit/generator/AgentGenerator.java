@@ -13,5 +13,22 @@ public interface AgentGenerator {
         preflight(ctx);
     }
 
+    /** Validate the host and plan its catalog once for this initialization or preview. */
+    default Prepared prepareCatalog(InitContext ctx, boolean preview) throws Exception {
+        if (preview) {
+            validate(ctx);
+        } else {
+            preflight(ctx);
+        }
+        return new Prepared(ctx.files().planCatalog(ctx, preview), this);
+    }
+
+    /** The catalog and the host writer validated for that run. */
+    record Prepared(CatalogUpdate catalog, AgentGenerator writer) {
+        public void generate() throws Exception {
+            catalog.generate(writer);
+        }
+    }
+
     void generate(InitContext ctx) throws Exception;
 }

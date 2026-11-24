@@ -3,8 +3,11 @@ package org.apache.camel.kit.service;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -23,6 +26,8 @@ import org.apache.camel.kit.config.AgentGeneratorStrategy;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.config.OpenCodeProjectConfig;
 import org.apache.camel.kit.doc.FrontmatterHandler;
+import org.apache.camel.kit.generator.CatalogUpdate;
+import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.ParserDiagnostic;
@@ -72,11 +77,16 @@ public class DoctorService {
         List<DoctorFinding> findings = new ArrayList<>();
 
         Properties config = checkConfig(root, findings);
-        AgentConfig agent = checkAgentConfig(config, findings);
-        checkGeneratedWorkspace(root, agent, findings);
-        checkMcp(root, config, findings);
+        AgentConfig agent = null;
+        if (config != null) {
+            agent = checkAgentConfig(config, findings);
+            checkGeneratedWorkspace(root, agent, findings);
+            checkMcp(root, config, findings);
+        }
         checkGraph(root, findings);
-        checkCommandPrefix(config, findings);
+        if (config != null) {
+            checkCommandPrefix(config, findings);
+        }
         checkPrerequisites(root, findings);
         checkStaleReferences(root, agent, findings);
 
@@ -84,33 +94,40 @@ public class DoctorService {
     }
 
     private Properties checkConfig(Path root, List<DoctorFinding> findings) {
-        Path configFile = root.resolve(".camel-kit/config.properties");
-        if (!Files.isRegularFile(configFile)) {
-            findings.add(DoctorFinding.fail("config", relativize(root, configFile),
-                    ".camel-kit/config.properties is missing",
-                    "Run camel-kit init --here --ai <agent> from the workspace root."));
-            return new Properties();
-        }
-
+        String path = ".camel-kit/config.properties";
+        Path configFile = root.resolve(path);
         Properties config = new Properties();
-        try (InputStream in = Files.newInputStream(configFile)) {
-            config.load(in);
-        } catch (IOException e) {
-            findings.add(DoctorFinding.fail("config", relativize(root, configFile),
-                    "Could not read .camel-kit/config.properties: " + e.getMessage(),
-                    "Recreate the file with camel-kit init --here --force or restore it from source control."));
-            return config;
+        try {
+            if (!Files.readAttributes(configFile, BasicFileAttributes.class).isRegularFile()) {
+                throw new IOException("Expected a regular file");
+            }
+            try (InputStream in = Files.newInputStream(configFile)) {
+                config.load(in);
+            }
+        } catch (NoSuchFileException e) {
+            findings.add(DoctorFinding.fail("config", path, path + " is missing",
+                    "Restore any lost Kit configuration before upgrading an existing workspace. "
+                                                                                  + "Run camel-kit init --here --ai <agent> from the workspace root."));
+            return null;
+        } catch (AccessDeniedException e) {
+            findings.add(DoctorFinding.fail("config", path, "Permission denied reading " + path,
+                    "Restore read access and re-run camel-kit doctor."));
+            return null;
+        } catch (IOException | IllegalArgumentException e) {
+            findings.add(DoctorFinding.fail("config", path, "Could not read " + path + ": " + e.getMessage(),
+                    "Repair the file or restore it from source control before running init."));
+            return null;
         }
 
         List<String> missing = REQUIRED_CONFIG_KEYS.stream()
                 .filter(key -> config.getProperty(key, "").isBlank())
                 .toList();
         if (missing.isEmpty()) {
-            findings.add(DoctorFinding.pass("config", relativize(root, configFile),
+            findings.add(DoctorFinding.pass("config", path,
                     ".camel-kit/config.properties contains the required keys",
                     "No action required."));
         } else {
-            findings.add(DoctorFinding.fail("config", relativize(root, configFile),
+            findings.add(DoctorFinding.fail("config", path,
                     ".camel-kit/config.properties is missing keys: " + String.join(", ", missing),
                     "Restore the missing keys or re-run camel-kit init --here --ai <agent> --force."));
         }
@@ -176,6 +193,20 @@ public class DoctorService {
             return;
         }
 
+        try {
+            CatalogUpdate.checkInterruptedUpdate(root, skillsDir);
+            for (String path : ManagedFiles.open(root, Set.of(), agentKey(agent)).retiredEntryPoints(agentKey(agent))) {
+                // The command directory check already reports unexpected camel-* stubs on stub-based hosts.
+                if (agent.generatesCommandStubs() && path.startsWith(agent.commandDirectory() + "/camel-")) {
+                    continue;
+                }
+                findings.add(DoctorFinding.fail("workspace", path, "Retired catalog entry point is still installed",
+                        "Review this file and move it outside the assistant's discovery directories to retire it."));
+            }
+        } catch (IOException e) {
+            findings.add(DoctorFinding.fail("skills", relativize(root, skillsDir), e.getMessage(),
+                    "Review the reported path before re-running init."));
+        }
         List<String> missingSkills = expectations.requiredSkills().stream()
                 .filter(skill -> !Files.isRegularFile(skillsDir.resolve(skill).resolve("SKILL.md")))
                 .toList();
@@ -187,6 +218,13 @@ public class DoctorService {
             findings.add(DoctorFinding.fail("skills", relativize(root, skillsDir),
                     "Missing SKILL.md for: " + String.join(", ", missingSkills),
                     "Restore the missing skill folders or re-run camel-kit init --here --force."));
+        }
+        List<String> missingResources = expectations.resources().stream()
+                .filter(path -> !Files.isRegularFile(skillsDir.resolve(path))).toList();
+        if (!missingResources.isEmpty()) {
+            findings.add(DoctorFinding.fail("skills", relativize(root, skillsDir),
+                    "Missing skill resources: " + String.join(", ", missingResources),
+                    "Re-run camel-kit init --here --force to restore the bundled resources."));
         }
         checkAgentSpecificWorkspace(root, agent, findings);
     }
@@ -205,14 +243,13 @@ public class DoctorService {
     }
 
     private void checkBobSkillVisibility(Path root, AgentConfig agent, List<DoctorFinding> findings) {
-        String remediation = "Use a build containing the Bob skill discovery fix, back up generated customizations, "
-                             + "then run camel-kit init --here --ai bob2 --force "
-                             + "(or camel kit init --here --ai bob2 --force).";
         for (String skill : expectations.publicSkills()) {
             Path skillFile = root.resolve(agent.skillsDirectory()).resolve(skill).resolve("SKILL.md");
             if (!Files.isRegularFile(skillFile)) {
                 continue; // Missing files are already reported by checkGeneratedWorkspace.
             }
+            String remediation = "Review the local file, then run camel-kit init --here --ai bob2 --force --replace "
+                                 + relativize(root, skillFile) + " to restore the public entry.";
             try {
                 String content = Files.readString(skillFile);
                 if (content.isBlank()) {

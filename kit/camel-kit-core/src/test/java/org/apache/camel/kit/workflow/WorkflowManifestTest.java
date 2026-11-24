@@ -145,6 +145,13 @@ class WorkflowManifestTest {
     }
 
     @Test
+    void rejectsDuplicateFieldsInTheCorePackInput() {
+        IOException failure
+                = assertThrows(IOException.class, () -> loadManifest(MINIMAL_VALID_MANIFEST + "\nversion: 2\n"));
+        assertTrue(failure.getMessage().contains("Duplicate field 'version'"), failure::getMessage);
+    }
+
+    @Test
     void loadsMinimalValidManifest() {
         WorkflowManifest manifest = assertDoesNotThrow(() -> loadManifest(MINIMAL_VALID_MANIFEST));
 

@@ -20,6 +20,8 @@ record unavailable verification honestly. Then stop; do not fall through to impl
 
 ## Decision Tree
 
+<!-- camel-kit:step choose -->
+
 Answer these questions in order. The first "yes" is your destination.
 
 | # | Question | If Yes | Slash Command |

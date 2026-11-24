@@ -16,7 +16,10 @@ public class Bob2Generator extends DefaultGenerator {
 
     private void generateRegisteredResources(InitContext ctx) throws Exception {
         for (AgentDescriptor.TemplateInstall template : AgentRegistry.descriptor("bob2").templates()) {
-            if (!PersonaResourceInstaller.isPersonaTemplate(template)) {
+            if (".bob/custom_modes.yaml".equals(template.target())) {
+                String modes = new QuteTemplateEngine().render(template.source(), AgentsMdGenerator.templateData(ctx));
+                ctx.files().write(ctx.projectDir().resolve(template.target()), modes);
+            } else if (!PersonaResourceInstaller.isPersonaTemplate(template)) {
                 copyTemplateResource(ctx, template.source(), ctx.projectDir().resolve(template.target()));
             }
         }

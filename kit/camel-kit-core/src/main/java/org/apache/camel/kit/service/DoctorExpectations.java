@@ -7,8 +7,8 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.apache.camel.kit.workflow.SkillCatalog;
 import org.apache.camel.kit.workflow.WorkflowManifest;
-import org.apache.camel.kit.workflow.WorkflowManifestLoader;
 
 /**
  * Expected generated workspace contract used by {@link DoctorService}.
@@ -18,6 +18,7 @@ public final class DoctorExpectations {
     private final List<WorkflowManifest.WorkflowCommand> generatedStubs;
     private final List<String> requiredSkills;
     private final List<String> publicSkills;
+    private final List<String> resources;
     private final Set<String> camelMcpTools;
     private final Set<String> knowledgeMcpTools;
     private final Set<String> citrusMcpTools;
@@ -26,12 +27,14 @@ public final class DoctorExpectations {
                                List<WorkflowManifest.WorkflowCommand> generatedStubs,
                                List<String> requiredSkills,
                                List<String> publicSkills,
+                               List<String> resources,
                                Set<String> camelMcpTools,
                                Set<String> knowledgeMcpTools,
                                Set<String> citrusMcpTools) {
         this.generatedStubs = List.copyOf(generatedStubs);
         this.requiredSkills = List.copyOf(requiredSkills);
         this.publicSkills = List.copyOf(publicSkills);
+        this.resources = List.copyOf(resources);
         this.camelMcpTools = Collections.unmodifiableSet(new LinkedHashSet<>(camelMcpTools));
         this.knowledgeMcpTools = Collections.unmodifiableSet(new LinkedHashSet<>(knowledgeMcpTools));
         this.citrusMcpTools = Collections.unmodifiableSet(new LinkedHashSet<>(citrusMcpTools));
@@ -39,13 +42,19 @@ public final class DoctorExpectations {
 
     public static DoctorExpectations loadDefault() {
         try {
-            return from(WorkflowManifestLoader.loadDefault());
+            SkillCatalog catalog = SkillCatalog.bundled();
+            return from(catalog.manifest().workflow(),
+                    catalog.paths().stream().filter(p -> !p.endsWith("/SKILL.md")).toList());
         } catch (IOException e) {
             throw new UncheckedIOException("Could not load workflow manifest for doctor expectations", e);
         }
     }
 
     public static DoctorExpectations from(WorkflowManifest workflow) {
+        return from(workflow, List.of());
+    }
+
+    private static DoctorExpectations from(WorkflowManifest workflow, List<String> resources) {
         return new DoctorExpectations(
                 workflow.generatedCommandStubs(),
                 workflow.skills().stream()
@@ -56,6 +65,7 @@ public final class DoctorExpectations {
                         .map(WorkflowManifest.WorkflowCommand::skill)
                         .distinct()
                         .toList(),
+                resources,
                 orderedSet(workflow.mcpServer("camel").allowedTools()),
                 orderedSet(workflow.mcpServer("camel-knowledge").allowedTools()),
                 orderedSet(workflow.mcpServer("citrus").allowedTools()));
@@ -77,6 +87,10 @@ public final class DoctorExpectations {
 
     public List<String> requiredSkills() {
         return requiredSkills;
+    }
+
+    public List<String> resources() {
+        return resources;
     }
 
     public List<String> publicSkills() {

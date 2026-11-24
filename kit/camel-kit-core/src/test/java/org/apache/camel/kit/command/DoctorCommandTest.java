@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.CommandRunner;
@@ -17,10 +18,13 @@ import org.apache.camel.kit.service.DoctorExpectations;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class DoctorCommandTest {
 
@@ -78,7 +82,7 @@ class DoctorCommandTest {
         assertNotEquals(0, result.exitCode());
         JsonNode json = MAPPER.readTree(result.output());
         assertEquals("FAIL", json.get("status").asText());
-        assertTrue(json.get("summary").get("fail").asInt() > 0);
+        assertEquals(1, json.get("summary").get("fail").asInt(), result.output());
         assertTrue(hasFinding(json, "FAIL", "config",
                 ".camel-kit/config.properties is missing",
                 "Run camel-kit init --here --ai <agent>"), result.output());
@@ -86,7 +90,47 @@ class DoctorCommandTest {
         RunResult textResult = runDoctor("--project-dir", tempDir.toString());
         assertNotEquals(0, textResult.exitCode());
         assertTrue(textResult.output().contains(".camel-kit/config.properties is missing"));
+        assertTrue(textResult.output().contains("Restore any lost Kit configuration before upgrading"));
         assertTrue(textResult.output().contains("Run camel-kit init --here --ai <agent>"));
+    }
+
+    @Test
+    @Tag("cli-compat")
+    void malformedPropertiesProduceAnActionableJsonFinding() throws Exception {
+        writeConfig("agent.name=bob2\nextra=\\u12x4\n");
+        Files.writeString(tempDir.resolve(".camel-kit/project-graph.json"), "{}");
+        RunResult result = runDoctor("--project-dir", tempDir.toString(), "--json");
+
+        assertEquals(1, result.exitCode());
+        JsonNode json = MAPPER.readTree(result.output());
+        assertTrue(hasFinding(json, "FAIL", "config", "Could not read .camel-kit/config.properties",
+                "restore it from source control"), result.output());
+        assertEquals(1, json.get("summary").get("fail").asInt(), result.output());
+        assertFalse(hasFinding(json, "WARN", "config", "project.command-prefix"), result.output());
+        assertTrue(hasFinding(json, "PASS", "graph"), result.output());
+        assertTrue(hasFinding(json, "PASS", "workspace", "stale resource references"), result.output());
+        assertTrue(json.path("findings").findValuesAsText("category").contains("prerequisites"), result.output());
+    }
+
+    @Test
+    @Tag("cli-compat")
+    void unreadablePropertiesReportThePermissionAndRemedy() throws Exception {
+        assumeTrue(Files.getFileStore(tempDir).supportsFileAttributeView("posix"));
+        writeConfig("agent.name=bob2\n");
+        Path config = tempDir.resolve(".camel-kit/config.properties");
+        var permissions = Files.getPosixFilePermissions(config);
+        try {
+            Files.setPosixFilePermissions(config, Set.of());
+            assumeFalse(Files.isReadable(config), "The current user can bypass read permissions");
+            RunResult result = runDoctor("--project-dir", tempDir.toString(), "--json");
+            assertEquals(1, result.exitCode());
+            JsonNode json = MAPPER.readTree(result.output());
+            assertEquals(1, json.get("summary").get("fail").asInt(), result.output());
+            assertTrue(hasFinding(json, "FAIL", "config", "Permission denied reading .camel-kit/config.properties",
+                    "Restore read access"), result.output());
+        } finally {
+            Files.setPosixFilePermissions(config, permissions);
+        }
     }
 
     @Test
@@ -229,6 +273,12 @@ class DoctorCommandTest {
             Path skillDir = skills.resolve(skill);
             Files.createDirectories(skillDir);
             Files.writeString(skillDir.resolve("SKILL.md"), "# " + skill + "\n");
+        }
+
+        for (String path : EXPECTATIONS.resources()) {
+            Path file = skills.resolve(path);
+            Files.createDirectories(file.getParent());
+            Files.createFile(file);
         }
 
         Files.createDirectories(root.resolve(".bob"));

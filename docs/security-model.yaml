@@ -57,7 +57,7 @@ component_families:
   - id: A
     name: Kit workspace CLI (Aesh)
     paths: ["kit/camel-kit-core (command, service, generator, catalog, config)", kit/camel-kit-main, kit/camel-jbang-plugin-kit]
-    entry_points: [init, doctor, doc, nextId, plan analyze, graph]
+    entry_points: [init, doctor, doc, nextId, plan analyze, hook, graph]
     in_model: true
     reachability: Reachable from a non-operator input (analysed tree via init --here, downloaded catalog content, model-authored pipeline artifact, another local account).
   - id: B
@@ -67,9 +67,11 @@ component_families:
     in_model: true
     reachability: Reachable from the contents of the analysed tree (file bodies, names, symbolic links) without building or running the project.
   - id: C
-    name: Kit skills, templates, traits, agent registry, workflow manifest
-    paths: [kit/camel-kit-core/src/main/resources/skills, kit/camel-kit-core/src/main/resources/templates, kit/camel-kit-core/src/main/resources/agents, kit/camel-kit-core/src/main/resources/workflow]
+    name: Kit skills, templates, traits, agent registry, workflow manifest and assembled skill catalog
+    paths: [kit/camel-kit-core/src/main/resources/skills, kit/camel-kit-core/src/main/resources/templates, kit/camel-kit-core/src/main/resources/agents, kit/camel-kit-core/src/main/resources/workflow, kit/camel-kit-core/src/main/resources/META-INF/camel-kit/packs]
     in_model: true
+    build_inputs: Distribution-selected pack modules. Provider types are checked without initialization. Init consumes the bundled catalog and uses its existing generated-path checks.
+    hook_dispatch: The assistant invokes the bundled skill in its host. Kit constructs a distribution-selected Java provider in the CLI JVM with the operator's permissions. The provider controls helper calls and is responsible for its observations.
     reachability: Only when a shipped instruction or generated artifact itself crosses a boundary it documents holding (allow-list, worker tool list, hook or guard, MCP coordinate or repository). The model disobeying an instruction is not a finding.
   - id: D
     name: Ship controller (Technology Preview)
@@ -144,6 +146,14 @@ entry_points:
     input: source inventory, JSON snapshot/receipt, document and review report
     attacker_controllable: true
     caller_must_enforce: Project-contained regular files under the resolved root (root aliases allowed); reject descendant symlinks, traversal, Git internals, duplicate/trailing JSON and scalar coercion; simultaneous source limits 10000 entries, 64 MiB/file, 512 MiB total; snapshot/report/document inputs to record 1 MiB each; receipts 2 MiB to fit the embedded snapshot and review fields. No source execution or network. Review scope and conclusions remain the reviewer's responsibility.
+  - entry: camel-kit hook
+    input: Caller-owned scope, target, evidence paths and confirmed answer, skill result and saved pending JSON, source and artifact contents.
+    attacker_controllable: true
+    server_enforces:
+      - Resolve the handler from the bundled catalog.
+      - Match the echoed binding, decisions and current file digests.
+      - Require a passing observation for each declared check before accepting a pass.
+    caller_must_enforce: Trust the distribution and its provider code, select the complete source scope, keep the last verified pending result intact, confirm developer answers and decide stage completion.
   - entry: camel-kit plan analyze
     input: implementation-plan.md task metadata (model-authored)
     attacker_controllable: true
@@ -223,7 +233,7 @@ configuration_variants:
     security_relevant: false
   - knob: camel-kit init --force
     default: false
-    effect: Regenerates Camel-Kit's own assets; preserves shared files it did not write or that were changed unless named with --replace (data loss, not security).
+    effect: Regenerates subagents and personas. Preserves edits and unrecognized shared or catalog content unless explicitly selected with --replace.
     security_relevant: false
   - knob: -p key=value, -c path
     default: none
@@ -298,7 +308,7 @@ claimed_properties:
     property: init confines its writes to the operator-selected target directory and removes only what it generated, through no symlink. An untrusted tree or a symbolic link that redirects a write outside the target is in scope; an intentionally operator-selected destination is authorized.
     violation_symptom: File created, replaced or deleted outside the operator-selected target, or a write or deletion redirected through a symbolic link.
     severity: security-critical when reachable from an attacker-controllable input (analysed tree, registry data); otherwise correctness
-    provenance: "Contract: maintainer (2026-10-27, Q9). InitService/ConfinedPaths preflight generated leaves/ancestors and Camel-owned skill/shared/template subtrees; unrelated worktrees and data links are allowed; new atomic files use umask-default modes and replacements preserve existing POSIX modes; GeneratedAssetCleaner guards deletion; generated file replacements use AtomicFileWriter. InitWriteConfinementTest covers static hostile descendant links and selected-root aliases."
+    provenance: "Contract: maintainer (2026-10-27, Q9). InitService/ConfinedPaths preflight generated leaves/ancestors and Camel-owned skill/shared/template subtrees; unrelated worktrees and data links are allowed; new atomic files use umask-default modes and replacements preserve existing POSIX modes; GeneratedAssetCleaner guards legacy deletion; catalog updates use the committed ownership ledger or, for a missing catalog record, known release fingerprints at the installed path in a pre-ledger Kit workspace, including each assistant that writes to a shared skills directory. Init validates the active workspace configuration before writing the ledger. First-time adoption records its origin in the ledger before writing the config, so retries preserve pre-existing copies. Unrecorded skills with different content can reuse historical names. Updates verify host-scoped paths, confinement and SHA-256 of regular files (normalized line endings for recognized UTF-8 text, exact bytes for opaque resources) before refresh, removal or a layout change. Identical catalog content is adopted. Other edited or unrecognized selected files receive rendered proposals outside host discovery directories unless explicitly replaced; init and Doctor report interrupted catalog work directories and preserve their contents for recovery; generated file replacements use AtomicFileWriter. InitWriteConfinementTest covers static hostile descendant links and selected-root aliases."
   - id: P4
     property: Pinned, named-repository supply chain for everything fetched or configured; Ship resolver uses fixed HTTPS Maven Central, checksum fail, no redirects, exact coordinates, size caps, SHA-256 content identity, isolated URLClassLoader payloads. Kit's own handling of what it downloads is in scope - catalog JSON is read from the JAR stream in memory, Citrus schema entries are written only inside the cache directory after lexical containment and descendant-link checks; Catalog/Citrus/Forage versions are safe single path components; Citrus/Forage cache ancestry is preflighted; Forage writes only the two allowlisted catalog files into fresh staging.
     violation_symptom: Unpinned coordinate, repository outside the named lists, download accepted on checksum mismatch (Ship), artifact outside its exact path, payload class loaded from elsewhere, or a downloaded artifact that escapes the cache directory or executes code through Kit's parsing or extraction.

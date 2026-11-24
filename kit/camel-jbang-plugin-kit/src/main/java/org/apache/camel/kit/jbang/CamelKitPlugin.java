@@ -6,6 +6,7 @@ import org.apache.camel.dsl.jbang.core.common.CommandTree;
 import org.apache.camel.dsl.jbang.core.common.Plugin;
 import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.command.DoctorCommand;
+import org.apache.camel.kit.command.HookCommand;
 import org.apache.camel.kit.command.InitCommand;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.command.graph.GraphCommand;
@@ -27,6 +28,7 @@ public class CamelKitPlugin implements Plugin {
                 .addSubcommand("init", new CommandTree(new InitCommand(camelKitMain)))
                 .addSubcommand("doctor", new CommandTree(new DoctorCommand(camelKitMain)))
                 .addSubcommand("doc", new CommandTree(new DocCommand()))
+                .addSubcommand("hook", new CommandTree(new HookCommand()))
                 .addSubcommand("graph", new CommandTree(new GraphCommand()))
                 .addSubcommand("plan", new CommandTree(new PlanCommand()))
                 .addSubcommand("nextId", new CommandTree(new NextIdCommand()))

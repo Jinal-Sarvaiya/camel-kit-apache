@@ -10,7 +10,7 @@ For integration work, trust the project first, then invoke the entry skill:
 ```
 
 `/skill:camel-start` routes to the correct Camel Kit workflow skill for greenfield design, migration, planning,
-execution, validation, or debugging. Use the `camel-knowledge` skill directly for Camel documentation questions.
+execution, validation, or debugging.{#if HAS_KNOWLEDGE} Use the `camel-knowledge` skill directly for Camel documentation questions.{/if}
 
 ## Pi Assets
 

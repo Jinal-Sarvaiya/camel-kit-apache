@@ -1,8 +1,10 @@
 package org.apache.camel.kit.service;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -17,13 +19,18 @@ import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.generator.ManagedFiles.Action;
 import org.apache.camel.kit.output.Printer;
 
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
+import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assumptions.assumeFalse;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * Initialization inside an existing application must not replace files the application already owns, and
@@ -91,6 +98,370 @@ class InitSafeAdoptionTest {
         assertTrue(Files.isRegularFile(project.resolve("docs/constitution.md")));
         assertFalse(Files.exists(project.resolve(".camel-kit/conflicts")));
         assertTrue(ledger(project).containsKey("mvnw"));
+    }
+
+    @Test
+    void obstructedCatalogProposalIsReportedBeforeAnyWrites() throws Exception {
+        Path project = tempDir.resolve("orders");
+        var service = new InitService();
+        var init = request(project, "claude");
+        service.initialize(init);
+        String path = ".claude/skills/camel-validate/SKILL.md";
+        Files.writeString(project.resolve(path), "My validation rules");
+        Path proposal = project.resolve(ManagedFiles.PROPOSALS + "/catalog/" + path.substring(1) + ".proposed");
+        Files.createDirectories(proposal.getParent().getParent());
+        Files.writeString(proposal.getParent(), "Previous proposal at this path");
+        var before = snapshot(project);
+        for (var failure : List.of(
+                assertThrows(InvalidAgentConfigurationException.class, () -> service.preview(init)),
+                assertThrows(InvalidAgentConfigurationException.class, () -> service.initialize(init)))) {
+            assertTrue(failure.getMessage().contains(proposal.getParent().toString()), failure::getMessage);
+        }
+        assertEquals(before, snapshot(project));
+        Files.move(proposal.getParent(), project.resolve("previous-proposal"));
+        service.initialize(init);
+        assertEquals("My validation rules", Files.readString(project.resolve(path)));
+        assertTrue(Files.isRegularFile(proposal));
+    }
+
+    @Test
+    @Tag("cli-compat")
+    void releasedClaudeWorkspaceUpdatesStockAndKeepsEdits() throws Exception {
+        var service = new InitService();
+        var init = request(tempDir, "claude");
+        Files.createDirectories(tempDir.resolve(".camel-kit"));
+        Files.writeString(tempDir.resolve(".camel-kit/config.properties"), "agent.name=claude");
+        String guide = ".claude/skills/camel-implement/guides/run-script.md";
+        String retired = ".claude/skills/camel-ship/guides/auto-fix-loop.md";
+        // Exact installed 0.4.1 guide and the Ship guide from the last revision that shipped it.
+        copyReleasedFixture(tempDir.resolve(guide));
+        copyReleasedFixture(tempDir.resolve(retired));
+        String release = Files.readString(tempDir.resolve(guide));
+        String stub = ".claude/commands/camel-validate.md";
+        Path commands = writeReleasedClaudeStub(tempDir).getParent();
+        Files.writeString(commands.resolve("camel-start.md"), "My launch instructions");
+        Files.writeString(commands.resolve("team.md"), "Team command");
+        var original = snapshot(tempDir);
+        var preview = service.preview(init).stream()
+                .collect(Collectors.toMap(ManagedFiles.Change::path, ManagedFiles.Change::action));
+        assertEquals(original, snapshot(tempDir));
+        assertEquals(Action.REFRESH, preview.get(guide));
+        assertEquals(Action.REMOVE, preview.get(retired));
+        assertEquals(Action.REMOVE, preview.get(stub));
+        assertEquals(Action.PRESERVE, preview.get(".claude/commands/camel-start.md"));
+        service.initialize(init);
+        assertFalse(Files.exists(tempDir.resolve(retired)));
+        assertFalse(Files.exists(tempDir.resolve(stub)));
+        assertEquals("My launch instructions", Files.readString(commands.resolve("camel-start.md")));
+        assertEquals("Team command", Files.readString(commands.resolve("team.md")));
+        assertNotEquals(release, Files.readString(tempDir.resolve(guide)));
+        assertTrue(ledger(tempDir).containsKey("catalog/" + guide));
+
+        // Reverting a tracked file to an old stock version is a local edit.
+        Files.writeString(tempDir.resolve(guide), release);
+        assertTrue(service.initialize(init).conflicts().stream().anyMatch(c -> c.path().equals(guide)));
+        assertEquals(release, Files.readString(tempDir.resolve(guide)));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"claude, codex", "codex, claude"})
+    @Tag("cli-compat")
+    void releasedWorkspaceUpgradesBothAssistantsInEitherOrder(String first, String second) throws Exception {
+        Path project = tempDir.resolve("released");
+        Path fresh = tempDir.resolve("fresh");
+        Files.createDirectories(project.resolve(".camel-kit"));
+        Files.writeString(project.resolve(".camel-kit/config.properties"), "agent.name=codex\n");
+        Path commands = writeReleasedClaudeStub(project).getParent();
+        var service = new InitService();
+        for (String host : List.of(first, second)) {
+            String skills = AgentRegistry.get(host).skillsDirectory();
+            copyReleasedFixture(project.resolve(skills).resolve("camel-implement/guides/run-script.md"));
+            service.initialize(request(fresh, host));
+        }
+        for (String host : List.of(first, second)) {
+            var init = request(project, host);
+            String guide = AgentRegistry.get(host).skillsDirectory() + "/camel-implement/guides/run-script.md";
+            assertTrue(service.preview(init).stream()
+                    .anyMatch(c -> c.path().equals(guide) && c.action() == Action.REFRESH));
+            service.initialize(init);
+        }
+        var expected = catalogRecords(fresh);
+        assertEquals(expected, catalogRecords(project));
+        for (String path : expected.keySet()) {
+            assertEquals(-1L, Files.mismatch(fresh.resolve(path), project.resolve(path)), path);
+        }
+        assertFalse(Files.exists(commands));
+        assertFalse(Files.exists(project.resolve(ManagedFiles.PROPOSALS + "/catalog")));
+    }
+
+    @Test
+    @Tag("cli-compat")
+    void releasedWorkspaceUpgradesWithLatin1Properties() throws Exception {
+        Path config = Files.createDirectories(tempDir.resolve(".camel-kit")).resolve("config.properties");
+        Files.writeString(config, "agent.name=claude\nteam.owner=André\n", StandardCharsets.ISO_8859_1);
+        Files.writeString(config.resolveSibling("config.yaml"), "old: [");
+        Path stub = writeReleasedClaudeStub(tempDir);
+        var init = request(tempDir, "claude");
+        var service = new InitService();
+
+        assertTrue(service.preview(init).stream().anyMatch(c -> c.action() == Action.REMOVE
+                && c.path().equals(".claude/commands/camel-validate.md")));
+        service.initialize(init);
+        assertFalse(Files.exists(stub));
+        var settings = new Properties();
+        try (var in = Files.newInputStream(config)) {
+            settings.load(in);
+        }
+        assertEquals("André", settings.getProperty("team.owner"));
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {".camel-kit/config.properties", ".camel-kit/config.yaml", ManagedFiles.LEDGER})
+    @Tag("cli-compat")
+    void deniedWorkspaceFileReadsExplainHowToRetryWithoutChangingTheProject(String relativePath) throws Exception {
+        assumeTrue(Files.getFileStore(tempDir).supportsFileAttributeView("posix"));
+        Path file = tempDir.resolve(relativePath);
+        Files.createDirectories(file.getParent());
+        Files.createFile(file);
+        var original = snapshot(tempDir);
+        var permissions = Files.getPosixFilePermissions(file);
+        var service = new InitService();
+        var init = request(tempDir, "claude");
+        try {
+            Files.setPosixFilePermissions(file, Set.of());
+            assumeFalse(Files.isReadable(file), "The current user can bypass read permissions");
+            String expected = "Permission denied reading " + file + ". Restore read access and retry.";
+            assertEquals(expected, assertThrows(InvalidAgentConfigurationException.class,
+                    () -> service.preview(init)).getMessage());
+            assertEquals(expected, assertThrows(InvalidAgentConfigurationException.class,
+                    () -> service.initialize(init)).getMessage());
+        } finally {
+            Files.setPosixFilePermissions(file, permissions);
+        }
+        assertEquals(original, snapshot(tempDir));
+    }
+
+    @ParameterizedTest
+    @CsvSource({"config.properties, false", "config.yaml, false", "config.properties, true", "config.yaml, true"})
+    @Tag("cli-compat")
+    void malformedConfigLeavesWorkspaceUntouchedAndRepairCanBeRetried(String filename, boolean trackedFromInit)
+            throws Exception {
+        Path config = Files.createDirectories(tempDir.resolve(".camel-kit")).resolve(filename);
+        boolean properties = filename.equals("config.properties");
+        Files.writeString(config,
+                properties ? "agent.name=claude\nextra=\\u12x4\n" : "agent:\n  name: claude\nextra: [");
+        if (trackedFromInit) {
+            Files.writeString(tempDir.resolve(ManagedFiles.LEDGER), "catalog.tracked-from-init=true\n");
+        }
+        Path stub = writeReleasedClaudeStub(tempDir);
+        var service = new InitService();
+        var init = request(tempDir, "claude");
+        var original = snapshot(tempDir);
+        var preview = assertThrows(InvalidAgentConfigurationException.class, () -> service.preview(init));
+        assertTrue(preview.getMessage().contains(config.toString()), preview::getMessage);
+        assertEquals(original, snapshot(tempDir));
+        var apply = assertThrows(InvalidAgentConfigurationException.class, () -> service.initialize(init));
+        assertEquals(preview.getMessage(), apply.getMessage());
+        assertEquals(original, snapshot(tempDir));
+
+        Files.writeString(config, properties ? "agent.name=claude\n" : "agent:\n  name: claude\n");
+        service.initialize(init);
+        assertEquals(trackedFromInit, Files.exists(stub));
+        assertEquals(trackedFromInit, Boolean.parseBoolean(ledger(tempDir).getProperty("catalog.tracked-from-init")));
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = "agent.name=   \n")
+    void adoptingAnExistingProjectPreservesCopiesOfReleasedFilesAcrossRetries(String configuration) throws Exception {
+        if (configuration != null) {
+            Path config = Files.createDirectories(tempDir.resolve(".camel-kit")).resolve("config.properties");
+            Files.writeString(config, configuration);
+        }
+        String path = ".claude/skills/camel-implement/guides/run-script.md";
+        Path guide = tempDir.resolve(path);
+        copyReleasedFixture(guide);
+        Path stub = writeReleasedClaudeStub(tempDir);
+        String originalGuide = Files.readString(guide);
+        String originalStub = Files.readString(stub);
+        var service = new InitService();
+        service.preview(request(tempDir, "claude"));
+        assertFalse(Files.exists(tempDir.resolve(ManagedFiles.LEDGER)));
+        for (int run = 0; run < 2; run++) {
+            service.initialize(request(tempDir, "claude"));
+            assertEquals(originalGuide, Files.readString(guide));
+            assertEquals(originalStub, Files.readString(stub));
+        }
+        service.initialize(request(tempDir, "claude", List.of(path)));
+        assertNotEquals(originalGuide, Files.readString(guide));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {false, true})
+    @Tag("cli-compat")
+    void historicalSkillNameAloneDoesNotMakeAPersonalSkillRetired(boolean existingKitWorkspace) throws Exception {
+        if (existingKitWorkspace) {
+            Files.createDirectories(tempDir.resolve(".camel-kit"));
+            Files.writeString(tempDir.resolve(".camel-kit/config.properties"), "agent.name=claude\n");
+        }
+        String path = ".claude/skills/camel-flow/SKILL.md";
+        Path skill = tempDir.resolve(path);
+        Files.createDirectories(skill.getParent());
+        String content = "---\nname: camel-flow\ndescription: Team inventory checklist\n---\nRun the team checklist.\n";
+        Files.writeString(skill, content);
+        var init = request(tempDir, "claude");
+        var service = new InitService();
+        service.initialize(init);
+        var doctor = new DoctorService().inspect(new DoctorRequest(tempDir));
+        assertFalse(doctor.hasFailures(), doctor.findings().toString());
+        assertTrue(service.preview(init).stream().noneMatch(c -> c.path().equals(path)));
+        assertTrue(service.initialize(init).conflicts().stream().noneMatch(c -> c.path().equals(path)));
+        assertEquals(content, Files.readString(skill));
+        assertFalse(ledger(tempDir).containsKey("catalog/" + path));
+    }
+
+    private static void copyReleasedFixture(Path file) throws Exception {
+        Files.createDirectories(file.getParent());
+        try (var in = InitSafeAdoptionTest.class.getResourceAsStream("/pre-ledger/" + file.getFileName())) {
+            Files.copy(in, file);
+        }
+    }
+
+    private static Path writeReleasedClaudeStub(Path project) throws Exception {
+        Path commands = Files.createDirectories(project.resolve(".claude/commands"));
+        return Files.writeString(commands.resolve("camel-validate.md"),
+                "Read .claude/skills/camel-validate/SKILL.md and follow those instructions. Requested input: $ARGUMENTS");
+    }
+
+    private static Map<String, String> catalogRecords(Path project) throws Exception {
+        var records = ledger(project);
+        return records.stringPropertyNames().stream().filter(key -> key.startsWith("catalog/"))
+                .collect(Collectors.toMap(key -> key.substring("catalog/".length()), records::getProperty));
+    }
+
+    @ParameterizedTest
+    @MethodSource("agents")
+    @Tag("cli-compat")
+    void missingAndStaleCatalogRecordsConvergeWithoutRewritingTheFiles(String host) throws Exception {
+        var service = new InitService();
+        var init = request(tempDir, host);
+        service.initialize(init);
+        Path receipt = tempDir.resolve(ManagedFiles.LEDGER);
+        String skill = AgentRegistry.get(host).skillsDirectory() + "/camel-validate/SKILL.md";
+        Path file = tempDir.resolve(skill);
+        Files.writeString(file, Files.readString(file).replace("\r\n", "\n").replace("\n", "\r\n"));
+        var modified = Files.getLastModifiedTime(file);
+        Properties initial = ledger(tempDir);
+        Files.delete(receipt);
+        for (int pass = 0; pass < 3; pass++) {
+            if (pass == 1) {
+                var previous = ledger(tempDir);
+                previous.setProperty("catalog/" + skill, "stale");
+                try (var out = Files.newBufferedWriter(receipt)) {
+                    previous.store(out, null);
+                }
+            }
+            var preview = service.preview(init);
+            assertEquals(initial.stringPropertyNames().stream().filter(key -> key.startsWith("catalog/")).count(),
+                    preview.stream().filter(c -> c.action() == Action.UNCHANGED).count());
+            assertEquals(Set.of("mvnw", "mvnw.cmd", ".mvn/wrapper/maven-wrapper.properties"),
+                    service.initialize(init).conflicts().stream().map(ManagedFiles.Change::path)
+                            .collect(Collectors.toSet()));
+            assertEquals(initial.getProperty("catalog/" + skill), ledger(tempDir).getProperty("catalog/" + skill));
+            assertEquals(modified, Files.getLastModifiedTime(file));
+            assertFalse(Files.exists(tempDir.resolve(ManagedFiles.PROPOSALS)));
+        }
+    }
+
+    @Test
+    @Tag("cli-compat")
+    void directoryReplacementAcceptsOnlySelectedAssetsAndArchivesPreviousProposals() throws Exception {
+        var service = new InitService();
+        service.initialize(request(tempDir, "claude"));
+        Path skills = tempDir.resolve(".claude/skills");
+        String selected = ".claude/skills/camel-validate/SKILL.md";
+        String sibling = ".claude/skills/camel-start/SKILL.md";
+        String original = Files.readString(tempDir.resolve(selected));
+        Files.writeString(tempDir.resolve(selected), "Validation edits");
+        Files.writeString(tempDir.resolve(sibling), "Start edits");
+        Path personal = skills.resolve("camel-validate/personal.md");
+        Files.writeString(personal, "Team rules");
+        Path old = tempDir.resolve(".camel-kit/conflicts").resolve(selected);
+        Files.createDirectories(old.getParent());
+        Files.writeString(old, "Previous merge notes");
+        var request = request(tempDir, "claude", List.of(".claude/skills/camel-validate"));
+        var before = snapshot(tempDir);
+        var preview = service.preview(request);
+        assertEquals(before, snapshot(tempDir));
+        assertTrue(preview.stream().anyMatch(c -> c.action() == Action.MOVE));
+        var result = service.initialize(request);
+        assertEquals(List.of(sibling), result.conflicts().stream().map(ManagedFiles.Change::path).toList());
+        assertEquals(original, Files.readString(tempDir.resolve(selected)));
+        assertEquals("Previous merge notes", Files.readString(tempDir.resolve(
+                ".camel-kit/conflicts/previous-claude-skills/camel-validate/SKILL.md")));
+        assertFalse(Files.exists(old));
+        var proposal = result.conflicts().getFirst().proposal();
+        assertEquals(tempDir.resolve(".camel-kit/conflicts/catalog/claude/skills/camel-start/SKILL.md.proposed"),
+                proposal);
+        assertTrue(Files.isRegularFile(proposal));
+        assertTrue(service.initialize(request(tempDir, "claude", List.of(".claude/skills"))).conflicts().isEmpty());
+        assertFalse(Files.exists(proposal));
+        assertEquals("Team rules", Files.readString(personal));
+    }
+
+    @ParameterizedTest
+    @MethodSource("agents")
+    @Tag("cli-compat")
+    void selectedCatalogFilesRequireOwnershipOrExplicitReplacement(String agentName) throws Exception {
+        Path project = tempDir.resolve(agentName);
+        var agent = AgentRegistry.get(agentName);
+        String skill = agent.skillsDirectory() + "/camel-validate/SKILL.md";
+        String guide = agent.skillsDirectory() + "/shared/iron-laws.md";
+        var paths = new ArrayList<>(List.of(skill, guide));
+        if (agent.generatesCommandStubs()) {
+            paths.add(agent.commandDirectory() + "/camel-validate." + agent.fileFormat());
+        }
+        var service = new InitService();
+        service.initialize(request(project, agentName));
+        var generated = new HashMap<String, String>();
+        for (String path : paths) {
+            generated.put(path, Files.readString(project.resolve(path)));
+            Files.writeString(project.resolve(path), "My " + path);
+        }
+        // This guide predates catalog tracking, so even subsequent runs must not claim it.
+        Properties original = ledger(project);
+        original.remove("catalog/" + guide);
+        try (var out = Files.newBufferedWriter(project.resolve(ManagedFiles.LEDGER))) {
+            original.store(out, null);
+        }
+        var before = snapshot(project);
+        var preview = service.preview(request(project, agentName));
+        assertEquals(before, snapshot(project));
+        for (String path : paths) {
+            assertTrue(preview.stream().anyMatch(c -> c.path().equals(path) && c.action() == Action.PRESERVE), path);
+        }
+
+        for (int run = 0; run < 2; run++) {
+            var result = service.initialize(request(project, agentName));
+            assertEquals(Set.copyOf(paths), result.conflicts().stream().map(ManagedFiles.Change::path)
+                    .collect(Collectors.toSet()));
+            for (String path : paths) {
+                assertEquals("My " + path, Files.readString(project.resolve(path)));
+                assertEquals(generated.get(path),
+                        Files.readString(project
+                                .resolve(ManagedFiles.PROPOSALS + "/catalog/" + path.substring(1) + ".proposed")));
+                assertEquals(original.getProperty("catalog/" + path), ledger(project).getProperty("catalog/" + path));
+            }
+        }
+        var replacement = request(project, agentName, List.of(skill));
+        assertTrue(service.preview(replacement).stream()
+                .anyMatch(c -> c.path().equals(skill) && c.action() == Action.REFRESH));
+        assertTrue(
+                service.initialize(replacement).warnings().stream().noneMatch(w -> w.message().contains("--replace")));
+        assertEquals(generated.get(skill), Files.readString(project.resolve(skill)));
+        assertFalse(
+                Files.exists(project.resolve(ManagedFiles.PROPOSALS + "/catalog/" + skill.substring(1) + ".proposed")));
+        assertEquals("My " + guide, Files.readString(project.resolve(guide)));
     }
 
     @ParameterizedTest
@@ -351,7 +722,9 @@ class InitSafeAdoptionTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"pom.xml", "src/main/resources/camel/orders.camel.yaml", "../outside.md", "README.md"})
+    @ValueSource(strings = {
+            "pom.xml", "src/main/resources/camel/orders.camel.yaml", "../outside.md", "README.md", ".", ".claude",
+            ".bob/skills", ".claude/skills/personal"})
     void replaceRejectsFilesInitDoesNotOwnBeforeAnyProjectWrites(String path) throws Exception {
         Path project = existingProject(tempDir.resolve("orders"));
         List<String> before = snapshot(project);
@@ -415,7 +788,7 @@ class InitSafeAdoptionTest {
     }
 
     @Test
-    void userFilesNextToShippedSkillsSurviveWhileShippedSkillsAreRefreshed() throws Exception {
+    void editedSkillsAndNeighboringProjectFilesSurviveReinitialization() throws Exception {
         Path project = tempDir.resolve("orders");
         new InitService().initialize(request(project, "claude"));
         Path skills = project.resolve(".claude/skills");
@@ -428,7 +801,10 @@ class InitSafeAdoptionTest {
 
         new InitService().initialize(request(project, "claude"));
 
-        assertEquals(generated, Files.readString(shipped));
+        assertEquals("edited shipped skill\n", Files.readString(shipped));
+        assertEquals(generated,
+                Files.readString(
+                        project.resolve(".camel-kit/conflicts/catalog/claude/skills/camel-start/SKILL.md.proposed")));
         assertEquals("our notes\n", Files.readString(skills.resolve("camel-start/team-notes.md")));
         assertEquals("our own skill\n", Files.readString(skills.resolve("deploy-orders/SKILL.md")));
     }

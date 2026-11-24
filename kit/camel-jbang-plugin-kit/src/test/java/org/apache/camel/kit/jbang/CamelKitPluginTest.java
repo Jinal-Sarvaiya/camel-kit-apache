@@ -63,6 +63,18 @@ class CamelKitPluginTest {
     }
 
     @Test
+    void hookIsDiscoverableThroughTheCamelHost() throws Exception {
+        var main = new CamelJBangMain();
+        var root = new CommandTree(main);
+        new CamelKitPlugin().customize(root, main);
+        var output = new StringWriter();
+        root.setOutput(output::write);
+        assertEquals(0, root.execute("kit", "hook", "--help").getResultValue());
+        assertTrue(output.toString().contains("--result"), output::toString);
+        assertTrue(output.toString().contains("camel kit hook"), output::toString);
+    }
+
+    @Test
     void acceptsHostEscapedLiteralShipContextAndCamelArgumentFiles() throws Exception {
         Path context = Files.writeString(tempDir.resolve("ship-context"), "EXPANDED VALUE");
         Path arguments = Files.writeString(

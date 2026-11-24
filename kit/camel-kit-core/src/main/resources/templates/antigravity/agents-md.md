@@ -4,8 +4,8 @@ Start with `/camel-start`. In Antigravity CLI, use `/skills` to inspect native p
 You can also ask Antigravity to use the `camel-start` skill by name.
 
 Pipeline: `/camel-brainstorm` or `/camel-migrate` → `/camel-plan` → `/camel-execute` → `/camel-validate`.
-Utilities: `/camel-ship`, `/camel-knowledge`, `/camel-debug`.
-Internal libraries: `camel-design`, `camel-implement`, `camel-test`, `camel-verify`; let pipeline skills invoke them.
+Utilities: {#for name in UTILITY_SKILLS}`/{name}`{#if name_hasNext}, {/if}{/for}.
+Internal libraries: {#for name in INTERNAL_SKILLS}`{name}`{#if name_hasNext}, {/if}{/for}; let pipeline skills invoke them.
 
 ## Current Documentation and ADRs
 

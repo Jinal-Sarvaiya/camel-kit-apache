@@ -1,5 +1,6 @@
 package org.apache.camel.kit.command;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -20,6 +21,7 @@ import org.apache.camel.kit.service.InitWarning;
 import org.apache.camel.kit.tui.InitTuiView;
 import org.apache.camel.kit.tui.TaskTracker;
 import org.apache.camel.kit.util.PrerequisiteChecker;
+import org.apache.camel.kit.workflow.WorkflowManifestLoader;
 
 import dev.tamboui.image.capability.TerminalImageCapabilities;
 import org.aesh.command.CommandDefinition;
@@ -60,18 +62,17 @@ public class InitCommand extends CamelKitCommand {
     public boolean noFetch;
 
     @Option(parser = KitOptionParser.class, name = "force",
-            description = "Reinitialize a project that already has .camel-kit/. Files you changed are preserved",
+            description = "Reinitialize an existing workspace, preserving edits to shared files and catalog assets",
             hasValue = false)
     public boolean force;
 
     @Option(parser = KitOptionParser.class, name = "dry-run",
-            description = "Show what init would do to files the project may already own, without writing anything",
+            description = "Preview changes to shared files and catalog assets without writing anything",
             hasValue = false)
     public boolean dryRun;
 
     @OptionList(parser = KitOptionParser.class, name = "replace",
-                description = "Replace this existing shared file (for example AGENTS.md or mvnw) instead of "
-                              + "preserving it (repeatable)",
+                description = "Replace a shared file, a selected catalog file, or the selected files in a catalog directory (repeatable)",
                 valueSeparator = OptionList.NO_SEPARATOR)
     public List<String> replace;
     @Option(parser = KitOptionParser.class, name = "replace-wrapper",
@@ -159,7 +160,8 @@ public class InitCommand extends CamelKitCommand {
             printer().println(dim("  Directory: ") + cyan(resolvedTargetDir.toString()));
             printer().println(dim("  Found:     ") + ".camel-kit/");
             printer().println();
-            printer().println(dim("  To reinitialize: ") + bold("--force") + dim(" (files you changed are preserved)"));
+            printer().println(dim("  To reinitialize: ") + bold("--force")
+                              + dim(" (preserves edits to shared files and catalog assets)"));
             printer().println(dim("  Example:      ") + "camel-kit init " + projectName + " --ai " + ai + " --force");
             printer().println();
             return 1;
@@ -200,18 +202,33 @@ public class InitCommand extends CamelKitCommand {
         }
         printer()
                 .println(bold("Dry run") + dim(" \u2014 nothing was written to ") + cyan(resolvedTargetDir.toString()));
+        int unchanged = 0;
         for (ManagedFiles.Change change : changes) {
             String outcome = switch (change.action()) {
+                case UNCHANGED -> null;
+                case MOVE -> green("move    ");
                 case CREATE -> green("create  ");
                 case REFRESH -> green("replace ");
                 case MERGE -> green("merge   ");
+                case REMOVE -> green("remove  ");
                 case PRESERVE -> yellow("preserve");
             };
-            printer().println("  " + outcome + "  " + change.path());
+            if (outcome == null) {
+                unchanged++;
+                continue;
+            }
+            String destination = change.action() == ManagedFiles.Action.MOVE
+                    ? " -> " + resolvedTargetDir.relativize(change.proposal()) : "";
+            printer().println("  " + outcome + "  " + change.path() + destination);
+        }
+        if (unchanged > 0) {
+            printer().println("  " + unchanged + " unchanged catalog files");
         }
         printer().println(dim("  merge: Camel Kit's block or servers are added and your content is kept."));
-        printer().println(dim("  preserve: the file is yours and stays as it is; replace it with --replace <path>."));
-        printer().println(dim("  Camel Kit's own assets (skills, subagents, .camel-kit/) are always written."));
+        printer().println(
+                dim("  preserve: the file stays as it is. Use --replace <path> to accept a file or the selected assets in a catalog directory."));
+        printer().println(dim(
+                "  remove: an unchanged catalog file is retired."));
         return 0;
     }
 
@@ -261,7 +278,11 @@ public class InitCommand extends CamelKitCommand {
         printer().println("  " + yellow("\u26A0") + bold("  Existing files preserved"));
         printer().println(dim("  Not written by Camel Kit, or changed since, so left as they are:"));
         for (ManagedFiles.Change conflict : result.conflicts()) {
-            // Only the Maven wrapper is preserved without a proposal: it is never assembled from mixed files.
+            if (conflict.preservedRetiredFile()) {
+                printer().println("     " + cyan(conflict.path())
+                                  + dim("  \u2190 retired catalog file, review and move or remove it manually"));
+                continue;
+            }
             String proposal = conflict.proposal() == null
                     ? dim("  \u2190 kept as is, no Camel Kit version saved")
                     : dim("  \u2190 Camel Kit version: ")
@@ -272,14 +293,16 @@ public class InitCommand extends CamelKitCommand {
             printer().println(dim("  Merge the Camel Kit version by hand, or replace a file with ")
                               + bold("--force --replace <path>"));
         }
-        if (result.conflicts().stream().anyMatch(conflict -> conflict.proposal() == null)) {
+        if (result.conflicts().stream()
+                .anyMatch(conflict -> conflict.path().equals("mvnw") || conflict.path().equals("mvnw.cmd")
+                        || conflict.path().equals(".mvn/wrapper/maven-wrapper.properties"))) {
             printer().println(dim("  To replace the whole Maven wrapper, use ")
                               + bold("--force --replace-wrapper"));
         }
         printer().println();
     }
 
-    void printNextSteps(String projectName, String agentName, String agentId) {
+    void printNextSteps(String projectName, String agentName, String agentId) throws IOException {
         String divider = "  " + "\u2500".repeat(34);
         printer().println("  " + bold("Next steps"));
         printer().println(divider);
@@ -324,7 +347,10 @@ public class InitCommand extends CamelKitCommand {
         printer().println("  2  " + cyan("/camel-start") + "  \u2014 route integration work");
         printer().println("     " + cyan("/camel-migrate") + " \u2014 migration shortcut");
         printer().println("  3  " + cyan("/camel-debug") + "  \u2014 troubleshoot broken routes");
-        printer().println("     " + cyan("/camel-knowledge") + " \u2014 ask Camel documentation questions");
+        if (WorkflowManifestLoader.loadDefault().commands().stream()
+                .anyMatch(c -> c.userFacing() && c.name().equals("camel-knowledge"))) {
+            printer().println("     " + cyan("/camel-knowledge") + " \u2014 ask Camel documentation questions");
+        }
         printer().println();
     }
 

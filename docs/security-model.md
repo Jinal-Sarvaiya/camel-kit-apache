@@ -97,9 +97,9 @@ metadata; Kit configures it for each harness, and it also serves MCP clients tha
 
   | Family | Representative entry points | Touches outside the process? | In this model? |
   | --- | --- | --- | --- |
-  | **A. Workspace CLI** — `init`, `doctor`, `doc`, `nextId`, `plan analyze`, `graph *` (`camel-kit-core` commands, services, generators, catalog downloaders; `camel-kit-main` JBang launcher; `camel-jbang-plugin-kit`) | Aesh commands | Writes the target workspace; reads `~/.camel-kit/config.properties`; `init` downloads catalogs over HTTPS unless `--no-fetch`; prerequisite probes spawn `java`, `jbang`, `camel` (including `camel test --help`) and `mvn` when no wrapper exists; see §4.5 | **In** |
+  | **A. Workspace CLI** — `init`, `doctor`, `doc`, `nextId`, `plan analyze`, `hook`, `graph *` (`camel-kit-core` commands, services, generators, catalog downloaders; `camel-kit-main` JBang launcher; `camel-jbang-plugin-kit`) | Aesh commands | Writes the target workspace; reads `~/.camel-kit/config.properties`; `init` downloads catalogs over HTTPS unless `--no-fetch`; prerequisite probes spawn `java`, `jbang`, `camel` (including `camel test --help`) and `mvn` when no wrapper exists; see §4.5 | **In** |
   | **B. Graph analysis** (`camel-kit-graph`: Pom, Java, Groovy, XML route, Mule XML, DataWeave, BizTalk, YAML route, Config parsers plus the cross-linker and property-binding post-processors) | `camel-kit graph …`; `init --here` auto-analysis | Reads the analysed tree; writes `.camel-kit/project-graph.json`; no network, no child process *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))* | **In** — the analysed tree is untrusted input |
-  | **C. Skills, templates, traits, agent registry, workflow manifest** (`kit/camel-kit-core/src/main/resources/{skills,templates,agents,workflow}`) | installed by `init` into the workspace | Nothing by itself; the harness executes the instructions with its own permissions; generated MCP configs make the harness launch MCP servers through `jbang` at pinned coordinates | **In** as shipped instructions and generated configuration; the harness and the model are out (§4.3) |
+  | **C. Skills, templates, traits, agent registry, workflow manifest and assembled skill catalog** (`kit/camel-kit-core/src/main/resources/{skills,templates,agents,workflow,META-INF/camel-kit/packs}` and the packaged `META-INF/camel-kit/*catalog.zip`) | installed by `init` into the workspace | Nothing by itself; the harness executes the instructions with its own permissions; generated MCP configs make the harness launch MCP servers through `jbang` at pinned coordinates | **In** as shipped instructions and generated configuration; the harness and the model are out (§4.3) |
   | **D. Ship controller** (Technology Preview; `camel-kit-core` `ship/**`, `command/ship`) | `camel-kit ship`, `/camel-ship` delegates | Spawns `pi`/`node` (Pi backend), `/usr/bin/setsid`, `/bin/kill`, its own `java`; writes `.camel-kit/ship/state` or `$CAMEL_KIT_SHIP_STATE_HOME`; publishes into the live project; HTTPS to Maven Central through family E | **In** |
   | **E. Ship resolver and evidence payloads** (`camel-kit-ship-resolver`; `ship/evidence/**` launchers) | controller-only | HTTPS to Maven Central; private local Maven repository; private tmp/home | **In** |
   | **F. External MCP servers** — Camel JBang MCP (`camel-jbang-mcp`), Citrus MCP | launched by the harness from the generated config | Network; whatever the server does | **Out** — separately owned (§4.3). Camel-Kit's responsibility ends at the generated configuration: pinned coordinate, named repositories, allowed-tool list. |
@@ -192,7 +192,7 @@ trusted")*.
 4. **Shipped skills + loaded context → harness/model → generated artifacts.** Skills are the only instruction
    source besides the user *(documented — `context-authority.md`, "Instruction Authority")*. Everything the model
    produces is untrusted input to any deterministic consumer: `doc check` frontmatter, `plan analyze` task metadata,
-   Ship worker results.
+   workflow hook submissions and pending results, and Ship worker results.
 5. **Ship: controller ↔ worker ↔ evidence ↔ publication.** The controller "is the only component that writes Ship run
    state and commits stage transitions" *(documented — `docs/commands.md`)*. Workers run in a controller-owned
    staging workspace; "the request working directory is the child process cwd, not a filesystem sandbox. The
@@ -394,7 +394,23 @@ links), controller-owned state, caches and private temporary directories *(docum
 
 ## 4.5a Build-time and configuration variants
 
-Camel-Kit is a family of postures. The knobs that move the security envelope:
+Camel-Kit is a family of postures. Skill pack selection is a distribution build input. The maintainer selects modules
+on the build classpath. The compiler checks provider types without initializing them. `init` reads installed skill
+content from the bundled catalog and applies the existing generated-path checks. Pack descriptors in the project
+being initialized do not participate in selection. See the [pack contract](modules/ROOT/pages/contributing.adoc#skill-packs).
+
+At runtime, `camel-kit hook` resolves the step and handler from that same bundled catalog. The assistant
+invokes a bundled skill in its host. For a Java handler, Kit constructs the distribution-selected provider
+and calls it in the CLI JVM with the operator's permissions. Trusting that distribution includes trusting
+its provider code and the helpers it chooses to run.
+
+The caller owns the source scope, target, evidence paths and confirmed answers. Kit reads the submitted
+and pending JSON as data. It checks the echoed binding and decisions against the caller's request,
+hashes the named project files, and requires an observation for each declared check before accepting a pass.
+The provider is responsible for the substance of the observations. On re-entry, earlier decisions come from
+the last verified pending result, which the caller must keep intact. The assistant controls stage completion.
+
+The knobs that move the security envelope:
 
 | Knob | Default | Effect on the model | Maintainer stance |
 | --- | --- | --- | --- |
@@ -402,7 +418,7 @@ Camel-Kit is a family of postures. The knobs that move the security envelope:
 | Generated MCP tool lists (`enabled_tools`, `tools`, `directTools`, `includeTools`, `alwaysAllow`/`autoApprove`, OpenCode `permission`) and the Claude `settings.json` MCP rules | the workflow manifest's `allowed_tools` — "the read-only and generation helpers used by the skills", with "runtime mutation/control tools" left out *(documented — `docs/architecture.md` §6)* | **Availability filter** (only the listed tools exist for the agent): Codex `enabled_tools`, Copilot `tools`, Pi `directTools`, Qwen `includeTools`. **Approval only** (every server tool exists; the list or rule decides what runs without a prompt): Bob 2 `alwaysAllow`/`autoApprove` = the manifest list; Claude Code `settings.json` `permissions.allow` = explicit `mcp__<server>__<tool>` entries for the manifest list (46 current tools); unlisted tools remain available but require host approval; the `autoApprove`/`alwaysAllow` keys in the generated Claude `.mcp.json` are not a Claude Code tool filter *(maintainer, 2026-10-22 — review of #6)*. **Prompt before every call**: Codex `default_tools_approval_mode = "prompt"`, OpenCode `permission` `ask` for `camel_*`, `camel-knowledge_*` and `citrus_*`, Qwen and Copilot permission prompts. Antigravity gets the full tool set with no generated approval *(documented — `templates/mcp-configs/*`, `docs/agent-architectures.md`)*. | **Ruled 2026-10-27 (Q3):** the Claude Code wildcard pre-approval is *not* the accepted posture. Accepted posture: explicit per-tool grants aligned with the manifest `allowed_tools`, verified in the generated behaviour. V3 implements that posture; regression coverage and actual Claude Code permission probes are recorded in [V3 evidence](security-verification.md#v3-claude-permissions). The other postures are documented. |
 | `camel.mcp.repos`, `knowledge.mcp.repos`, `citrus.mcp.repos`, `camel.catalog.repos`; JBang launcher `//REPOS` | Maven Central, ASF public, **ASF snapshots, Central snapshots** *(documented — `distribution.properties`, `CamelKit.java`)* | Snapshot repositories serve mutable artifacts: "hosted snapshots are mutable and may lag `main`" *(documented — README)*. `-p` can repoint every list. | **Ruled 2026-10-27 (Q4):** snapshots are retained for development with their mutability documented; release defaults pin released versions; mutable snapshot content is `BY-DESIGN`, and snapshot mutability waives no other control. |
 | `camel-kit init --no-fetch` | off | Skips every `init`-time download; the workspace relies on pre-populated `.camel-kit/.cache`. | Documented; no security effect beyond removing network access. |
-| `camel-kit init --force` | off | Reinitializes an initialized project. Regenerates Camel-Kit's own assets (shipped skills, subagents, personas), replaces only its marked block in instruction files, and preserves other shared files it did not write or that were changed, including a customised Claude `settings.json` allow-list; `--replace <path>` rewrites one shared file in full *(documented — `docs/commands.md`)*. | Data-loss, not security. A preserved `settings.json` keeps the operator's grants, not the generated ones. |
+| `camel-kit init --force` | off | Reinitializes an initialized project. Regenerates subagents and personas, updates the marked block in instruction files, and preserves edits and unrecognized shared or catalog content, including a customised Claude `settings.json` allow-list. `--replace <path>` accepts a shared file, a catalog file or the selected assets in a catalog directory *(documented — `docs/commands.md`)*. | Data-loss, not security. A preserved `settings.json` keeps the operator's grants, not the generated ones. |
 | `-p key=value`, `-c path` | none | Override any distribution property, including Camel/Quarkus/Spring Boot versions and repository lists. | Trusted input (`OUT-OF-MODEL: trusted-input`). |
 | `camel-kit ship --ask always\|smart\|never` | `smart` | `never` removes pauses for material ambiguity but "still stops for missing tools, failed mandatory checks, or authority the user has not granted; a default does not grant permission" *(documented — `docs/commands.md`)*. | Documented; `never` is not a safety mode (§4.9). |
 | `camel-kit ship --backend` | `pi` | Pi worker: `--tools read,grep,find,ls` for read-only stages and `read,bash,edit,write,grep,find,ls` for EXECUTE, launched with `--no-approve`, `--no-extensions`, `--no-skills`, `--no-context-files` and `--offline` inside the staging cwd *(documented — `PiWorker` argument list)*; it inherits the controller's environment *(maintainer, 2026-10-27 — Q8)*. Native backends (`bob2-native`, `copilot-native`, `claude-native`, `codex-native`) use the host's read-only subagent; "host-enforced tool restriction depends on the Codex CLI version" *(documented — `docs/architecture.md` §8)*. | **Ruled 2026-10-27 (Q8):** Pi retained with the documented boundary — inherited environment, no process sandbox, exact-value scan of selected secrets; failures of the claimed controls remain in scope. Native: documented. |
@@ -438,6 +454,7 @@ Per-entry-point trust table. "Caller" is the developer unless stated otherwise.
 | `camel-kit graph …` output, `.camel-kit/project-graph.json` | graph JSON consumed by skills | derived from the tree | Treat as data in prompts *(documented — umbrella "Reading route sources")* |
 | `camel-kit doc check/stale/unstale <file>` | YAML frontmatter of pipeline artifacts | model-authored → **yes** | Legacy frontmatter flags parsed as data by `FrontmatterHandler` (Jackson YAML); no separate byte quota is claimed for these legacy commands |
 | `camel-kit doc snapshot/record`, `doc check --project` | source tree, JSON snapshot/receipt and documentation review | tree/model-authored → **yes** | `DocumentationEvidence` resolves the selected project root (including an alias), confines reads and receipt writes to it, and rejects descendant symlinks, traversal and Git internals; hashes regular files only. Source limits: 10,000 entries, 64 MiB/file, 512 MiB total; snapshot/report/document inputs to `record`: 1 MiB each; receipts: 2 MiB to fit the embedded snapshot and review fields. Count and byte limits apply together. Duplicate/trailing JSON and scalar coercion are rejected. No source execution or network access. Hashes bind review inputs; they do not prove coverage, approval or semantic correctness. |
+| `camel-kit hook` | caller input JSON, skill result, saved pending result, source and artifact files | model or analysed tree → **yes** | Check binding, revisions, required checks and decision history (§4.5a). Only the bundled catalog selects executable code. |
 | `camel-kit plan analyze` | `implementation-plan.md` task metadata | model-authored → **yes** | Parsed as data by `PlanAnalyzer`; no project execution |
 | `camel-kit nextId <slug>` | slug → `docs/camel-kit/NNN-slug/` | no — operator | — |
 | `camel-kit ship --text`, `--document PATH` | context for the model | supplied by the developer; **content is loaded context** for the model | Do not pass secrets; third-party documents can carry instruction-like text (§4.3, §4.10) |
@@ -554,7 +571,20 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
    `GeneratedAssetCleaner`)*; generated file replacements use atomic writes *(documented — `AtomicFileWriter`)*; existing
    `.codex/config.toml` / `opencode.json` are merged, not replaced *(documented — `docs/architecture.md`)*. `InitService` preflights the exact generated leaves and their ancestors, plus Camel-owned skill,
    shared-guide and template subtrees before writing. `ConfinedPaths` refuses links in these managed
-   paths; unrelated worktrees, custom skills and existing data may contain links. New atomic writes
+   paths; unrelated worktrees, custom skills and existing data may contain links. Catalog updates and retirements read
+   the previous installation's SHA-256 records only for valid resource or stub paths under the selected
+   agent's generated directories. A ledger record takes precedence. For a missing record, Kit can recognize the
+   selected assistant's stock file by path and a bundled release fingerprint in a pre-ledger Kit workspace. In a
+   shared skills directory this includes fingerprints from assistants that install to the same path. Init validates
+   the active workspace configuration before writing the ledger. First-time
+   adoption records its origin in the ledger before writing the config, so retries preserve pre-existing copies. An
+   unrecorded skill with different content can reuse a historical name. Review ledger changes alongside the files they
+   track. Kit checks confinement and compares installed content before refresh or removal.
+   An identical catalog file is adopted. An unfamiliar or edited file receives a rendered proposal outside assistant discovery directories unless the operator selects it for replacement.
+   Hashes normalize
+   LF and CRLF for recognized UTF-8 text. Opaque resources are compared byte for byte. Layout replacements
+   displace only files with matching recorded or release hashes and their directories. Init and Doctor report interrupted catalog
+   work directories for inspection. Kit leaves their contents for recovery. Other retirements prune only empty parents. New atomic writes
    use umask-default permissions and replacements retain existing POSIX modes.
    Explicitly selected target aliases remain supported. Catalog, Citrus and Forage validate version
    components; Citrus and Forage also validate cache ancestry; Citrus also checks extracted paths and derived reference destinations.
@@ -1064,7 +1094,8 @@ tags read *(maintainer, 2026-10-27 — Qn)*.
   authorized; distinguish that from an unintended escape (V5).
 - **Q10 — Publication → §4.1.** Retain this as an additive Camel sub-project security model, linked from `SECURITY.md`.
   Register it on the ASF security site and the Camel security page after acceptance, with
-  [apache/camel-kit#131](https://github.com/apache/camel-kit/issues/131) tracking that work.
+  [apache/camel-kit#131](https://github.com/apache/camel-kit/issues/131) tracking that work. See
+  [SECURITY-REGISTRATION.md](SECURITY-REGISTRATION.md) for external PR templates and registration checklist.
 - **Q11 — Knowledge → §4.2, §4.3, §4.4a, §4.12.** Include its server and index in this same security model, with a
   dedicated Knowledge section. The monorepo move has happened. Missing coverage remains work to complete (V6), and
   reports use the same private reporting process.

@@ -1,7 +1,6 @@
 package org.apache.camel.kit.generator;
 
 import java.nio.file.Path;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
@@ -20,11 +19,9 @@ public class PiGenerator extends DefaultGenerator {
     public void generate(InitContext ctx) throws Exception {
         super.generate(ctx);
 
-        Map<String, Object> data = new HashMap<>(
-                Map.of(
-                        "COMMAND_PREFIX", ctx.commandPrefix(),
-                        "PI_VERSION", ctx.distribution().piVersion(),
-                        "PI_MCP_ADAPTER_VERSION", ctx.distribution().piMcpAdapterVersion()));
+        Map<String, Object> data = AgentsMdGenerator.templateData(ctx);
+        data.put("PI_VERSION", ctx.distribution().piVersion());
+        data.put("PI_MCP_ADAPTER_VERSION", ctx.distribution().piMcpAdapterVersion());
         installDescriptorTemplates(ctx, data);
     }
 

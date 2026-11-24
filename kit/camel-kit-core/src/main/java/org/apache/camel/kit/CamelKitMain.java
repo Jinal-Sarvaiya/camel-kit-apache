@@ -6,6 +6,7 @@ import java.nio.file.Path;
 
 import org.apache.camel.kit.command.DoctorCommand;
 import org.apache.camel.kit.command.HelpAwareCommand;
+import org.apache.camel.kit.command.HookCommand;
 import org.apache.camel.kit.command.InformationOptionParser;
 import org.apache.camel.kit.command.InitCommand;
 import org.apache.camel.kit.command.doc.DocCommand;
@@ -175,6 +176,7 @@ public class CamelKitMain extends HelpAwareCommand {
                 .addSubcommand("init", new InitCommand(main))
                 .addSubcommand("doctor", new DoctorCommand(main))
                 .addSubcommand("doc", new DocCommand())
+                .addSubcommand("hook", new HookCommand())
                 .addSubcommand("graph", new GraphCommand())
                 .addSubcommand("plan", new PlanCommand())
                 .addSubcommand("nextId", new NextIdCommand())

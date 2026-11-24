@@ -20,7 +20,7 @@ Camel-Kit combines two mechanisms to give AI agents accurate, efficient access t
 
 Together they enable AI-powered integration development targeting Apache Camel. Skills carry the process knowledge (how to design a flow, how to generate YAML, how to validate a route), while MCP provides the data knowledge (which components exist, what options they accept, whether an endpoint URI or Citrus test action is valid).
 
-The authoritative workflow contract lives in `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml`. It defines command names and aliases, generated command stubs, skill visibility, pipeline stages, artifacts, transitions, MCP servers, allowed tools, and documentation references. Generator code reads this manifest for command stubs and for tool filters where the target runtime supports them; tests validate skill frontmatter against it. When changing workflow behavior, update the manifest first and then update the Markdown skill bodies and docs to match.
+The core workflow contract lives in `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml`. It defines command names and aliases, generated command stubs, skill visibility, pipeline stages, artifacts, transitions, MCP servers, allowed tools, and documentation references. The build composes this manifest with the selected skill packs. Generator code reads the bundled catalog for command stubs and for tool filters where the target runtime supports them; tests validate skill frontmatter against it. When changing workflow behavior, update the manifest first and then update the Markdown skill bodies and docs to match.
 
 ---
 
@@ -32,7 +32,9 @@ A skill is a directory containing a manifest file (`SKILL.md`) and an optional `
 
 **Skill location:** `kit/camel-kit-core/src/main/resources/skills/{skill-name}/`
 
-**Workflow manifest:** `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml` is the source of truth for skill visibility and generated slash-command stubs. The `SKILL.md` frontmatter must match the manifest.
+The contributor guide includes the [pack descriptor and runnable example](modules/ROOT/pages/contributing.adoc#skill-packs).
+
+**Core workflow manifest:** `kit/camel-kit-core/src/main/resources/workflow/camel-kit-workflow.yaml` is the source of truth for skill visibility and generated slash-command stubs. The `SKILL.md` frontmatter must match the manifest.
 
 ### SKILL.md Format
 
@@ -225,6 +227,11 @@ This graph-aware context complements file analysis with a bounded topology view 
 ---
 
 ## 3. The Orchestration Model
+
+A pack can bind a named step to a skill or a Java provider. Both receive the same versioned request and
+return observations for required checks. The CLI binds acceptance to the current source and artifact bytes.
+The caller handles pending decisions and ordinary stage sequencing. See the
+[workflow hook contract](modules/ROOT/pages/contributing.adoc#implement-hook).
 
 ### Pipeline
 
@@ -920,15 +927,25 @@ that decides what happens to them:
   only files named for replacement are written. Preview and execution share that plan.
 - A preserved file is reported and the generated version is saved under `.camel-kit/conflicts/`. A preserved Maven
   wrapper file is the exception: it is reported without a saved version, so no partial wrapper is offered for
-  merging; `--replace-wrapper` replaces the whole wrapper. `--replace <path>` rewrites one shared file in full;
-  `--dry-run` reports the outcome per file without writing.
+  merging. `--replace-wrapper` replaces the whole wrapper. `--replace <path>` accepts a shared file, a catalog file,
+  or the selected assets in a catalog directory. The preview lists changed paths and counts unchanged catalog files.
 - Existing MCP configurations, JSON and `.codex/config.toml`, are merged, not replaced. One that cannot
   be merged is rejected before anything is written, by `--dry-run` as well as by initialization; for Codex both build
   and validate the same merged candidate.
 
-Assets Camel-Kit ships under its own names (`camel-*` skills, subagents, personas, hooks, `.camel-kit/templates/`) are
-not tracked and are always regenerated. This keeps reinitialization able to restore the restricted Ship worker
-definitions regardless of local edits. Files the user adds next to them are never visited.
+Each run regenerates subagents, personas, hooks and `.camel-kit/templates/`, including restricted Ship workers.
+Catalog files are rendered with their host traits and invocation metadata in staging. Init compares each destination
+with its ledger record before publishing the finished file or retiring it. In a pre-ledger Kit workspace, a known
+release hash identifies a stock file at its installed path. Assistants that share a skills
+directory can recognize either rendering there. The config names only the most recently initialized assistant.
+First-time adoption records `catalog.tracked-from-init=true` in the ledger before writing the Kit config,
+so a retry preserves pre-existing copies of released files. Init records a file that already matches the new
+rendering in place. For a selected file with unfamiliar or edited content, it saves a `.proposed` copy under
+`.camel-kit/conflicts/catalog/`. Text hashes normalize LF and CRLF for the formats listed in the contributor guide. Opaque resources use
+SHA-256 of their exact bytes. An edited retired file keeps its record so later runs can report it. A switch
+between a file and a directory stages the new content and requires every displaced file to match its recorded or released hash.
+Init checks write access before switching. If a run leaves staged content or a backup, subsequent previews,
+initializations and Doctor identify the recovery directory under the selected assistant's skills.
 
 Rejected alternatives:
 
@@ -940,12 +957,8 @@ Rejected alternatives:
   from one the user wrote, so generated files would never be refreshed on reinitialization.
 - **Hash-track the instruction files too.** A preserved `AGENTS.md` would lack the skill routing until merged by hand.
 - **Use marked blocks for every shared file.** JSON, YAML and shell files cannot carry a reliable marker.
-- **Track every generated file, including skills.** Skills are rewritten several times in one run (install, agent
-  adaptation, traits, dispatch block, version resolution), and preserving a locally edited Ship worker would weaken
-  its restrictions.
 
-Missing provenance is unknown ownership, never Camel-Kit ownership. A workspace initialized before the ledger existed
-is treated like any other existing project: unmarked instruction files get the block appended, and other shared files
+Shared files use their own provenance rules. In a workspace initialized before the ledger existed, unmarked instruction files get the block appended, and other shared files
 are preserved until named with `--replace`. Markers that do not form exactly one ordered pair (missing, duplicated,
 nested or reversed) are never merged, because any guess could delete the user's text between them. A replacement is
 recorded as used only once it is written, so one that was skipped is reported.

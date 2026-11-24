@@ -278,7 +278,9 @@ To select additional packs while building core itself, add the pack modules as b
 
 The `legacy-flows` example reads a legacy format in which each `.flow` file names one integration flow.
 Its pack descriptor registers a public Java class with a public zero-argument constructor. The contribution
-key gives the parser its stable ID. Use `requires: [provider/legacy-flow]` on a step that relies on it.
+key gives the parser its stable ID. Declare `requires: [provider/legacy-flow]` on a step that relies on it.
+This checks the dependency at build time. Include the runtime invocation and its failure handling in the step's own
+instructions so the installed workflow checks the provider before consuming its graph.
 The pack compiler checks duplicate keys, dependencies, the contribution contract and the packaged classes.
 
 [source,yaml]
@@ -286,19 +288,28 @@ The pack compiler checks duplicate keys, dependencies, the contribution contract
 include::example$skill-pack/src/main/resources/META-INF/camel-kit/packs/legacy-flows/pack.yaml[]
 ----
 
+The example contributes these instructions at `validate/report`.
+
+[source,markdown]
+----
+include::example$skill-pack/src/main/resources/META-INF/camel-kit/packs/legacy-flows/inventory.md[]
+----
+
 Implement `org.apache.camel.kit.graph.parser.MigrationParser` from `org.apache.camel:camel-kit-graph`.
 Return the API version against which the provider was compiled. Kit checks it when constructing the graph builder.
 Declare lowercase input extensions without a dot. Discovery counts those files against the same byte budget as
 built-in sources. For formats sharing an extension, use `acceptsContent` to inspect a bounded candidate.
-Mule uses this check to recognize its XML namespace.
+Providers declaring `xml` receive all size-checked XML candidates, including `pom.xml`. Mule uses this check to recognize its XML namespace.
 
 Kit passes all matching files in path order to `parseFiles` once, so a parser can resolve cross-file references.
 With zero matching files it skips that call. The fragment starts with Maven context. Emit graph nodes and edges
-using the existing graph types, give nodes stable IDs, and record source-relative paths in their `file` properties.
+using the existing graph types. Prefix pack-specific node IDs with a stable namespace to avoid collisions.
+Use `GraphParser.relativeFileName` to record source-relative `file` properties with forward slashes on every platform.
 The example projects its private `Flow` record onto a `RESOURCE_FILE` node. Return per-file observations through
 `warnings()` and clear them in `resetWarnings()` if the parser keeps state. A thrown exception or timeout discards
 that parser's fragment. Callers of `buildWithDiagnostics` can inspect the scanned paths, warnings, failures and
-produced counts alongside the graph. Library callers using the graph artifact alone can pass their own
+produced counts alongside the graph. For migration providers, the scanned paths are the files selected for parsing.
+A failure or timeout before content selection finishes reports an empty list. Library callers using the graph artifact alone can pass their own
 ID-to-parser map to `new GraphBuilder(map)`. Supply a separate parser instance for each ID. The no-argument
 constructor retains the standard parser set, including Mule.
 
@@ -319,6 +330,8 @@ classpath="$example/target/kit-with-report-review-1.0-SNAPSHOT.jar:$(cat "$examp
 workspace=$(mktemp -d)
 (
   cd "$workspace" || exit 1
+  java -cp "$classpath" org.apache.camel.kit.CamelKitMain init --here --ai claude --no-fetch --silent
+  grep -F -- 'graph generate --require-parser legacy-flow' .claude/skills/camel-validate/SKILL.md
   echo Orders > orders.flow
   java -cp "$classpath" org.apache.camel.kit.CamelKitMain graph generate --require-parser legacy-flow
   java -cp "$classpath" org.apache.camel.kit.CamelKitMain graph find --type RESOURCE_FILE --name Orders

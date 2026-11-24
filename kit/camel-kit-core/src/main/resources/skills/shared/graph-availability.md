@@ -1,6 +1,6 @@
 # Graph Availability Check
 
-> **Loaded by:** Per-skill graph guides (camel-validate, camel-implement, camel-test).
+> **Loaded by:** The migration skill, per-skill graph guides and pack steps that require a graph parser.
 > **Purpose:** Common graph detection and fallback contract.
 
 ## Check

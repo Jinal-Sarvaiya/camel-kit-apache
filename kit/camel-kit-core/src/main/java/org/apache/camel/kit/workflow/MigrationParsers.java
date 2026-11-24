@@ -1,6 +1,7 @@
 package org.apache.camel.kit.workflow;
 
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -12,7 +13,11 @@ public final class MigrationParsers {
     private MigrationParsers() {
     }
 
-    public static GraphBuilder bundled(String requiredId) throws IOException {
+    public static GraphBuilder newGraphBuilder() throws IOException {
+        return newGraphBuilder(null);
+    }
+
+    public static GraphBuilder newGraphBuilder(String requiredId) throws IOException {
         Map<String, MigrationParser> parsers = new TreeMap<>();
         for (var entry : new TreeMap<>(SkillCatalog.bundled().manifest().contributions()).entrySet()) {
             var binding = entry.getValue();
@@ -30,10 +35,12 @@ public final class MigrationParsers {
                         .asSubclass(MigrationParser.class);
                 parsers.put(id, type.getConstructor().newInstance());
             } catch (ReflectiveOperationException | ClassCastException | LinkageError e) {
+                Throwable cause
+                        = e instanceof InvocationTargetException invocation ? invocation.getTargetException() : e;
                 throw new IOException(
                         "Cannot load " + binding.pack() + ": " + entry.getKey() + " ("
-                                      + provider.implementation() + "): " + e,
-                        e);
+                                      + provider.implementation() + "): " + cause,
+                        cause);
             }
         }
         if (requiredId != null && !parsers.containsKey(requiredId)) {

@@ -15,7 +15,7 @@ Java packages use `org.apache.camel.kit`; Maven group IDs use `org.apache.camel`
 |--------|----------------|
 | `kit/camel-kit-main` | JBang entry point (`src/main/jbang/main/CamelKit.java`) |
 | `kit/camel-kit-core` | CLI commands, config, init/trait machinery; all skills + templates resources |
-| `kit/camel-kit-graph` | Project graph analysis — 9 parsers (Pom, Java, Groovy, XML, Mule, DataWeave, BizTalk, YAML, Config) |
+| `kit/camel-kit-graph` | Project graph analysis with built-in parsers and migration parsers selected by the distribution catalog |
 | `kit/camel-kit-ship-resolver` | Classloader-isolated Maven Resolver for Ship evidence |
 | `kit/camel-jbang-plugin-kit` | Camel JBang plugin |
 
@@ -77,7 +77,8 @@ Governance:
 
 ## Graph module
 
-- New parsers must be registered in the parser registry.
+- Implement migration parsers with the versioned `MigrationParser` interface. Register each one as a
+  `provider/<id>` entry in its pack descriptor. See the worked example in `docs/modules/ROOT/pages/contributing.adoc`.
 - Parser test data: `src/test/resources/{platform-name}/`.
 
 ## Definition of done

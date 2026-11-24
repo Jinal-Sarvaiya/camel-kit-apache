@@ -984,6 +984,7 @@ class SkillPackCompilerTest {
     }
 
     @Test
+    @Tag("cli-compat")
     void migrationPackParsesAlongsideMuleAndReportsUnavailableRuntimeClass() throws Exception {
         Path example = Path.of("../../docs/modules/ROOT/examples/skill-pack/src/main").toRealPath();
         Path dist = Files.createDirectory(temp.resolve("distribution"));
@@ -996,15 +997,33 @@ class SkillPackCompilerTest {
             Files.write(archive, SkillPackCompiler.compile(loader, List.of("legacy-flows")));
         }
 
-        Path project = Files.createDirectory(temp.resolve("source"));
-        Path graph = project.resolve(".camel-kit/project-graph.json");
+        Path workspace = Files.createDirectory(temp.resolve("validation workspace"));
+        assertCli(0, dist, workspace, "init", "--here", "--ai", "claude", "--no-fetch", "--silent");
+        String step = Files.readString(workspace.resolve(".claude/skills/camel-validate/SKILL.md"));
+        String command = step.lines().filter(line -> line.startsWith("Run `graph generate --require-parser "))
+                .findFirst().orElseThrow();
+        assertTrue(step.contains("On failure, report the diagnostic and leave the inventory incomplete"), step);
+        assertTrue(step.contains("use the installed `camel-kit`"), step);
+
+        Path project = Files.createDirectory(temp.resolve("legacy source"));
+        Path graph = workspace.resolve("inventory graph.json");
+        var argv = command.substring(command.indexOf('`') + 1, command.lastIndexOf('`')).split(" ");
+        assertEquals(
+                List.of("graph", "generate", "--require-parser", "legacy-flow", "--project-dir", "SOURCE", "--output",
+                        "GRAPH"),
+                List.of(argv));
+        String[] args = java.util.Arrays.stream(argv).map(arg -> switch (arg) {
+            case "SOURCE" -> project.toString();
+            case "GRAPH" -> graph.toString();
+            default -> arg;
+        }).toArray(String[]::new);
         Files.writeString(project.resolve("orders.flow"), "Orders");
         Files.writeString(project.resolve("empty.flow"), "");
         Files.writeString(project.resolve("ignored.txt"), "unrelated");
         String mule = "<mule xmlns='http://www.mulesoft.org/schema/mule/core'>";
         Files.writeString(project.resolve("mule.xml"), mule + "<flow name='orders'/></mule>");
         Files.writeString(project.resolve("broken.xml"), mule);
-        String output = assertCli(0, dist, project, "graph", "generate", "--require-parser", "legacy-flow");
+        String output = assertCli(0, dist, workspace, args);
         assertTrue(output.contains("Missing flow name in empty.flow"), output);
         assertTrue(output.contains("Could not parse Mule XML file broken.xml"), output);
         var result = GraphSerializer.read(graph);
@@ -1017,14 +1036,21 @@ class SkillPackCompilerTest {
         try (var file = new java.io.RandomAccessFile(project.resolve("large.flow").toFile(), "rw")) {
             file.setLength(GraphParser.MAX_SOURCE_BYTES + 1L);
         }
-        String oversized = assertCli(1, dist, project, "graph", "generate");
+        String oversized = assertCli(1, dist, workspace, args);
         assertTrue(oversized.contains("Graph input exceeds") && oversized.contains("large.flow"), oversized);
         assertArrayEquals(saved, Files.readAllBytes(graph));
         Files.delete(project.resolve("large.flow"));
         Files.delete(dist.resolve("example/LegacyFlowParser.class"));
-        String missing = assertCli(1, dist, project, "graph", "generate", "--require-parser", "legacy-flow");
+        String missing = assertCli(1, dist, workspace, args);
         assertTrue(missing.contains("provider/legacy-flow") && missing.contains("example.LegacyFlowParser"), missing);
         assertArrayEquals(saved, Files.readAllBytes(graph));
+
+        Files.deleteIfExists(workspace.resolve(".camel-kit/project-graph.json"));
+        String doctor = assertCli(1, dist, workspace, "doctor", "--json");
+        var finding = SkillCatalog.JSON.readTree(doctor).required("findings").valueStream()
+                .filter(f -> f.path("category").asText().equals("graph")).findFirst().orElseThrow();
+        assertTrue(finding.path("message").asText().contains("provider/legacy-flow"), doctor);
+        assertTrue(finding.path("remediation").asText().contains("reinstall the Camel Kit distribution"), doctor);
     }
 
     @Test
@@ -1041,6 +1067,23 @@ class SkillPackCompilerTest {
         String missing = assertCli(1, dist, source, "graph", "generate", "--require-parser", "mule-xml");
         assertTrue(missing.contains("Required migration parser provider/mule-xml is unavailable"), missing);
         assertArrayEquals(saved, Files.readAllBytes(graph));
+    }
+
+    public static class BrokenParser extends MuleXmlFlowParser {
+        public BrokenParser() {
+            throw new IllegalStateException("missing parser metadata");
+        }
+    }
+
+    @Test
+    void constructorFailureNamesTheProviderAndCause() throws Exception {
+        String descriptor = "add: {provider/broken: {contract: 1, provider: {service: "
+                            + "org.apache.camel.kit.graph.parser.MigrationParser, implementation: "
+                            + BrokenParser.class.getName() + "}}}";
+        Path dist = distribution(pack("broken-pack", descriptor), "broken-pack");
+        String output = assertCli(1, dist, temp, "graph", "generate");
+        assertTrue(output.contains("broken-pack: provider/broken") && output.contains(BrokenParser.class.getName())
+                && output.contains("IllegalStateException: missing parser metadata"), output);
     }
 
     public static class FutureParser extends MuleXmlFlowParser {

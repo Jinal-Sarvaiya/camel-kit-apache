@@ -429,7 +429,7 @@ public class InitService {
             throws Exception {
         Path graphFile = camelKitDir.resolve("project-graph.json");
         try {
-            GraphBuildResult result = MigrationParsers.bundled(null).buildWithDiagnostics(targetDir);
+            GraphBuildResult result = MigrationParsers.newGraphBuilder().buildWithDiagnostics(targetDir);
             for (ParserDiagnostic diagnostic : result.warningDiagnostics()) {
                 reportWarning(request, warnings, "Project graph warning: " + diagnostic.summary());
             }

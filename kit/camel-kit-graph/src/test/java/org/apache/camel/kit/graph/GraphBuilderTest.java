@@ -2,8 +2,11 @@ package org.apache.camel.kit.graph;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.camel.kit.graph.model.*;
@@ -12,6 +15,8 @@ import org.apache.camel.kit.graph.parser.MuleXmlFlowParser;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -228,6 +233,101 @@ class GraphBuilderTest {
         assertEquals(List.of(), findDiagnostic(empty, "MuleXmlFlowParser").scannedFiles());
         assertTrue(empty.warningDiagnostics().isEmpty());
         assertEquals(0, empty.graph().nodeCount());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"", "XML", ".xml", "dir/xml", "dir\\xml"})
+    void rejectsInvalidExtensionsWithTheProviderId(String extension) {
+        assertInvalidExtensions(Set.of(extension));
+    }
+
+    @Test
+    void rejectsMissingExtensionsWithTheProviderId() {
+        assertInvalidExtensions(null);
+        assertInvalidExtensions(Set.of());
+        assertInvalidExtensions(Collections.singleton(null));
+    }
+
+    private void assertInvalidExtensions(Set<String> declared) {
+        var parser = new MuleXmlFlowParser() {
+            @Override
+            public Set<String> inputExtensions() {
+                return declared;
+            }
+        };
+        var error = assertThrows(IllegalArgumentException.class, () -> new GraphBuilder(Map.of("inventory", parser)));
+        assertTrue(error.getMessage().contains("provider/inventory"), error::getMessage);
+        assertTrue(error.getMessage().contains("input extensions"), error::getMessage);
+    }
+
+    @Test
+    void rejectsOneParserInstanceRegisteredUnderTwoIds() {
+        var parser = new MuleXmlFlowParser();
+        var error = assertThrows(IllegalArgumentException.class,
+                () -> new GraphBuilder(Map.of("first", parser, "second", parser)));
+        assertTrue(error.getMessage().contains("provider/first") && error.getMessage().contains("provider/second"),
+                error::getMessage);
+    }
+
+    @Test
+    void migrationTimeoutReportsOnlySelectedInputs(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("pom.xml"), "<project/>");
+        Files.writeString(root.resolve("flow.xml"), "<mule xmlns='http://www.mulesoft.org/schema/mule/core'/>");
+        var parser = new MuleXmlFlowParser() {
+            @Override
+            public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+                try {
+                    new CountDownLatch(1).await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        };
+        GraphBuildResult result = new GraphBuilder(new EmptyParser(), List.of(parser), 1, TimeUnit.SECONDS)
+                .buildWithDiagnostics(root);
+        ParserDiagnostic diagnostic = result.failedDiagnostics().getFirst();
+        assertTrue(diagnostic.timedOut());
+        assertEquals(List.of("flow.xml"), diagnostic.scannedFiles());
+    }
+
+    @Test
+    void failedContentCheckDoesNotReportCandidatesAsParsed(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("other.xml"), "<other/>");
+        var parser = new MuleXmlFlowParser() {
+            @Override
+            public boolean acceptsContent(Path file) {
+                throw new IllegalStateException("could not select inputs");
+            }
+        };
+        var result = new GraphBuilder(Map.of("inventory", parser)).buildWithDiagnostics(root);
+        ParserDiagnostic diagnostic = result.failedDiagnostics().getFirst();
+        assertEquals(List.of("could not select inputs"), diagnostic.failures());
+        assertEquals(List.of(), diagnostic.scannedFiles());
+    }
+
+    @Test
+    void differentProviderNodesWithTheSameIdWarnAndKeepCatalogOrder(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("input.xml"), "<mule xmlns='http://www.mulesoft.org/schema/mule/core'/>");
+        var builder = new GraphBuilder(Map.of("last", new NodeProvider("last"), "first", new NodeProvider("first")));
+        var result = builder.buildWithDiagnostics(root);
+        assertTrue(result.successful(), result::failureSummary);
+        assertEquals("last", result.graph().getNode("shared").properties().get("value"));
+        var warnings = result.warningDiagnostics().getFirst().warnings();
+        assertEquals(List.of("Node shared from provider/last replaces the node from provider/first"), warnings);
+    }
+
+    private static final class NodeProvider extends MuleXmlFlowParser {
+        private final String value;
+
+        private NodeProvider(String value) {
+            this.value = value;
+        }
+
+        @Override
+        public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
+            graph.addNode(new GraphNode("shared", NodeType.RESOURCE_FILE, Map.of("value", value)));
+            graph.addNode(new GraphNode("identical", NodeType.RESOURCE_FILE, Map.of()));
+        }
     }
 
     private ParserDiagnostic findDiagnostic(GraphBuildResult result, String parserName) {

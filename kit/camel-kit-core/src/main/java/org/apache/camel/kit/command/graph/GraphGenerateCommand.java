@@ -35,7 +35,7 @@ public class GraphGenerateCommand extends CliCommand {
         try {
             Path root = projectDir.toAbsolutePath().normalize();
             PrintWriter err = this.err;
-            GraphBuildResult result = MigrationParsers.bundled(requiredParser).buildWithDiagnostics(root);
+            GraphBuildResult result = MigrationParsers.newGraphBuilder(requiredParser).buildWithDiagnostics(root);
             for (ParserDiagnostic diagnostic : result.warningDiagnostics()) {
                 err.println("Warning: " + diagnostic.summary());
             }

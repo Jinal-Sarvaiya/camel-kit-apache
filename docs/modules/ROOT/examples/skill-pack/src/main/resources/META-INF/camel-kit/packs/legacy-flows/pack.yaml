@@ -1,8 +1,13 @@
 id: legacy-flows
 schema: 1
+requires: [core]
 add:
   provider/legacy-flow:
     contract: 1
     provider:
       service: org.apache.camel.kit.graph.parser.MigrationParser
       implementation: example.LegacyFlowParser
+  step/validate/report/legacy-inventory:
+    contract: 1
+    resource: inventory.md
+    requires: [provider/legacy-flow]

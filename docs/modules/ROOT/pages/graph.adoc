@@ -11,12 +11,12 @@ image::graph-visualize.png["Graph visualization of a MuleSoft project: nodes are
 [[build]]
 == How the graph is built
 
-The default distribution of `camel-kit graph generate` runs nine content parsers and two post-processors and persists the result at
-`.camel-kit/project-graph.json` (another path with `--output`; queries take `--graph-file`). `PomParser` runs first
-and synchronously, because the other parsers need the Maven artifacts for runtime detection and for the dependency
-allowlist; the eight others then run in parallel on parser-local fragments that are merged in a fixed order, so the
-result does not depend on completion timing. Parser diagnostics record the scanned files, warnings, failures,
-timeouts and produced counts.
+In the default distribution, `camel-kit graph generate` runs nine content parsers and two post-processors.
+It writes the graph to `.camel-kit/project-graph.json`. Use `--output` to choose another path and `--graph-file`
+to query that graph. `PomParser` runs first because the other parsers use its Maven artifacts for runtime
+detection and the dependency allowlist. The other eight parsers run in parallel. Kit merges their fragments
+in a fixed order so the result is independent of completion timing. Parser diagnostics record the scanned
+files, warnings, failures, timeouts and produced counts.
 
 [cols="1,2,2"]
 |===
@@ -48,7 +48,7 @@ visualize` writes an interactive page to `.camel-kit/project-graph.html`.
 == Migration parser providers
 
 The distribution catalog identifies migration parsers by `provider/<id>`. The default catalog includes
-`provider/mule-xml`. To inventory a Mule project, run these commands from its source directory.
+`provider/mule-xml`. Excluding this provider removes Mule XML parsing. DataWeave and BizTalk remain built in. To inventory a Mule project, run these commands from its source directory.
 
 [source,shell]
 ----
@@ -63,7 +63,8 @@ documents remain available. A missing provider or incompatible API produces an e
 the CLI writes a graph. A workflow that requires the parser must check that exit code before using the output.
 
 Kit loads a fresh provider instance for each CLI graph build. Migration providers merge in catalog ID order
-between the Camel XML and DataWeave fragments. The xref:contributing.adoc#migration-parser[worked parser pack]
+between the Camel XML and DataWeave fragments. If two migration providers produce different nodes with the same ID,
+the later provider replaces the earlier node and the build reports a warning naming both providers. The xref:contributing.adoc#migration-parser[worked parser pack]
 adds a file format and a private source model through the same interface.
 
 [[commands]]

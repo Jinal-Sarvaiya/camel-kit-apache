@@ -912,7 +912,7 @@ Pi executes these contracts inline and records the missing isolation. Other targ
 
 Skills are shared markdown instruction files that every supported AI target loads and follows. The equalization layer keeps these behaviors consistent:
 
-- The same six Iron Laws are enforced, with inline targets recording the absence of independent reviewer contexts
+- The same seven Iron Laws are enforced, with inline targets recording the absence of independent reviewer contexts
 - The same constitution rules are checked
 - The same MCP tools are called
 - The same output formats are produced

@@ -359,6 +359,7 @@ Read `shared/iron-laws.md` for the full Iron Laws. This phase enforces ALL six:
 - **Iron Law 4: Spec Compliance Before Quality** — ALWAYS spec review FIRST, then quality review. Never in parallel. Never reversed.
 - **Iron Law 5: Adversarial Code Review** — Critic Lanes run after implementation and before Stage 1 review. Use parallel fresh contexts when supported; otherwise run the same lenses sequentially in the current session and record that isolation is unavailable.
 - **Iron Law 6: Surgical Changes** — TOUCH ONLY WHAT YOU’RE ASKED TO TOUCH. No unrelated refactoring or "cleanups."
+- **Iron Law 7: Deliverables in Project Directory** — Write ALL deliverables (routes, config, POMs, Java files, tests, Docker Compose) into the project directory from the first edit and iterate in place. NEVER use temporary directories for application code (throwaway verification scripts may use scratch; environment probe MUST use temp per `guides/environment-probe.md`).
 
 ### Rationalization Table
 

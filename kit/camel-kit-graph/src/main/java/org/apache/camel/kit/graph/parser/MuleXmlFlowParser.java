@@ -15,7 +15,7 @@ import org.w3c.dom.*;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.*;
 
-public class MuleXmlFlowParser implements GraphParser {
+public class MuleXmlFlowParser implements MigrationParser {
 
     private static final String MULE_NS_MARKER = "mulesoft.org/schema/mule";
     private static final int SNIFF_BYTES = 1024;
@@ -43,20 +43,8 @@ public class MuleXmlFlowParser implements GraphParser {
     private final List<String> warnings = new ArrayList<>();
 
     @Override
-    public void parse(Path projectRoot, ProjectGraph graph) {
-        parseFiles(projectRoot, scannedFilePaths(projectRoot, GraphParser.projectFiles(projectRoot)), graph);
-    }
-
-    @Override
-    public List<String> scannedFiles(Path projectRoot) {
-        return GraphParser.relativeFileNames(projectRoot,
-                scannedFilePaths(projectRoot, GraphParser.projectFiles(projectRoot)));
-    }
-
-    @Override
-    public List<Path> scannedFilePaths(Path projectRoot, List<Path> projectFiles) {
-        return GraphParser.findFilePaths(projectRoot, projectFiles, this::isCandidateName).stream()
-                .filter(this::isMuleXml).toList();
+    public int apiVersion() {
+        return API_VERSION;
     }
 
     @Override
@@ -86,15 +74,19 @@ public class MuleXmlFlowParser implements GraphParser {
         warnings.clear();
     }
 
-    private boolean isCandidateName(Path file) {
-        String name = file.getFileName().toString().toLowerCase(Locale.ROOT);
-        return name.endsWith(".xml") && !name.equals("pom.xml");
+    @Override
+    public Set<String> inputExtensions() {
+        return Set.of("xml");
     }
 
     /**
      * Namespace sniff: read first 1KB and check for the MuleSoft namespace marker.
      */
-    private boolean isMuleXml(Path file) {
+    @Override
+    public boolean acceptsContent(Path file) {
+        if ("pom.xml".equalsIgnoreCase(file.getFileName().toString())) {
+            return false;
+        }
         try (InputStream is = Files.newInputStream(file, LinkOption.NOFOLLOW_LINKS)) {
             byte[] buf = new byte[SNIFF_BYTES];
             int read = is.read(buf);
@@ -113,7 +105,7 @@ public class MuleXmlFlowParser implements GraphParser {
             var factory = SecureXml.documentBuilderFactory();
             DocumentBuilder builder = factory.newDocumentBuilder();
             Document doc = builder.parse(new ByteArrayInputStream(GraphParser.readSource(xmlFile)));
-            String relPath = projectRoot.relativize(xmlFile).toString();
+            String relPath = GraphParser.relativeFileName(projectRoot, xmlFile);
             return Optional.of(new ParsedMuleDocument(relPath, elementChildren(doc.getDocumentElement())));
         } catch (Exception e) {
             warnings.add("Could not parse Mule XML file " + GraphParser.relativeFileName(projectRoot, xmlFile)

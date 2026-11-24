@@ -11,12 +11,14 @@ import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.camel.kit.graph.model.GraphNode;
 import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.graph.parser.GraphParser;
+import org.apache.camel.kit.graph.parser.MuleXmlFlowParser;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -47,6 +49,26 @@ class GraphInputBoundaryTest {
         assertFalse(result.successful());
         assertTrue(result.failureSummary().contains("Project source exceeds"));
         assertEquals(0, result.graph().nodeCount());
+    }
+
+    @Test
+    void migrationAndBuiltInSourcesShareOneBudget(@TempDir Path root) throws Exception {
+        for (int i = 0; i < 16; i++) {
+            try (var source = new java.io.RandomAccessFile(root.resolve(i + ".flow").toFile(), "rw")) {
+                source.setLength(MAX_SOURCE_BYTES);
+            }
+        }
+        Files.writeString(root.resolve("extra.properties"), "x");
+        var parser = new MuleXmlFlowParser() {
+            @Override
+            public Set<String> inputExtensions() {
+                return Set.of("flow");
+            }
+        };
+        var result = new GraphBuilder(Map.of("legacy-flow", parser)).buildWithDiagnostics(root);
+        assertEquals(1, result.diagnostics().size());
+        assertEquals("ProjectFileScanner", result.failedDiagnostics().getFirst().parserName());
+        assertTrue(result.failureSummary().contains("Project source exceeds"));
     }
 
     @Test

@@ -56,6 +56,10 @@ public interface GraphParser {
     }
 
     static List<Path> projectFiles(Path projectRoot) {
+        return projectFiles(projectRoot, Set.of());
+    }
+
+    static List<Path> projectFiles(Path projectRoot, Set<String> additionalExtensions) {
         if (!Files.exists(projectRoot)) {
             return List.of();
         }
@@ -92,7 +96,7 @@ public interface GraphParser {
                     countEntry();
                     Path path = projectRoot.resolve(realRoot.relativize(file));
                     if (attributes.isRegularFile()) {
-                        if (isSourceFile(path)) {
+                        if (isSourceFile(path) || matchesExtension(path, additionalExtensions)) {
                             sourceBytes += requireSafeFile(projectRoot, path);
                             if (sourceBytes > MAX_TOTAL_SOURCE_BYTES) {
                                 throw new IllegalArgumentException(
@@ -172,6 +176,12 @@ public interface GraphParser {
             }
             return bytes;
         }
+    }
+
+    static boolean matchesExtension(Path file, Set<String> extensions) {
+        String name = file.getFileName().toString();
+        int dot = name.lastIndexOf('.');
+        return dot >= 0 && extensions.contains(name.substring(dot + 1).toLowerCase(Locale.ROOT));
     }
 
     private static boolean isSourceFile(Path file) {

@@ -6,6 +6,10 @@
     <groupId>example</groupId>
     <artifactId>kit-with-report-review</artifactId>
     <version>1.0-SNAPSHOT</version>
+    <properties>
+        <maven.compiler.release>21</maven.compiler.release>
+        <example.packs>report-review</example.packs>
+    </properties>
     <dependencies>
         <dependency>
             <groupId>org.apache.camel</groupId>
@@ -27,7 +31,7 @@
                                 <java classname="org.apache.camel.kit.workflow.SkillPackCompiler" fork="true" resultproperty="pack.compiler.exit" errorproperty="pack.compiler.error">
                                     <classpath refid="maven.runtime.classpath"/>
                                     <arg value="${project.build.outputDirectory}/META-INF/camel-kit/catalog.zip"/>
-                                    <arg value="report-review"/>
+                                    <arg value="${example.packs}"/>
                                 </java>
                                 <fail message="${pack.compiler.error}">
                                     <condition><not><equals arg1="${pack.compiler.exit}" arg2="0"/></not></condition>

@@ -33,6 +33,7 @@ import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.ParserDiagnostic;
 import org.apache.camel.kit.util.PrerequisiteChecker;
 import org.apache.camel.kit.util.ProcessRunner;
+import org.apache.camel.kit.workflow.MigrationParsers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -1375,12 +1376,21 @@ public class DoctorService {
             return;
         }
 
+        GraphBuilder builder;
         try {
-            GraphBuildResult result = new GraphBuilder().buildWithDiagnostics(root);
+            builder = MigrationParsers.newGraphBuilder();
+        } catch (IOException | RuntimeException e) {
+            findings.add(DoctorFinding.fail("graph", relativize(root, graphFile),
+                    "Cannot load graph parsers from the Camel Kit distribution: " + e.getMessage(),
+                    "Repair or reinstall the Camel Kit distribution and run camel-kit doctor again."));
+            return;
+        }
+        try {
+            GraphBuildResult result = builder.buildWithDiagnostics(root);
             for (ParserDiagnostic diagnostic : result.warningDiagnostics()) {
                 findings.add(DoctorFinding.warn("graph", relativize(root, graphFile),
                         "Graph generation warning: " + diagnostic.summary(),
-                        "Inspect the listed source file and regenerate the graph after fixing it."));
+                        "Review the parser warning and regenerate the graph after addressing its cause."));
             }
             if (!result.successful()) {
                 findings.add(DoctorFinding.fail("graph", relativize(root, graphFile),

@@ -56,6 +56,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Migration packs can register versioned Java graph parsers. The default Mule XML parser uses this interface,
+  and `graph generate --require-parser <id>` reports an unavailable parser to the calling workflow (#197).
+  The example pack includes a validation step that runs its required parser. Graph builds warn when one migration
+  provider replaces a different node with the same ID from another provider.
+
 - Run a distribution's required workflow hooks with `camel-kit hook` or `camel kit hook`. Bundled skills and Java
   providers share a versioned result contract, including developer questions and checks bound to file revisions (#196).
 

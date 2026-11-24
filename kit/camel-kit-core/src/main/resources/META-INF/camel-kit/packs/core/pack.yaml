@@ -4,3 +4,8 @@ add:
   step/validate/report/timestamp:
     contract: 1
     resource: report-timestamp.md
+  provider/mule-xml:
+    contract: 1
+    provider:
+      service: org.apache.camel.kit.graph.parser.MigrationParser
+      implementation: org.apache.camel.kit.graph.parser.MuleXmlFlowParser

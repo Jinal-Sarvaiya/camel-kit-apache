@@ -773,7 +773,7 @@ camel-kit graph route-topology
 camel-kit graph migration-context <routeId> [--depth N]
 ```
 
-The graph is stored in `.camel-kit/project-graph.json` and rebuilt automatically when relevant commands detect changes. For greenfield projects where no code exists yet, the graph is not generated -- all skills fall back to sensible defaults. The graph **enhances but never gates**: its presence improves output quality, but its absence never blocks the pipeline.
+The graph is stored in `.camel-kit/project-graph.json` and rebuilt automatically when relevant commands detect changes. For greenfield projects where no code exists yet, the graph is not generated -- all skills fall back to sensible defaults. The standard pipeline uses the graph for optional acceleration. A migration pack that explicitly requires a parser reports an unavailable provider and leaves that step incomplete.
 
 ### Migration Context Command
 

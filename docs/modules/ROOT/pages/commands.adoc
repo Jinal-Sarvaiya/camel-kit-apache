@@ -190,6 +190,7 @@ Builds and queries the project's property graph, persisted at `.camel-kit/projec
 
 ----
 camel-kit graph generate                      # build or rebuild the graph
+camel-kit graph generate --require-parser mule-xml  # require the bundled Mule parser
 camel-kit graph stats                         # availability, node and edge counts
 camel-kit graph find --type CAMEL_ROUTE       # nodes by type, name or ID
 camel-kit graph neighbors <node-id>           # connected nodes

@@ -87,7 +87,7 @@ Guides under `skills/shared/` are loaded by several skills, so one guide serves 
 | `camel-security-checklist.md` | Camel security rules, detection patterns and fix snippets for design, validation and review
 | `mcp-setup.md` | MCP server configuration, version binding rules and fallback policy
 | `forage.md` | The infrastructure configuration ladder and the Forage catalog queries
-| `graph-availability.md` | Graph CLI detection and the "enhances, never gates" fallback
+| `graph-availability.md` | Optional graph query fallback and required migration parser failures
 | `pipeline-infrastructure.md` | Pipeline IDs, state, artifact provenance and staleness
 | `discovery-completeness.md` | Discovery and completeness semantics shared by the interview and Ship discovery
 | `datamapper-canonicalize.md` | Engine selection from schemas and field count; pre-computed XPaths for XSLT

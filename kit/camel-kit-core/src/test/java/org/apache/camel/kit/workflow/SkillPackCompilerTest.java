@@ -1084,7 +1084,7 @@ class SkillPackCompilerTest {
     }
 
     @Test
-    void twoHooksAtOnePointShareTheInvocationProtocol() throws Exception {
+    void sharedProtocolImmediatelyFollowsTheLastHookAtThePoint() throws Exception {
         String second = "step/validate/report/second";
         Path addon = pack("more", """
                 requires: [report-review]
@@ -1106,8 +1106,13 @@ class SkillPackCompilerTest {
         }
         try (var loader = loader(temp)) {
             String stage = content(SkillCatalog.load(loader), "camel-validate/SKILL.md");
-            assertTrue(stage.contains("hook --id " + COVERAGE));
-            assertTrue(stage.contains("hook --id " + second));
+            var paragraphs = List.of(stage.split("\n\n"));
+            int protocol = paragraphs.indexOf(WorkflowHook.PROTOCOL);
+            assertTrue(protocol >= 3 && protocol + 1 < paragraphs.size(), "Missing protocol or surrounding steps");
+            assertTrue(paragraphs.get(protocol - 3).contains("hook --id " + COVERAGE));
+            assertTrue(paragraphs.get(protocol - 2).startsWith(REVIEW));
+            assertTrue(paragraphs.get(protocol - 1).contains("hook --id " + second));
+            assertTrue(paragraphs.get(protocol + 1).startsWith("Use the current date and time"));
             String pathHelp = "open `request.implementation` relative to the host's installed skills directory";
             assertTrue(stage.contains(pathHelp));
             assertEquals(stage.indexOf(pathHelp), stage.lastIndexOf(pathHelp));

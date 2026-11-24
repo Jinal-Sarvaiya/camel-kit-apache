@@ -92,7 +92,7 @@ public final class SkillPackCompiler {
         Map<String, byte[]> files = new TreeMap<>();
         Map<String, SkillCatalog.Binding> bindings = new TreeMap<>();
         Map<String, List<String>> steps = new TreeMap<>();
-        var hookPoints = new TreeSet<String>();
+        Map<String, Integer> protocolPositions = new HashMap<>();
         Map<String, String> stageSkills = new HashMap<>();
         workflow.stages().forEach(stage -> stageSkills.put(stage.id(), stage.skill()));
         for (Declaration d : entries.values()) {
@@ -110,13 +110,14 @@ public final class SkillPackCompiler {
                     }
                     path = skill + "/SKILL.md";
                     String point = parts[0] + "/" + parts[1];
-                    if (d.entry().hook() != null) {
-                        hookPoints.add(point);
+                    List<String> instructions = steps.computeIfAbsent(point, unused -> new ArrayList<>());
+                    WorkflowHook hook = d.entry().hook();
+                    if (hook == null) {
+                        instructions.add(new String(resources.get(d), StandardCharsets.UTF_8).strip());
+                    } else {
+                        instructions.add(hook.instructions(d.key()));
+                        protocolPositions.put(point, instructions.size());
                     }
-                    steps.computeIfAbsent(point, unused -> new ArrayList<>())
-                            .add(d.entry().hook() == null
-                                    ? new String(resources.get(d), StandardCharsets.UTF_8).strip()
-                                    : d.entry().hook().instructions(d.key()));
                 }
                 case "provider" -> path = null;
                 default -> throw d.error("unknown contribution kind");
@@ -138,7 +139,7 @@ public final class SkillPackCompiler {
                             d.entry().handles()));
         }
         WorkflowManifest effective = composeWorkflow(workflow, entries, definitions, steps);
-        hookPoints.forEach(point -> steps.get(point).add(WorkflowHook.PROTOCOL));
+        protocolPositions.forEach((point, position) -> steps.get(point).add(position, WorkflowHook.PROTOCOL));
         bindSteps(stageSkills, files, steps, entries);
         var manifest = new SkillCatalog.Manifest(1, List.copyOf(packs.keySet()), effective, bindings);
         return archive(new SkillCatalog(manifest, files, null));

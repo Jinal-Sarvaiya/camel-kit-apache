@@ -57,7 +57,7 @@ Rules:
 
 Governance:
 - `docs/constitution.md` — 8 non-negotiable rules for every generated route.
-- `skills/shared/iron-laws.md` — 6 iron laws. Skill changes must not contradict them.
+- `skills/shared/iron-laws.md` — 7 iron laws. Skill changes must not contradict them.
 - Record every architectural decision, including rejected alternatives. Never reference
   internal architecture decision documents in public PRs/issues.
 

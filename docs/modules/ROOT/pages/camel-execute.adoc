@@ -35,10 +35,13 @@ verification commands from the shipped guides and the detected project state, ne
 Environment probe::
 Before any implementer runs, the executor generates a throwaway skeleton for the selected runtime and checks it:
 Maven dependency resolution for Spring Boot and Quarkus (reported as skipped for Camel Main), the runtime startup
-command, and Docker services only when the design needs external services and Docker is available. Mechanical
-failures are fixed and re-probed. An architectural failure, for example a component that does not exist for the
-target runtime, triggers the bounded re-plan loop: it modifies only the affected flow sections of the design, at
-most three rounds, then re-probes; a persistent failure is escalated.
+command, and Docker services only when the design needs external services and Docker is available. The probe
+skeleton is generated in a temporary directory (`mktemp -d /tmp/camel-kit-probe-XXXXXX`) and cleaned up after the
+check completes. This is the only exception to Iron Law 7: all actual deliverables (routes, configuration, tests)
+are written directly into the project directory from the first edit. Mechanical failures are fixed and re-probed.
+An architectural failure, for example a component that does not exist for the target runtime, triggers the bounded
+re-plan loop: it modifies only the affected flow sections of the design, at most three rounds, then re-probes; a
+persistent failure is escalated.
 
 Catalog research::
 Before each wave the executor deduplicates the components, EIPs, data formats and languages referenced by its tasks

@@ -283,6 +283,24 @@ class ShippedAssetStructureTest {
         }
     }
 
+    @Test
+    void generatedAgentsIncludeDeliverablesInProjectInstruction() throws Exception {
+        for (String agentName : sortedAgentNames()) {
+            InitContext ctx = createContext(agentName, tempDir.resolve("law7-" + agentName));
+            AgentGeneratorFactory.create(agentName).generate(ctx);
+
+            Path agentsMd = ctx.projectDir().resolve("AGENTS.md");
+            assertTrue(Files.exists(agentsMd),
+                    agentName + " must generate root AGENTS.md");
+
+            String content = Files.readString(agentsMd);
+            assertTrue(content.contains("Write deliverables into the project from the start and iterate in place"),
+                    agentName + " root AGENTS.md must include Iron Law 7 instruction to write deliverables in project");
+            assertTrue(content.contains("NEVER use temporary directories for routes, config, or application code"),
+                    agentName + " root AGENTS.md must prohibit temporary directories for deliverables");
+        }
+    }
+
     private static void assertGeneratedMigrationOperationsGuides(String agentName, InitContext ctx) throws Exception {
         Path analysisGuide = ctx.skillsDir().resolve("camel-migrate/guides/migration-analysis.md");
         Path retirementGuide = ctx.skillsDir().resolve("camel-migrate/guides/source-retirement-audit.md");

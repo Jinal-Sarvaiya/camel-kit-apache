@@ -162,7 +162,8 @@ class GraphSerializerTest {
     void schemaRegistrationRejectsAnotherNamespaceAndReservedNames() {
         var adapter = new MuleGraphAdapter();
         assertTrue(assertThrows(IllegalArgumentException.class,
-                () -> new GraphTypeRegistry(Map.of("other", adapter))).getMessage().contains("provider/other"));
+                () -> new GraphTypeRegistry(Map.of("other", adapter)).requireAdapter("other")).getMessage()
+                .contains("provider/other"));
         GraphTypeAdapter conflict = new GraphTypeAdapter() {
             public Map<String, NodeType> nodeTypes() {
                 return Map.of("CLASS", new NodeType("example:class"));
@@ -177,8 +178,8 @@ class GraphSerializerTest {
             }
         };
         assertTrue(assertThrows(IllegalArgumentException.class,
-                () -> new GraphTypeRegistry(Map.of("example", conflict))).getMessage()
-                .contains("already registered: CLASS"));
+                () -> new GraphTypeRegistry(Map.of("example", conflict)).requireAdapter("example")).getMessage()
+                .contains("CLASS already maps to CLASS from core"));
     }
 
     @Test

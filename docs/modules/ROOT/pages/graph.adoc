@@ -53,7 +53,7 @@ The distribution catalog identifies migration parsers by `provider/<id>`. The de
 [source,shell]
 ----
 camel-kit graph generate --require-parser mule-xml
-camel-kit graph find --type MULE_FLOW
+camel-kit graph find --type mule:flow
 ----
 
 The first command checks that the named parser is available and builds the graph with all selected parsers.
@@ -79,7 +79,7 @@ generated with that version.
 
 Common types keep their existing names, including `CAMEL_ROUTE` and `ROUTES_TO`. Migration types
 use a provider namespace, for example `mule:flow`, `mule:flow-contains` or `biztalk:orchestration`.
-The default distribution selects the `mule-graph` and `biztalk-graph` packs. Their adapters map
+The core pack supplies the Mule and BizTalk adapters in stock and custom distributions. They map
 old names in saved graphs and query filters to the same types. For example, `graph find --type MULE_FLOW`
 and `graph find --type mule:flow` return the same nodes with canonical types.
 
@@ -93,7 +93,8 @@ If the adapter is missing, the command identifies the unavailable provider and e
 A workflow that requires this analysis must leave its step incomplete. Generic commands such as
 `find`, `neighbors`, `stats` and `visualize` still work with the recorded type names. A library caller
 can read, traverse, write and reload such a graph, including its properties and relationships.
-Unmapped legacy names retain their spelling until a reader has the corresponding adapter.
+A type filter accepts registered names and types present in the loaded graph. A misspelling returns an
+error with the valid names. Unmapped legacy names retain their spelling until a reader has the corresponding adapter.
 See xref:contributing.adoc#graph-adapter[registering a graph adapter].
 
 [[commands]]

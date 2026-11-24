@@ -296,7 +296,6 @@ public class BizTalkOdxParser {
             GraphNode messageNode = new GraphNode(messageId, BizTalkGraphAdapter.MESSAGE, nodeProps);
             graph.addNode(messageNode);
 
-            // Create BIZTALK_ORCHESTRATION_CONTAINS edge
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("order", String.valueOf(order));
             GraphEdge containsEdge = new GraphEdge(
@@ -304,7 +303,6 @@ public class BizTalkOdxParser {
                     edgeProps);
             graph.addEdge(containsEdge);
 
-            // Create BIZTALK_USES_SCHEMA edge
             if (type != null) {
                 String schemaId = "biztalk-schema:" + type;
 
@@ -381,7 +379,6 @@ public class BizTalkOdxParser {
             GraphNode portNode = new GraphNode(portId, BizTalkGraphAdapter.PORT, nodeProps);
             graph.addNode(portNode);
 
-            // Create BIZTALK_ORCHESTRATION_CONTAINS edge
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("order", String.valueOf(order));
             GraphEdge containsEdge
@@ -448,14 +445,13 @@ public class BizTalkOdxParser {
             GraphNode shapeNode = new GraphNode(shapeId, BizTalkGraphAdapter.SHAPE, nodeProps);
             graph.addNode(shapeNode);
 
-            // Create BIZTALK_ORCHESTRATION_CONTAINS edge
             Map<String, String> edgeProps = new HashMap<>();
             edgeProps.put("order", String.valueOf(order));
             GraphEdge containsEdge
                     = new GraphEdge(orchId, shapeId, BizTalkGraphAdapter.ORCHESTRATION_CONTAINS, edgeProps);
             graph.addEdge(containsEdge);
 
-            // For Transform shapes, create BIZTALK_USES_MAP edge
+            // A Transform shape references the map that implements it.
             if ("Transform".equals(shapeType)) {
                 String mapClassName = properties.get("ClassName");
                 if (mapClassName != null) {

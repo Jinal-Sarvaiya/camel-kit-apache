@@ -448,7 +448,7 @@ public class InitService {
                     Files.deleteIfExists(temporary);
                 }
                 createdPaths.add(graphFile);
-                String detectedProjectType = detectProjectType(projectGraph);
+                String detectedProjectType = detectProjectType(projectGraph, request, warnings);
                 String detectedRuntime
                         = updateConfigWithRuntime(camelKitDir, projectGraph, request.distribution(), request, warnings,
                                 targetDir);
@@ -770,11 +770,22 @@ public class InitService {
         return false;
     }
 
-    private String detectProjectType(ProjectGraph graph) throws IOException {
+    private String detectProjectType(ProjectGraph graph, InitRequest request, List<InitWarning> warnings) {
         var types = new ArrayList<String>();
 
-        for (var adapter : SkillCatalog.bundled().graphTypes().adapters().values()) {
-            adapter.summarize(graph).ifPresent(types::add);
+        try {
+            var registry = SkillCatalog.bundled().graphTypes();
+            registry.unavailable().forEach((id, reason) -> reportWarning(request, warnings,
+                    "Graph summary unavailable for provider/" + id + ": " + reason));
+            registry.adapters().forEach((id, adapter) -> {
+                try {
+                    adapter.summarize(graph).ifPresent(types::add);
+                } catch (RuntimeException | LinkageError e) {
+                    reportWarning(request, warnings, "Graph summary failed for provider/" + id + ": " + e);
+                }
+            });
+        } catch (IOException e) {
+            reportWarning(request, warnings, "Could not load graph adapters: " + e);
         }
 
         if (!graph.findByType(NodeType.CAMEL_ROUTE).isEmpty()) {

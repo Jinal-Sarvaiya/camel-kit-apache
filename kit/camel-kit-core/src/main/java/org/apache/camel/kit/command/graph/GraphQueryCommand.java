@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Set;
 
 import org.apache.camel.kit.command.CliCommand;
 import org.apache.camel.kit.command.KitOptionParser;
@@ -39,15 +40,28 @@ public abstract class GraphQueryCommand extends CliCommand {
             try {
                 graph = GraphSerializer.read(graphFile, types);
             } catch (IOException e) {
-                err("Invalid graph file: " + graphFile + ". " + e.getMessage() + ". Regenerate with 'graph generate'.");
+                err("Invalid graph file: " + graphFile + ". " + errorMessage(e)
+                    + ". Regenerate with 'graph generate'.");
                 return 1;
             }
             out(execute(graph));
             return 0;
-        } catch (Exception e) {
-            err(e.getMessage());
+        } catch (Exception | LinkageError e) {
+            err(errorMessage(e));
             return 1;
         }
+    }
+
+    private static String errorMessage(Throwable error) {
+        String message = error.getMessage();
+        return message == null || message.isBlank() ? error.getClass().getName() : message;
+    }
+
+    protected static String invalidType(String kind, String value, Set<String> names) {
+        var error = GraphJsonWriter.createObject();
+        error.put("error", "Invalid " + kind + " type: " + value);
+        error.put("validTypes", String.join(", ", names));
+        return GraphJsonWriter.toJson(error);
     }
 
     protected abstract String execute(ProjectGraph graph) throws Exception;

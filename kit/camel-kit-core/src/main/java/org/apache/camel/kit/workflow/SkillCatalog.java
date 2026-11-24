@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -171,9 +172,13 @@ public final class SkillCatalog {
     }
 
     public GraphTypeRegistry graphTypes() throws IOException {
-        Map<String, GraphTypeAdapter> adapters = new TreeMap<>();
+        var bindings = providers(GraphTypeAdapter.class);
+        // Core owns its legacy aliases. Descending namespace order preserves the mixed-project init summary.
+        var order = Comparator.<String, Boolean>comparing(id -> !"core".equals(bindings.get(id).pack()))
+                .thenComparing(Comparator.reverseOrder());
+        Map<String, GraphTypeAdapter> adapters = new TreeMap<>(order);
         Map<String, String> unavailable = new TreeMap<>();
-        for (var entry : providers(GraphTypeAdapter.class).entrySet()) {
+        for (var entry : bindings.entrySet()) {
             String id = entry.getKey();
             try {
                 adapters.put(id, entry.getValue().instantiate(id, GraphTypeAdapter.class));

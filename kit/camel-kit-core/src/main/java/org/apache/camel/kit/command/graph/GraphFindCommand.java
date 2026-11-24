@@ -1,6 +1,7 @@
 package org.apache.camel.kit.command.graph;
 
 import java.util.List;
+import java.util.TreeSet;
 
 import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
@@ -23,18 +24,14 @@ public class GraphFindCommand extends GraphQueryCommand {
 
     @Override
     protected String execute(ProjectGraph graph) {
-        NodeType nodeType = null;
-        if (type != null) {
-            try {
-                nodeType = types.nodeType(type);
-            } catch (IllegalArgumentException e) {
-                ObjectNode error = GraphJsonWriter.createObject();
-                error.put("error", "Invalid node type: " + type);
-                error.put("validTypes",
-                        String.join(", ", types.nodeNames()));
-                return GraphJsonWriter.toJson(error);
+        if (type != null && !types.nodeNames().contains(type)) {
+            var names = new TreeSet<>(types.nodeNames());
+            graph.getNodes().values().forEach(node -> names.add(node.type().name()));
+            if (!names.contains(type)) {
+                return invalidType("node", type, names);
             }
         }
+        NodeType nodeType = type == null ? null : types.nodeType(type);
         GraphQuery query = new GraphQuery(graph);
         List<GraphNode> nodes = query.find(namePattern, nodeType);
         ObjectNode root = GraphJsonWriter.createObject();

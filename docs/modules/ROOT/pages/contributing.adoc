@@ -96,7 +96,7 @@ xref:skills.adoc[] for the structure and the tiers.
 Put a descriptor in `src/main/resources/META-INF/camel-kit/packs/<id>/pack.yaml`.
 Resource paths in the descriptor are relative to that directory. Pack IDs and the names of skills, stages,
 steps and providers start with a lowercase ASCII letter and continue with lowercase letters, digits or hyphens.
-List selected pack IDs in the distribution build. The compiler always includes `core`. The stock Kit build also selects `mule-graph` and `biztalk-graph`.
+List selected pack IDs in the distribution build. The compiler always includes `core`. It supplies the bundled Mule and BizTalk adapters alongside the migration guides.
 A selected module can contain only instructions and resources.
 
 The example distribution adds report guidance and a required route-coverage check to validation.
@@ -271,7 +271,7 @@ workspace=$(mktemp -d)
 The example ships `META-INF/camel-kit/catalog.zip` in its JAR. A custom distribution supplies exactly one archive
 at that path. With the standard Kit alone, the loader uses `META-INF/camel-kit/default-catalog.zip`.
 To select additional packs while building core itself, add the pack modules as build/runtime dependencies and set
-`-Dcamel.kit.packs=mule-graph,biztalk-graph,pack-a,pack-b`. This property supplies the complete selection beyond core. See xref:architecture.adoc#skill-packs[how the catalog reaches the assistant].
+`-Dcamel.kit.packs=pack-a,pack-b`. This property supplies the complete selection beyond core. See xref:architecture.adoc#skill-packs[how the catalog reaches the assistant].
 
 [[migration-parser]]
 === Contributing a migration parser
@@ -325,8 +325,11 @@ Register the public, zero-argument implementation of `GraphTypeAdapter` as a `pr
 contribution with contract 1. Its `nodeTypes()` and `edgeTypes()` map wire names to typed Java
 identifiers. Register a new type under its own name. For a legacy type, register the uppercase
 alias as the key and the canonical type as the value. Kit registers both names and rejects aliases
-that conflict with another mapping or a core type of the same kind. A pack can declare only types
-in its provider namespace. Both parts of `namespace:type` start with a lowercase ASCII letter and
+that conflict with another mapping or a core type of the same kind. Kit registers core providers
+first. A conflicting or malformed adapter becomes unavailable as a whole. An alias conflict identifies
+both providers or the reserved core type. Other adapters and generic graph queries remain available.
+During `init`, an adapter failure produces a warning. Kit still saves the graph, reports the other
+summaries and detects the runtime. A pack can declare only types in its provider namespace. Both parts of `namespace:type` start with a lowercase ASCII letter and
 may contain lowercase letters, digits and hyphens.
 
 Implement `summarize` using the pack's domain rules. Return an empty optional for a graph

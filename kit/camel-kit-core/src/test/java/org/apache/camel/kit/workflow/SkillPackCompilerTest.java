@@ -14,6 +14,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -26,6 +27,10 @@ import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 import org.apache.camel.kit.graph.GraphSerializer;
+import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.model.EdgeType;
+import org.apache.camel.kit.graph.model.GraphTypeAdapter;
+import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.graph.parser.GraphParser;
 import org.apache.camel.kit.graph.parser.MuleXmlFlowParser;
 
@@ -1091,6 +1096,77 @@ class SkillPackCompilerTest {
         String missing = assertCli(1, dist, source, "graph", "generate", "--require-parser", "mule-xml");
         assertTrue(missing.contains("Required migration parser provider/mule-xml is unavailable"), missing);
         assertArrayEquals(saved, Files.readAllBytes(graph));
+    }
+
+    public static class FailingSummary implements GraphTypeAdapter {
+        public Map<String, NodeType> nodeTypes() {
+            return Map.of();
+        }
+
+        public Map<String, EdgeType> edgeTypes() {
+            return Map.of();
+        }
+
+        public Optional<String> summarize(ProjectGraph graph) {
+            throw new IllegalStateException();
+        }
+    }
+
+    public static class ConflictingAdapter extends FailingSummary {
+        @Override
+        public Map<String, NodeType> nodeTypes() {
+            return Map.of("EXAMPLE_NODE", new NodeType("aaa:node"));
+        }
+
+        @Override
+        public Map<String, EdgeType> edgeTypes() {
+            return Map.of("MULE_CALLS_SUBFLOW", new EdgeType("aaa:calls"));
+        }
+    }
+
+    @Test
+    void customDistributionKeepsBundledAdaptersAndIsolatesRegistrationAndSummaryFailures() throws Exception {
+        String descriptor = String.format(Locale.ROOT, """
+                add:
+                  provider/aaa: {contract: 1, provider: {service: %1$s, implementation: %2$s}}
+                  provider/broken: {contract: 1, provider: {service: %1$s, implementation: %3$s}}
+                """, GraphTypeAdapter.class.getName(), ConflictingAdapter.class.getName(),
+                FailingSummary.class.getName());
+        Path dist = distribution(pack("custom", descriptor), "custom");
+        Path project = Files.createDirectory(temp.resolve("mixed-project"));
+        Files.writeString(project.resolve("mule.xml"),
+                "<mule xmlns='http://www.mulesoft.org/schema/mule/core'><flow name='orders'/></mule>");
+        Files.copy(Path.of("../camel-kit-graph/src/test/resources/testdata/biztalk/SimpleOrchestration.odx"),
+                project.resolve("orders.odx"));
+        Files.writeString(project.resolve("pom.xml"),
+                """
+                                <project><modelVersion>4.0.0</modelVersion><groupId>example</groupId><artifactId>orders</artifactId>
+                                <version>1</version><properties><camel.version>4.8.0</camel.version></properties>
+                        <dependencies><dependency><groupId>org.apache.camel.quarkus</groupId>
+                                <artifactId>camel-quarkus-core</artifactId><version>3.15.0</version></dependency></dependencies></project>
+                                """);
+        String init = assertCli(0, dist, project, "init", "--here", "--ai", "claude", "--no-fetch");
+        assertTrue(init.contains("Graph summary unavailable for provider/aaa") && init.contains("from provider/mule"),
+                init);
+        assertTrue(init.contains("Graph summary failed for provider/broken: java.lang.IllegalStateException"), init);
+        assertTrue(init.contains("MuleSoft Mule (1 flows, 0 sub-flows), Microsoft BizTalk"), init);
+        assertFalse(init.contains("Could not build project graph"), init);
+        assertTrue(
+                Files.readString(project.resolve(".camel-kit/config.properties")).contains("project.runtime=quarkus"));
+        assertTrue(SkillCatalog.JSON.readTree(assertCli(0, dist, project, "graph", "stats")).required("available")
+                .booleanValue());
+        assertEquals(1, SkillCatalog.JSON.readTree(assertCli(0, dist, project, "graph", "find", "--type", "MULE_FLOW"))
+                .required("total").intValue());
+        assertTrue(assertCli(0, dist, project, "graph", "find", "--type", "EXAMPLE_NODE")
+                .contains("Invalid node type: EXAMPLE_NODE"));
+        assertTrue(assertCli(1, dist, project, "graph", "analyze", "aaa").contains("from provider/mule"));
+        assertTrue(assertCli(1, dist, project, "graph", "analyze", "broken").contains("IllegalStateException"));
+        Path legacy = Files.writeString(project.resolve("legacy.json"),
+                "{\"version\":\"1.0\",\"nodes\":{\"flow\":{\"type\":\"MULE_FLOW\"}},\"edges\":[]}");
+        assertEquals(1, SkillCatalog.JSON.readTree(assertCli(0, dist, project, "graph", "find", "--type", "mule:flow",
+                "--graph-file", legacy.toString())).required("total").intValue());
+        assertTrue(assertCli(0, dist, project, "graph", "analyze", "mule", "--graph-file", legacy.toString())
+                .contains("MuleSoft Mule"));
     }
 
     public static class BrokenParser extends MuleXmlFlowParser {

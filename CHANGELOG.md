@@ -10,6 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Graph files now use format 1.1. CLI output such as `graph stats` reports namespaced types
+  (for example `mule:flow`). Existing 1.0 graphs and legacy filters remain readable.
+  Java callers using the former node and edge enums must recompile and use value comparisons (#198).
+  Custom distributions retain the bundled Mule and BizTalk adapters when adding other packs.
+
 - Migrate the standalone CLI and Camel JBang plugin from Picocli to Aesh (#171), retaining one-shot execution,
   ordered Ship context, validation before side effects, and machine-readable output. The plugin now requires
   the Aesh-based Camel 4.24.0 line (currently tested with 4.24.0-SNAPSHOT). Kit, its plugin, and Knowledge

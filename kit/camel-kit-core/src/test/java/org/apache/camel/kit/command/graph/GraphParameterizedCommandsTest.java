@@ -59,6 +59,29 @@ class GraphParameterizedCommandsTest {
     }
 
     @Test
+    void filterDiagnosticsIncludeOpaqueTypesPresentInThisGraph() throws Exception {
+        Files.writeString(graphFile, """
+                {"version":"1.1","nodes":{"a":{"type":"VENDOR_NODE"},"b":{"type":"vendor:item"}},
+                 "edges":[{"from":"a","to":"b","type":"vendor:contains"}]}
+                """);
+        var badNode = MAPPER.readTree(run(new GraphFindCommand(), "--type", "CAMEL_ROUT"));
+        assertEquals("Invalid node type: CAMEL_ROUT", badNode.required("error").textValue());
+        assertTrue(badNode.required("validTypes").textValue().contains("VENDOR_NODE"));
+        var badEdge = MAPPER.readTree(run(new GraphNeighborsCommand(), "a", "--edge-type", "ROUTES_TOO"));
+        assertEquals("Invalid edge type: ROUTES_TOO", badEdge.required("error").textValue());
+        assertTrue(badEdge.required("validTypes").textValue().contains("vendor:contains"));
+        for (String name : new String[]{"VENDOR_NODE", "vendor:item"}) {
+            assertEquals(1, MAPPER.readTree(run(new GraphFindCommand(), "--type", name)).required("total").intValue());
+        }
+        assertEquals(1, MAPPER.readTree(run(new GraphNeighborsCommand(), "a", "--edge-type", "vendor:contains"))
+                .required("total").intValue());
+        assertEquals(0,
+                MAPPER.readTree(run(new GraphFindCommand(), "--type", "MULE_FLOW")).required("total").intValue());
+        assertEquals(0, MAPPER.readTree(run(new GraphNeighborsCommand(), "a", "--edge-type", "ROUTES_TO"))
+                .required("total").intValue());
+    }
+
+    @Test
     void findWithPattern() throws Exception {
         JsonNode r = MAPPER.readTree(run(new GraphFindCommand(), "--type", "CAMEL_ROUTE", "--name", ".*process.*"));
         assertEquals(1, r.get("total").asInt());

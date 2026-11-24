@@ -103,7 +103,7 @@ Shared guides live at `kit/camel-kit-core/src/main/resources/skills/shared/` and
 
 | Guide | Purpose |
 |-------|---------|
-| `iron-laws.md` | Six non-negotiable pipeline process enforcement rules |
+| `iron-laws.md` | Seven non-negotiable pipeline process enforcement rules |
 | `camel-security-checklist.md` | Canonical Camel security rules and configuration snippets shared by design, validation, and review |
 | `datamapper-canonicalize.md` | Engine selection and field mapping enrichment for DataMapper |
 | `flow-test-data.md` | Test data generation patterns for flow design |
@@ -870,7 +870,7 @@ All supported targets use the shared markdown skills, with agent-specific differ
 
 The **Constitution** defines 8 route quality rules (what makes a good route): route structure, single responsibility, separation of concerns, naming conventions, observability, external configuration, component support verification, infrastructure via Forage.
 
-The **Iron Laws** define six pipeline process rules (how the pipeline operates): MCP verification, constitution compliance, no code without an approved design and task plan, spec compliance before quality, adversarial review before staged review, and surgical changes.
+The **Iron Laws** define seven pipeline process rules (how the pipeline operates): MCP verification, constitution compliance, no code without an approved design and task plan, spec compliance before quality, adversarial review before staged review, surgical changes, and deliverables in project directory.
 
 Iron Law 2 explicitly incorporates and enforces the 8 constitution rules. They are complementary, not overlapping -- the constitution says what to check, the iron laws say when and how to enforce it.
 

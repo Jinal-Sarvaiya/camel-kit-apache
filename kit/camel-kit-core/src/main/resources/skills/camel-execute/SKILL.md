@@ -349,7 +349,7 @@ After task loop completes, before final cross-cutting review:
 
 ## Iron Laws (enforced in this phase)
 
-Read `shared/iron-laws.md` for the full Iron Laws. This phase enforces ALL six:
+Read `shared/iron-laws.md` for the full Iron Laws. This phase enforces the following Iron Laws:
 
 - **Iron Law 1: MCP Catalog Verification** — every component must be verified before YAML generation. A
   `catalog-researcher` pre-verification summary satisfies this rule for the wave; otherwise implementer subagents must

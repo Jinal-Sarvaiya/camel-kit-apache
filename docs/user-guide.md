@@ -30,7 +30,7 @@ Camel-Kit is an AI-powered toolkit that guides you through designing, planning, 
 | **Design Spec** | The pipeline design contract. Describes each flow's source, processing steps, sink, error handling, data transformation, configuration, dependencies, and test criteria. |
 | **MCP** (Model Context Protocol) | Real-time catalog queries. The AI assistant queries the Camel MCP server to verify components, EIPs, data formats, and expression languages exist in your exact Camel version -- never relying on training data. |
 | **Constitution** | Eight route quality rules enforced on every generated route: route structure, single responsibility, separation of concerns, naming conventions, observability, external configuration, component support verification, and infrastructure via Forage. |
-| **Iron Laws** | Six non-negotiable pipeline rules: MCP catalog verification, constitution compliance, no code without an approved design and task plan, spec compliance before quality, adversarial review before staged review, and surgical changes. |
+| **Iron Laws** | Seven non-negotiable pipeline rules: MCP catalog verification, constitution compliance, no code without an approved design and task plan, spec compliance before quality, adversarial review before staged review, surgical changes, and deliverables in project directory. |
 
 ---
 

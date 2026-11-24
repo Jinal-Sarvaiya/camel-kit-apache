@@ -333,6 +333,7 @@ camel-kit graph <subcommand> [options]
 
 | Subcommand | Description |
 |------------|-------------|
+| `generate [--require-parser <id>]` | Rebuild the graph. A required migration parser must be available in the distribution. |
 | `stats` | Show graph statistics (node counts by type, edge counts by type) |
 | `find <query>` | Find nodes by name, type, or pattern |
 | `neighbors <nodeId>` | Show direct neighbors of a node |

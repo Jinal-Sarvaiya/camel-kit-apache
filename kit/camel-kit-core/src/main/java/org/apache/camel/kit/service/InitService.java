@@ -31,13 +31,13 @@ import org.apache.camel.kit.generator.InvalidAgentConfigurationException;
 import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.generator.QuteTemplateEngine;
 import org.apache.camel.kit.graph.GraphBuildResult;
-import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ParserDiagnostic;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.util.ConfinedPaths;
 import org.apache.camel.kit.util.TemplateUtils;
+import org.apache.camel.kit.workflow.MigrationParsers;
 
 /**
  * Initializes Camel-Kit workspaces.
@@ -429,7 +429,7 @@ public class InitService {
             throws Exception {
         Path graphFile = camelKitDir.resolve("project-graph.json");
         try {
-            GraphBuildResult result = new GraphBuilder().buildWithDiagnostics(targetDir);
+            GraphBuildResult result = MigrationParsers.bundled(null).buildWithDiagnostics(targetDir);
             for (ParserDiagnostic diagnostic : result.warningDiagnostics()) {
                 reportWarning(request, warnings, "Project graph warning: " + diagnostic.summary());
             }

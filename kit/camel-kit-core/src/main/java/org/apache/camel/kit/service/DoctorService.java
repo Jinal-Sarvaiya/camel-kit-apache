@@ -29,10 +29,10 @@ import org.apache.camel.kit.doc.FrontmatterHandler;
 import org.apache.camel.kit.generator.CatalogUpdate;
 import org.apache.camel.kit.generator.ManagedFiles;
 import org.apache.camel.kit.graph.GraphBuildResult;
-import org.apache.camel.kit.graph.GraphBuilder;
 import org.apache.camel.kit.graph.ParserDiagnostic;
 import org.apache.camel.kit.util.PrerequisiteChecker;
 import org.apache.camel.kit.util.ProcessRunner;
+import org.apache.camel.kit.workflow.MigrationParsers;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -1376,7 +1376,7 @@ public class DoctorService {
         }
 
         try {
-            GraphBuildResult result = new GraphBuilder().buildWithDiagnostics(root);
+            GraphBuildResult result = MigrationParsers.bundled(null).buildWithDiagnostics(root);
             for (ParserDiagnostic diagnostic : result.warningDiagnostics()) {
                 findings.add(DoctorFinding.warn("graph", relativize(root, graphFile),
                         "Graph generation warning: " + diagnostic.summary(),

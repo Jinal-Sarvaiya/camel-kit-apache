@@ -5,10 +5,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.*;
 
 import org.apache.camel.kit.graph.model.GraphEdge;
@@ -22,21 +26,34 @@ public class GraphBuilder {
 
     private final GraphParser pomParser;
     private final List<GraphParser> remainingParsers;
+    private final Map<GraphParser, Set<String>> migrationExtensions = new IdentityHashMap<>();
     private final long parserTimeout;
     private final TimeUnit parserTimeoutUnit;
 
     public GraphBuilder() {
-        this(new PomParser(), List.of(
-                new JavaGraphParser(),
-                new GroovyGraphParser(),
-                new XmlRouteParser(),
-                new MuleXmlFlowParser(),
-                new DataWeaveParser(),
-                new BizTalkParser(),
-                new YamlRouteParser(),
-                new ConfigParser()),
-             DEFAULT_PARSER_TIMEOUT,
-             DEFAULT_PARSER_TIMEOUT_UNIT);
+        this(Map.of("mule-xml", new MuleXmlFlowParser()));
+    }
+
+    /** Use exactly the selected migration providers, in catalog ID order at the original Mule merge position. */
+    public GraphBuilder(Map<String, ? extends MigrationParser> migrationParsers) {
+        this(new PomParser(), contentParsers(migrationParsers), DEFAULT_PARSER_TIMEOUT, DEFAULT_PARSER_TIMEOUT_UNIT);
+    }
+
+    private static List<GraphParser> contentParsers(Map<String, ? extends MigrationParser> migrationParsers) {
+        List<GraphParser> parsers = new ArrayList<>(
+                List.of(new JavaGraphParser(), new GroovyGraphParser(),
+                        new XmlRouteParser()));
+        new TreeMap<>(migrationParsers).forEach((id, parser) -> {
+            int version = parser.apiVersion();
+            if (version != MigrationParser.API_VERSION) {
+                throw new IllegalArgumentException(
+                        "Parser provider/" + id + " requires API " + version
+                                                   + ", supported: " + MigrationParser.API_VERSION);
+            }
+            parsers.add(parser);
+        });
+        parsers.addAll(List.of(new DataWeaveParser(), new BizTalkParser(), new YamlRouteParser(), new ConfigParser()));
+        return parsers;
     }
 
     GraphBuilder(
@@ -44,6 +61,20 @@ public class GraphBuilder {
                  long parserTimeout, TimeUnit parserTimeoutUnit) {
         this.pomParser = Objects.requireNonNull(pomParser, "pomParser");
         this.remainingParsers = List.copyOf(Objects.requireNonNull(remainingParsers, "remainingParsers"));
+        for (var parser : this.remainingParsers) {
+            if (parser instanceof MigrationParser migration) {
+                Set<String> extensions = Set.copyOf(migration.inputExtensions());
+                if (extensions.isEmpty() || extensions.stream().anyMatch(ext -> ext.isBlank()
+                        || !ext.matches("[^./\\\\]+") || !ext.equals(ext.toLowerCase(Locale.ROOT)))) {
+                    throw new IllegalArgumentException(
+                            "Invalid input extensions for " + parserName(parser) + ": " + extensions);
+                }
+                if (migrationExtensions.put(parser, extensions) != null) {
+                    throw new IllegalArgumentException(
+                            "Each migration provider needs its own parser instance: " + parserName(parser));
+                }
+            }
+        }
         if (parserTimeout <= 0) {
             throw new IllegalArgumentException("parserTimeout must be positive");
         }
@@ -64,7 +95,9 @@ public class GraphBuilder {
         List<ParserDiagnostic> diagnostics = new ArrayList<>();
         List<Path> projectFiles;
         try {
-            projectFiles = GraphParser.projectFiles(projectRoot);
+            Set<String> extensions = new HashSet<>();
+            migrationExtensions.values().forEach(extensions::addAll);
+            projectFiles = GraphParser.projectFiles(projectRoot, extensions);
         } catch (RuntimeException e) {
             diagnostics.add(failureDiagnostic(
                     "ProjectFileScanner",
@@ -175,15 +208,29 @@ public class GraphBuilder {
                     elapsedMillis(startedAt));
             return new ParserRun(delta, diagnostic);
         }
+        List<String> scannedFiles = task.scannedFiles();
         try {
-            ProjectGraph fragment = parser.parseFragment(projectRoot, baseGraph, task.scannedFilePaths());
+            ProjectGraph fragment;
+            if (parser instanceof MigrationParser migration) {
+                List<Path> candidates = task.scannedFilePaths();
+                GraphParser.requireSafeFiles(projectRoot, candidates);
+                List<Path> inputs = candidates.stream().filter(migration::acceptsContent).toList();
+                scannedFiles = GraphParser.relativeFileNames(projectRoot, inputs);
+                fragment = new ProjectGraph();
+                fragment.merge(baseGraph);
+                if (!inputs.isEmpty()) {
+                    migration.parseFiles(projectRoot, inputs, fragment);
+                }
+            } else {
+                fragment = parser.parseFragment(projectRoot, baseGraph, task.scannedFilePaths());
+            }
             delta = deltaFrom(fragment, baseGraph);
             if (System.nanoTime() - startedAt > parserTimeoutUnit.toNanos(parserTimeout)) {
-                return new ParserRun(new ProjectGraph(), timeoutDiagnostic(parser, task.scannedFiles()));
+                return new ParserRun(new ProjectGraph(), timeoutDiagnostic(parser, scannedFiles));
             }
             ParserDiagnostic diagnostic = diagnostic(
                     parser,
-                    task.scannedFiles(),
+                    scannedFiles,
                     List.of(),
                     collectWarnings(parser),
                     List.of(),
@@ -193,7 +240,7 @@ public class GraphBuilder {
                     elapsedMillis(startedAt));
             return new ParserRun(delta, diagnostic);
         } catch (RuntimeException e) {
-            ParserDiagnostic diagnostic = failureDiagnostic(parser, task.scannedFiles(), e, elapsedMillis(startedAt));
+            ParserDiagnostic diagnostic = failureDiagnostic(parser, scannedFiles, e, elapsedMillis(startedAt));
             return new ParserRun(delta, diagnostic);
         }
     }
@@ -229,7 +276,15 @@ public class GraphBuilder {
 
     private ParserTask parserTask(GraphParser parser, Path projectRoot, List<Path> projectFiles) {
         try {
-            List<Path> scannedFilePaths = parser.scannedFilePaths(projectRoot, projectFiles);
+            List<Path> scannedFilePaths;
+            Set<String> extensions = migrationExtensions.get(parser);
+            if (extensions != null) {
+                scannedFilePaths
+                        = projectFiles.stream().filter(file -> GraphParser.matchesExtension(file, extensions))
+                                .toList();
+            } else {
+                scannedFilePaths = parser.scannedFilePaths(projectRoot, projectFiles);
+            }
             return new ParserTask(
                     parser,
                     scannedFilePaths,

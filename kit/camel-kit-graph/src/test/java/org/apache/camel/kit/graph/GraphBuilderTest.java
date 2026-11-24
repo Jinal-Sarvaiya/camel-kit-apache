@@ -8,6 +8,7 @@ import java.util.concurrent.TimeUnit;
 
 import org.apache.camel.kit.graph.model.*;
 import org.apache.camel.kit.graph.parser.GraphParser;
+import org.apache.camel.kit.graph.parser.MuleXmlFlowParser;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -201,6 +202,32 @@ class GraphBuilderTest {
         assertTrue(diagnostic.successful());
         assertEquals(List.of("indexed.file"), diagnostic.scannedFiles());
         assertTrue(result.graph().hasNode("class:indexed.file"));
+    }
+
+    @Test
+    void migrationParserReceivesOnlyMatchingFilesAndKeepsPartialDiagnostics(@TempDir Path root) throws Exception {
+        Path src = Files.createDirectory(root.resolve("src"));
+        String mule = "<mule xmlns='http://www.mulesoft.org/schema/mule/core'>";
+        Files.writeString(src.resolve("ordinary.xml"), "<other/>");
+        Files.writeString(src.resolve("good.xml"), mule + "<flow name='orders'/></mule>");
+        Files.writeString(src.resolve("bad.xml"), mule);
+        GraphBuilder builder = new GraphBuilder(Map.of("mule-xml", new MuleXmlFlowParser()));
+        GraphBuildResult result = builder.buildWithDiagnostics(root);
+        ParserDiagnostic diagnostic = findDiagnostic(result, "MuleXmlFlowParser");
+        assertTrue(result.successful(), result::failureSummary);
+        assertEquals(List.of("src/bad.xml", "src/good.xml"), diagnostic.scannedFiles());
+        assertEquals(1, diagnostic.warnings().size());
+        assertTrue(diagnostic.warnings().getFirst().contains("src/bad.xml"));
+        assertEquals(1, diagnostic.nodesProduced());
+        assertEquals("src/good.xml", result.graph().getNode("mule-flow:orders").properties().get("file"));
+
+        Files.delete(src.resolve("bad.xml"));
+        Files.delete(src.resolve("good.xml"));
+        var empty = builder.buildWithDiagnostics(root);
+        assertTrue(empty.successful(), empty::failureSummary);
+        assertEquals(List.of(), findDiagnostic(empty, "MuleXmlFlowParser").scannedFiles());
+        assertTrue(empty.warningDiagnostics().isEmpty());
+        assertEquals(0, empty.graph().nodeCount());
     }
 
     private ParserDiagnostic findDiagnostic(GraphBuildResult result, String parserName) {

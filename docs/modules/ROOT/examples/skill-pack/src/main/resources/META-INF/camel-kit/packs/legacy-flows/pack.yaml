@@ -1,0 +1,8 @@
+id: legacy-flows
+schema: 1
+add:
+  provider/legacy-flow:
+    contract: 1
+    provider:
+      service: org.apache.camel.kit.graph.parser.MigrationParser
+      implementation: example.LegacyFlowParser

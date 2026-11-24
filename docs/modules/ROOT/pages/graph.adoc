@@ -3,15 +3,15 @@
 Camel Kit can build a property graph of an integration project: nodes for classes, routes, endpoints, beans, Maven
 artifacts and configuration properties, edges for inheritance, injection, route flow, bean references and
 configuration bindings. The graph feeds migration analysis, impact analysis, project-aware validation and
-retirement-candidate reporting. It is optional: every skill works without it, uses it when it is available, and skips
-the graph-enhanced steps silently when the CLI is unavailable. The graph enhances the agent; it never gates it.
+retirement-candidate reporting. The standard skills use it for optional acceleration and can continue with source
+inspection when it is unavailable. A migration pack can require a particular parser for one of its steps.
 
 image::graph-visualize.png["Graph visualization of a MuleSoft project: nodes are flows, connectors, Maven artifacts and configuration properties"]
 
 [[build]]
 == How the graph is built
 
-`camel-kit graph generate` runs nine content parsers and two post-processors and persists the result at
+The default distribution of `camel-kit graph generate` runs nine content parsers and two post-processors and persists the result at
 `.camel-kit/project-graph.json` (another path with `--output`; queries take `--graph-file`). `PomParser` runs first
 and synchronously, because the other parsers need the Maven artifacts for runtime detection and for the dependency
 allowlist; the eight others then run in parallel on parser-local fragments that are merged in a fixed order, so the
@@ -43,6 +43,28 @@ interface shortcuts described below; `PropertyBindingParser` then reads the prop
 `PropertyBindingSupport` syntax. Mule and BizTalk files are detected by their namespaces and extensions, so no
 configuration is needed; `init --source-platform` only hints the platform for unusual layouts. `camel-kit graph
 visualize` writes an interactive page to `.camel-kit/project-graph.html`.
+
+[[migration-parsers]]
+== Migration parser providers
+
+The distribution catalog identifies migration parsers by `provider/<id>`. The default catalog includes
+`provider/mule-xml`. To inventory a Mule project, run these commands from its source directory.
+
+[source,shell]
+----
+camel-kit graph generate --require-parser mule-xml
+camel-kit graph find --type MULE_FLOW
+----
+
+The first command checks that the named parser is available and builds the graph with all selected parsers.
+The second lists flow nodes and their source-relative `file` properties. A directory without Mule XML yields
+zero Mule flows. A malformed Mule document produces a warning naming the file while valid flows from other
+documents remain available. A missing provider or incompatible API produces an error and exit code 1 before
+the CLI writes a graph. A workflow that requires the parser must check that exit code before using the output.
+
+Kit loads a fresh provider instance for each CLI graph build. Migration providers merge in catalog ID order
+between the Camel XML and DataWeave fragments. The xref:contributing.adoc#migration-parser[worked parser pack]
+adds a file format and a private source model through the same interface.
 
 [[commands]]
 == Commands

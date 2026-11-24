@@ -547,6 +547,9 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
    is AST-only (JavaParser, no symbol solving) *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*; the Groovy parser compiles to the `CONVERSION`
    phase only *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*; YAML routes and configuration use Jackson's tree model, DataWeave and properties are
    regular-expression scans *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*. `GraphBuilder` applies a 60-second timeout to every parser, including the POM parser.
+   The distribution's compiled catalog selects trusted migration parser classes on the Kit runtime classpath.
+   A required parser ID is looked up in that catalog. Analyzed projects cannot register providers. Registered
+   file extensions count toward the shared discovery budget before content inspection and parsing.
    A timeout discards that parser's partial result. `GraphParser` refuses file links and outside-root
    inputs, bounds each source to 16 MiB, aggregate recognized source to 256 MiB, and discovery to
    100,000 visited filesystem entries. VCS and build/dependency directories named `.git`, `.svn`,

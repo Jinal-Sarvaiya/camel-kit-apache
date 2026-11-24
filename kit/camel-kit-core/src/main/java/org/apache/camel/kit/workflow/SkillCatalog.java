@@ -87,7 +87,12 @@ public final class SkillCatalog {
                 String stage = entry.getKey().split("/")[1];
                 boolean atStage = manifest.workflow().stages().stream().anyMatch(s -> s.id().equals(stage)
                         && (s.skill() + "/SKILL.md").equals(binding.path()));
-                if (!atStage || !binding.requires().contains(hook.handler())
+                if (!atStage) {
+                    throw new IOException(
+                            binding.pack() + ": " + entry.getKey() + ": expected the skill entry for stage "
+                                          + stage + ", got " + binding.path());
+                }
+                if (!binding.requires().contains(hook.handler())
                         || !hook.supports(entry.getKey(), manifest.contributions().get(hook.handler()), skills)) {
                     throw new IOException(
                             binding.pack() + ": " + entry.getKey() + ": unsupported hook handler " + hook.handler());
@@ -161,7 +166,7 @@ public final class SkillCatalog {
         if (urls.size() != 1) {
             throw new IOException("Expected one assembled Camel Kit skill catalog, found " + urls);
         }
-        try (var archive = WorkflowHookProvider.Revision.hashing(urls.getFirst().openStream());
+        try (var archive = Sha256.stream(urls.getFirst().openStream());
              var stream = new ZipInputStream(archive)) {
             Manifest manifest = null;
             Map<String, byte[]> files = new TreeMap<>();
@@ -178,7 +183,7 @@ public final class SkillCatalog {
                 throw new IOException("Missing " + MANIFEST + " in " + urls);
             }
             return new SkillCatalog(
-                    manifest, files, WorkflowHookProvider.Revision.finishDigest(archive));
+                    manifest, files, Sha256.finish(archive));
         }
     }
 }

@@ -63,7 +63,11 @@ camel-kit hook --id step/validate/report/coverage --input input.json
 * On `failed`, inspect the named checks and their observations. Correct the source or evidence and rerun.
   For a missing check, return an observation for the required ID. For a stale request, obtain a fresh request and
   repeat the check against the current files. For an unsupported target or handler, check the distribution's pack declaration.
-* Only exit code zero with `passed` satisfies this contribution. Return the outcome to the calling skill or
+* An invalid submission writes a diagnostic to standard error identifying the missing or mismatched requirement.
+  Echo every request field, including `decisions: []` on the first invocation. A missing source or artifact
+  is reported relative to the project root where the command was run.
+* `invoke-skill`, `needs-input` and `failed` return exit code 1 with their JSON status on standard output.
+  Only exit code zero with `passed` satisfies this contribution. Return the outcome to the calling skill or
   developer. The assistant decides when the ordinary stage's other requirements are also complete.
 
 The verifier checks the provider's observations for completeness and binds them to the selected files.

@@ -1,15 +1,9 @@
 package org.apache.camel.kit.workflow;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.nio.file.Path;
-import java.security.DigestInputStream;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** A bundled Java implementation of the same contract used for assistant-run skill submissions. */
 @FunctionalInterface
@@ -18,18 +12,6 @@ public interface WorkflowHookProvider {
 
     /** SHA-256 covers the exact bytes at the project-relative path. */
     record Revision(String path, String sha256) {
-        static DigestInputStream hashing(InputStream input) {
-            try {
-                return new DigestInputStream(input, MessageDigest.getInstance("SHA-256"));
-            } catch (NoSuchAlgorithmException e) {
-                throw new IllegalStateException(e);
-            }
-        }
-
-        static String finishDigest(DigestInputStream input) throws IOException {
-            input.transferTo(OutputStream.nullOutputStream());
-            return HexFormat.of().formatHex(input.getMessageDigest().digest());
-        }
     }
 
     record Decision(String question, String answer) {
@@ -45,9 +27,13 @@ public interface WorkflowHookProvider {
             String implementation, String target, Map<String, String> sources, Map<String, Revision> artifacts,
             Map<String, String> checks, List<Decision> decisions) {
         public Request {
-            sources = Map.copyOf(sources);
-            artifacts = Map.copyOf(artifacts);
-            checks = Map.copyOf(checks);
+            sources = copyFields("request.sources", sources);
+            artifacts = copyFields("request.artifacts", artifacts);
+            checks = copyFields("request.checks", checks);
+            Objects.requireNonNull(decisions, "request.decisions is required");
+            for (int i = 0; i < decisions.size(); i++) {
+                Objects.requireNonNull(decisions.get(i), "request.decisions[" + i + "] is null");
+            }
             decisions = List.copyOf(decisions);
         }
 
@@ -66,7 +52,16 @@ public interface WorkflowHookProvider {
     /** Echo the request. Use passed, failed or needs-input. Only needs-input carries a question. */
     record Result(Request request, String status, Map<String, Check> checks, String question) {
         public Result {
-            checks = checks == null ? Map.of() : Map.copyOf(checks);
+            checks = checks == null ? Map.of() : copyFields("checks", checks);
         }
+    }
+
+    private static <T> Map<String, T> copyFields(String field, Map<String, T> values) {
+        Objects.requireNonNull(values, field + " is required");
+        values.forEach((key, value) -> {
+            Objects.requireNonNull(key, field + " contains a null key");
+            Objects.requireNonNull(value, () -> field + "." + key + " is null");
+        });
+        return Map.copyOf(values);
     }
 }

@@ -97,7 +97,7 @@ metadata; Kit configures it for each harness, and it also serves MCP clients tha
 
   | Family | Representative entry points | Touches outside the process? | In this model? |
   | --- | --- | --- | --- |
-  | **A. Workspace CLI** — `init`, `doctor`, `doc`, `nextId`, `plan analyze`, `graph *` (`camel-kit-core` commands, services, generators, catalog downloaders; `camel-kit-main` JBang launcher; `camel-jbang-plugin-kit`) | Aesh commands | Writes the target workspace; reads `~/.camel-kit/config.properties`; `init` downloads catalogs over HTTPS unless `--no-fetch`; prerequisite probes spawn `java`, `jbang`, `camel` (including `camel test --help`) and `mvn` when no wrapper exists; see §4.5 | **In** |
+  | **A. Workspace CLI** — `init`, `doctor`, `doc`, `nextId`, `plan analyze`, `hook`, `graph *` (`camel-kit-core` commands, services, generators, catalog downloaders; `camel-kit-main` JBang launcher; `camel-jbang-plugin-kit`) | Aesh commands | Writes the target workspace; reads `~/.camel-kit/config.properties`; `init` downloads catalogs over HTTPS unless `--no-fetch`; prerequisite probes spawn `java`, `jbang`, `camel` (including `camel test --help`) and `mvn` when no wrapper exists; see §4.5 | **In** |
   | **B. Graph analysis** (`camel-kit-graph`: Pom, Java, Groovy, XML route, Mule XML, DataWeave, BizTalk, YAML route, Config parsers plus the cross-linker and property-binding post-processors) | `camel-kit graph …`; `init --here` auto-analysis | Reads the analysed tree; writes `.camel-kit/project-graph.json`; no network, no child process *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))* | **In** — the analysed tree is untrusted input |
   | **C. Skills, templates, traits, agent registry, workflow manifest and assembled skill catalog** (`kit/camel-kit-core/src/main/resources/{skills,templates,agents,workflow,META-INF/camel-kit/packs}` and the packaged `META-INF/camel-kit/*catalog.zip`) | installed by `init` into the workspace | Nothing by itself; the harness executes the instructions with its own permissions; generated MCP configs make the harness launch MCP servers through `jbang` at pinned coordinates | **In** as shipped instructions and generated configuration; the harness and the model are out (§4.3) |
   | **D. Ship controller** (Technology Preview; `camel-kit-core` `ship/**`, `command/ship`) | `camel-kit ship`, `/camel-ship` delegates | Spawns `pi`/`node` (Pi backend), `/usr/bin/setsid`, `/bin/kill`, its own `java`; writes `.camel-kit/ship/state` or `$CAMEL_KIT_SHIP_STATE_HOME`; publishes into the live project; HTTPS to Maven Central through family E | **In** |
@@ -192,7 +192,7 @@ trusted")*.
 4. **Shipped skills + loaded context → harness/model → generated artifacts.** Skills are the only instruction
    source besides the user *(documented — `context-authority.md`, "Instruction Authority")*. Everything the model
    produces is untrusted input to any deterministic consumer: `doc check` frontmatter, `plan analyze` task metadata,
-   Ship worker results.
+   workflow hook submissions and pending results, and Ship worker results.
 5. **Ship: controller ↔ worker ↔ evidence ↔ publication.** The controller "is the only component that writes Ship run
    state and commits stage transitions" *(documented — `docs/commands.md`)*. Workers run in a controller-owned
    staging workspace; "the request working directory is the child process cwd, not a filesystem sandbox. The
@@ -399,6 +399,17 @@ on the build classpath. The compiler checks provider types without initializing 
 content from the bundled catalog and applies the existing generated-path checks. Pack descriptors in the project
 being initialized do not participate in selection. See the [pack contract](modules/ROOT/pages/contributing.adoc#skill-packs).
 
+At runtime, `camel-kit hook` resolves the step and handler from that same bundled catalog. The assistant
+invokes a bundled skill in its host. For a Java handler, Kit constructs the distribution-selected provider
+and calls it in the CLI JVM with the operator's permissions. Trusting that distribution includes trusting
+its provider code and the helpers it chooses to run.
+
+The caller owns the source scope, target, evidence paths and confirmed answers. Kit reads the submitted
+and pending JSON as data. It checks the echoed binding and decisions against the caller's request,
+hashes the named project files, and requires an observation for each declared check before accepting a pass.
+The provider is responsible for the substance of the observations. On re-entry, earlier decisions come from
+the last verified pending result, which the caller must keep intact. The assistant controls stage completion.
+
 The knobs that move the security envelope:
 
 | Knob | Default | Effect on the model | Maintainer stance |
@@ -443,6 +454,7 @@ Per-entry-point trust table. "Caller" is the developer unless stated otherwise.
 | `camel-kit graph …` output, `.camel-kit/project-graph.json` | graph JSON consumed by skills | derived from the tree | Treat as data in prompts *(documented — umbrella "Reading route sources")* |
 | `camel-kit doc check/stale/unstale <file>` | YAML frontmatter of pipeline artifacts | model-authored → **yes** | Legacy frontmatter flags parsed as data by `FrontmatterHandler` (Jackson YAML); no separate byte quota is claimed for these legacy commands |
 | `camel-kit doc snapshot/record`, `doc check --project` | source tree, JSON snapshot/receipt and documentation review | tree/model-authored → **yes** | `DocumentationEvidence` resolves the selected project root (including an alias), confines reads and receipt writes to it, and rejects descendant symlinks, traversal and Git internals; hashes regular files only. Source limits: 10,000 entries, 64 MiB/file, 512 MiB total; snapshot/report/document inputs to `record`: 1 MiB each; receipts: 2 MiB to fit the embedded snapshot and review fields. Count and byte limits apply together. Duplicate/trailing JSON and scalar coercion are rejected. No source execution or network access. Hashes bind review inputs; they do not prove coverage, approval or semantic correctness. |
+| `camel-kit hook` | caller input JSON, skill result, saved pending result, source and artifact files | model or analysed tree → **yes** | Check binding, revisions, required checks and decision history (§4.5a). Only the bundled catalog selects executable code. |
 | `camel-kit plan analyze` | `implementation-plan.md` task metadata | model-authored → **yes** | Parsed as data by `PlanAnalyzer`; no project execution |
 | `camel-kit nextId <slug>` | slug → `docs/camel-kit/NNN-slug/` | no — operator | — |
 | `camel-kit ship --text`, `--document PATH` | context for the model | supplied by the developer; **content is loaded context** for the model | Do not pass secrets; third-party documents can carry instruction-like text (§4.3, §4.10) |

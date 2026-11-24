@@ -92,6 +92,7 @@ public final class SkillPackCompiler {
         Map<String, byte[]> files = new TreeMap<>();
         Map<String, SkillCatalog.Binding> bindings = new TreeMap<>();
         Map<String, List<String>> steps = new TreeMap<>();
+        var hookPoints = new TreeSet<String>();
         Map<String, String> stageSkills = new HashMap<>();
         workflow.stages().forEach(stage -> stageSkills.put(stage.id(), stage.skill()));
         for (Declaration d : entries.values()) {
@@ -108,13 +109,24 @@ public final class SkillPackCompiler {
                         throw d.error("unknown workflow stage " + parts[0]);
                     }
                     path = skill + "/SKILL.md";
-                    steps.computeIfAbsent(parts[0] + "/" + parts[1], unused -> new ArrayList<>())
+                    String point = parts[0] + "/" + parts[1];
+                    if (d.entry().hook() != null) {
+                        hookPoints.add(point);
+                    }
+                    steps.computeIfAbsent(point, unused -> new ArrayList<>())
                             .add(d.entry().hook() == null
                                     ? new String(resources.get(d), StandardCharsets.UTF_8).strip()
                                     : d.entry().hook().instructions(d.key()));
                 }
                 case "provider" -> path = null;
                 default -> throw d.error("unknown contribution kind");
+            }
+            for (String handle : d.entry().handles()) {
+                // An explicit exclusion removes the invocation but leaves its handler available.
+                Declaration handled = entries.getOrDefault(handle, definitions.get(handle));
+                if (handled == null || handled.entry().hook() == null) {
+                    throw d.error("handles references an undeclared hook: " + handle);
+                }
             }
             List<String> requires = requirements(d, path, definitions);
             for (String key : requires) {
@@ -126,6 +138,7 @@ public final class SkillPackCompiler {
                             d.entry().handles()));
         }
         WorkflowManifest effective = composeWorkflow(workflow, entries, definitions, steps);
+        hookPoints.forEach(point -> steps.get(point).add(WorkflowHook.PROTOCOL));
         bindSteps(stageSkills, files, steps, entries);
         var manifest = new SkillCatalog.Manifest(1, List.copyOf(packs.keySet()), effective, bindings);
         return archive(new SkillCatalog(manifest, files, null));
@@ -275,7 +288,7 @@ public final class SkillPackCompiler {
             }
             boolean file = d.key().startsWith("resource/") && SkillCatalog.safePath(d.key())
                     && d.key().substring("resource/".length()).contains("/") && !d.key().endsWith("/SKILL.md");
-            if (!file && !d.key().matches("skill/" + id) && !d.key().matches("step/" + id + "/" + id + "/" + id)) {
+            if (!file && !d.key().matches("skill/" + id) && !d.key().matches(WorkflowHook.STEP)) {
                 throw d.error("invalid contribution identifier");
             }
             if (d.key().equals("skill/shared")) {

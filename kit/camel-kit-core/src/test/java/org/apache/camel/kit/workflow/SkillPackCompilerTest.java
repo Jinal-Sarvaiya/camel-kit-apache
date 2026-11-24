@@ -31,6 +31,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.ValueSource;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -1037,8 +1038,13 @@ class SkillPackCompilerTest {
     }
 
     @ParameterizedTest
-    @ValueSource(strings = {"resource/shared/guide.md", "skill/camel-migrate", "skill/missing", "provider/list"})
-    void buildRejectsUnsupportedHookHandlers(String handler) throws Exception {
+    @CsvSource({
+            "resource/shared/guide.md, expected a named step and a skill/<id> or provider/<id> handler",
+            "skill/camel-migrate, unsupported hook handler",
+            "skill/missing, requires missing contribution",
+            "provider/list, unsupported hook handler"
+    })
+    void buildRejectsUnsupportedHookHandlers(String handler, String reason) throws Exception {
         Path pack = pack("bad", String.format(Locale.ROOT, """
                 add:
                   provider/list:
@@ -1051,8 +1057,80 @@ class SkillPackCompilerTest {
         try (var loader = loader(pack)) {
             var error = assertThrows(IOException.class, () -> SkillPackCompiler.compile(loader, List.of("bad")));
             assertTrue(error.getMessage().contains("step/validate/report/check"), error::getMessage);
-            assertTrue(error.getMessage().contains(handler) || error.getMessage().contains("handler"),
-                    error::getMessage);
+            assertTrue(error.getMessage().contains(reason), error::getMessage);
+            assertTrue(error.getMessage().contains(handler), error::getMessage);
+        }
+    }
+
+    @Test
+    void exclusionRemovesTheHookAndItsInstructionsButKeepsTheHandler() throws Exception {
+        Path example = Path.of("../../docs/modules/ROOT/examples/skill-pack/src/main/resources");
+        Path overlay = pack("overlay", "requires: [report-review]\nexclude: [" + COVERAGE + "]");
+        Path archive = temp.resolve(SkillCatalog.DISTRIBUTION);
+        Files.createDirectories(archive.getParent());
+        try (var loader = loader(example, overlay)) {
+            Files.write(archive, SkillPackCompiler.compile(loader, List.of("report-review", "overlay")));
+        }
+        try (var loader = loader(temp)) {
+            var catalog = SkillCatalog.load(loader);
+            var entries = catalog.manifest().contributions();
+            assertFalse(entries.containsKey(COVERAGE));
+            assertEquals(List.of(COVERAGE), entries.get("skill/camel-review-coverage").handles());
+            String instructions = content(catalog, "camel-validate/SKILL.md");
+            assertFalse(instructions.contains(COVERAGE));
+            assertFalse(instructions.contains(WorkflowHook.PROTOCOL));
+            assertTrue(instructions.contains(REVIEW));
+        }
+    }
+
+    @Test
+    void twoHooksAtOnePointShareTheInvocationProtocol() throws Exception {
+        String second = "step/validate/report/second";
+        Path addon = pack("more", """
+                requires: [report-review]
+                add:
+                  skill/camel-inspect:
+                    contract: 1
+                    resource: inspect.md
+                    handles: [step/validate/report/second]
+                  step/validate/report/second:
+                    contract: 1
+                    hook: {handler: skill/camel-inspect, targets: [quarkus], checks: {smoke: report}}
+                """);
+        write("more", "inspect.md", SKILL);
+        Path example = Path.of("../../docs/modules/ROOT/examples/skill-pack/src/main/resources");
+        Path archive = temp.resolve(SkillCatalog.DISTRIBUTION);
+        Files.createDirectories(archive.getParent());
+        try (var loader = loader(example, addon)) {
+            Files.write(archive, SkillPackCompiler.compile(loader, List.of("report-review", "more")));
+        }
+        try (var loader = loader(temp)) {
+            String stage = content(SkillCatalog.load(loader), "camel-validate/SKILL.md");
+            assertTrue(stage.contains("hook --id " + COVERAGE));
+            assertTrue(stage.contains("hook --id " + second));
+            String pathHelp = "open `request.implementation` relative to the host's installed skills directory";
+            assertTrue(stage.contains(pathHelp));
+            assertEquals(stage.indexOf(pathHelp), stage.lastIndexOf(pathHelp));
+        }
+    }
+
+    @ParameterizedTest
+    @CsvSource(delimiter = '|', value = {
+            "skill/camel-inspect | step/validate/report/missing | undeclared hook",
+            "skill/camel-inspect | step/validate/report/coverage, step/validate/report/coverage | invalid handles",
+            "skill/camel-inspect | invalid | undeclared hook",
+            "resource/shared/extra.md | step/validate/report/coverage | invalid handles"
+    })
+    void rejectsInvalidHandlerDeclarations(String owner, String handles, String reason) throws Exception {
+        Path example = Path.of("../../docs/modules/ROOT/examples/skill-pack/src/main/resources");
+        Path extra = pack("extra", "add: {" + owner + ": {contract: 1, resource: extra.md, handles: ["
+                                   + handles + "]}}");
+        write("extra", "extra.md", SKILL);
+        try (var loader = loader(example, extra)) {
+            var error = assertThrows(IOException.class,
+                    () -> SkillPackCompiler.compile(loader, List.of("extra", "report-review")));
+            assertTrue(error.getMessage().contains(owner), error::getMessage);
+            assertTrue(error.getMessage().contains(reason), error::getMessage);
         }
     }
 

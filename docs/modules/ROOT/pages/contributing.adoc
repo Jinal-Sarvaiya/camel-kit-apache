@@ -113,6 +113,18 @@ include::example$skill-pack/src/main/resources/META-INF/camel-kit/packs/report-r
 include::example$skill-pack/src/main/resources/META-INF/camel-kit/packs/report-review/review.md[]
 ----
 
+.coverage.md
+[source,markdown]
+----
+include::example$skill-pack/src/main/resources/META-INF/camel-kit/packs/report-review/coverage.md[]
+----
+
+.coverage.py
+[source,python]
+----
+include::example$skill-pack/src/main/resources/META-INF/camel-kit/packs/report-review/coverage.py[]
+----
+
 === Composition rules
 
 * `schema: 1` versions the pack descriptor. Each added or replaced entry declares `contract: 1` for its
@@ -189,8 +201,11 @@ A step declares either a guidance resource or a `hook`. Its `handler` selects on
 `provider/<id>`. The handler advertises that step ID in its own `handles` list. The compiler checks the match and records the dependency. List supported target IDs in `targets` and map each
 mandatory check ID to an evidence artifact role in `checks`. Use the same lowercase ID syntax as pack IDs.
 A replacement can switch the implementation while preserving the targets and checks.
+An explicit `exclude` of the step removes both the hook and its invocation from that distribution.
+The handler remains available for other hooks. Each ID in `handles` must name a hook declared by the
+selected packs, including hooks explicitly excluded during composition.
 
-The caller supplies workspace-relative file paths with `/` separators. Each source and evidence path must refer
+The caller supplies project-relative file paths with `/` separators. Each source and evidence path must refer
 to a regular file within the project through directories without symbolic links. Artifact keys must match the
 declared roles exactly. The CLI prepares a version 1 request containing the step and handler identities, their
 owning packs, the assembled catalog SHA-256, the skill entry or Java class, target, source paths and SHA-256 digests, artifact paths and SHA-256

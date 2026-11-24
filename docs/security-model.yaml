@@ -57,7 +57,7 @@ component_families:
   - id: A
     name: Kit workspace CLI (Aesh)
     paths: ["kit/camel-kit-core (command, service, generator, catalog, config)", kit/camel-kit-main, kit/camel-jbang-plugin-kit]
-    entry_points: [init, doctor, doc, nextId, plan analyze, graph]
+    entry_points: [init, doctor, doc, nextId, plan analyze, hook, graph]
     in_model: true
     reachability: Reachable from a non-operator input (analysed tree via init --here, downloaded catalog content, model-authored pipeline artifact, another local account).
   - id: B
@@ -71,6 +71,7 @@ component_families:
     paths: [kit/camel-kit-core/src/main/resources/skills, kit/camel-kit-core/src/main/resources/templates, kit/camel-kit-core/src/main/resources/agents, kit/camel-kit-core/src/main/resources/workflow, kit/camel-kit-core/src/main/resources/META-INF/camel-kit/packs]
     in_model: true
     build_inputs: Distribution-selected pack modules. Provider types are checked without initialization. Init consumes the bundled catalog and uses its existing generated-path checks.
+    hook_dispatch: The assistant invokes the bundled skill in its host. Kit constructs a distribution-selected Java provider in the CLI JVM with the operator's permissions. The provider controls helper calls and is responsible for its observations.
     reachability: Only when a shipped instruction or generated artifact itself crosses a boundary it documents holding (allow-list, worker tool list, hook or guard, MCP coordinate or repository). The model disobeying an instruction is not a finding.
   - id: D
     name: Ship controller (Technology Preview)
@@ -145,6 +146,14 @@ entry_points:
     input: source inventory, JSON snapshot/receipt, document and review report
     attacker_controllable: true
     caller_must_enforce: Project-contained regular files under the resolved root (root aliases allowed); reject descendant symlinks, traversal, Git internals, duplicate/trailing JSON and scalar coercion; simultaneous source limits 10000 entries, 64 MiB/file, 512 MiB total; snapshot/report/document inputs to record 1 MiB each; receipts 2 MiB to fit the embedded snapshot and review fields. No source execution or network. Review scope and conclusions remain the reviewer's responsibility.
+  - entry: camel-kit hook
+    input: Caller-owned scope, target, evidence paths and confirmed answer, skill result and saved pending JSON, source and artifact contents.
+    attacker_controllable: true
+    server_enforces:
+      - Resolve the handler from the bundled catalog.
+      - Match the echoed binding, decisions and current file digests.
+      - Require a passing observation for each declared check before accepting a pass.
+    caller_must_enforce: Trust the distribution and its provider code, select the complete source scope, keep the last verified pending result intact, confirm developer answers and decide stage completion.
   - entry: camel-kit plan analyze
     input: implementation-plan.md task metadata (model-authored)
     attacker_controllable: true

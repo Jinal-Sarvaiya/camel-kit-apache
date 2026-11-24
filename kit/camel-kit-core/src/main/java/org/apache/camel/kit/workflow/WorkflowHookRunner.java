@@ -3,9 +3,11 @@ package org.apache.camel.kit.workflow;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.LinkOption;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -20,8 +22,10 @@ import org.apache.camel.kit.workflow.WorkflowHookProvider.Revision;
 import com.fasterxml.jackson.core.StreamReadFeature;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.MapperFeature;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.databind.cfg.CoercionAction;
 import com.fasterxml.jackson.databind.cfg.CoercionInputShape;
+import com.fasterxml.jackson.databind.exc.ValueInstantiationException;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.databind.type.LogicalType;
@@ -30,6 +34,7 @@ import com.fasterxml.jackson.databind.type.LogicalType;
 public final class WorkflowHookRunner {
     private static final JsonMapper JSON = JsonMapper.builder()
             .enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
+            .enable(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)
             .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
             .disable(MapperFeature.ALLOW_COERCION_OF_SCALARS)
             .disable(DeserializationFeature.ACCEPT_FLOAT_AS_INT)
@@ -143,14 +148,14 @@ public final class WorkflowHookRunner {
                     "expected artifact roles " + roles + ", received "
                                   + (input.artifacts() == null ? "none" : input.artifacts().keySet()));
         }
-        Map<String, String> sources = new TreeMap<>();
+        Map<String, String> sources = new HashMap<>();
         for (String source : input.sources()) {
             Revision revision = revision("source", source);
             if (sources.put(source, revision.sha256()) != null) {
                 throw new IOException("Duplicate source path: " + source);
             }
         }
-        Map<String, Revision> artifacts = new TreeMap<>();
+        Map<String, Revision> artifacts = new HashMap<>();
         for (var artifact : input.artifacts().entrySet()) {
             artifacts.put(artifact.getKey(), revision(artifact.getKey(), artifact.getValue()));
         }
@@ -189,11 +194,16 @@ public final class WorkflowHookRunner {
             throw new IOException(role + ": expected a project-relative file path, got " + name);
         }
         Path path = project.resolve(name);
+        if (Files.notExists(path, LinkOption.NOFOLLOW_LINKS)) {
+            throw new IOException(
+                    role + ": file not found: " + name + " (project root: " + project
+                                  + "; run the hook from the project root)");
+        }
         if (!Files.isRegularFile(path, LinkOption.NOFOLLOW_LINKS) || !path.equals(path.toRealPath())) {
             throw new IOException(role + ": expected a regular project file without symlinks: " + name);
         }
-        try (var stream = Revision.hashing(Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS))) {
-            return new Revision(name, Revision.finishDigest(stream));
+        try (var stream = Sha256.stream(Files.newInputStream(path, LinkOption.NOFOLLOW_LINKS))) {
+            return new Revision(name, Sha256.finish(stream));
         }
     }
 
@@ -204,6 +214,11 @@ public final class WorkflowHookRunner {
                 throw new IOException("expected a JSON object");
             }
             return value;
+        } catch (ValueInstantiationException e) {
+            Throwable cause = e.getCause();
+            throw new IOException(file + ": " + (cause == null ? e.getOriginalMessage() : cause.getMessage()), e);
+        } catch (NoSuchFileException e) {
+            throw new IOException("File not found: " + file, e);
         } catch (IOException e) {
             throw new IOException(file + ": " + e.getMessage(), e);
         }

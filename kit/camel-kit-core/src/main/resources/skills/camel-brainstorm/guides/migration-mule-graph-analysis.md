@@ -1,6 +1,6 @@
 # MuleSoft Migration Graph Analysis Guide
 
-> **Context:** Loaded by `migration-discovery.md` when `.camel-kit/project-graph.json` exists and contains `MULE_FLOW` nodes.
+> **Context:** Loaded by `migration-discovery.md` when `.camel-kit/project-graph.json` exists and contains `mule:flow` nodes.
 > **Purpose:** Accelerate MuleSoft migration analysis with provisional graph evidence that is reconciled against source.
 > **Output:** `.camel-kit/project-snapshot.md` + source-reconciled analysis summary for user confirmation.
 
@@ -38,7 +38,7 @@ Run the argv array:
 [*COMMAND_PREFIX_ARGV, "graph", "stats", "--graph-file", GRAPH_FILE]
 ```
 
-This returns JSON with the project's structural summary. For a MuleSoft project, expect node types like `MULE_FLOW`, `MULE_SUB_FLOW`, `MULE_ENDPOINT`, `MULE_CONNECTOR`, `MULE_PROCESSOR`, `MULE_TRANSFORM`, `MULE_ERROR_HANDLER`, and `DATAWEAVE_SCRIPT`.
+This returns JSON with the project's structural summary. For a MuleSoft project, expect node types like `mule:flow`, `mule:sub-flow`, `mule:endpoint`, `mule:connector`, `mule:processor`, `mule:transform`, `mule:error-handler`, and `mule:dataweave-script`.
 
 Record:
 - Total node and edge counts
@@ -75,12 +75,12 @@ Extract Mule version from `mule-core` or Mule BOM artifact.
 
 Run the argv array to list all flows:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "MULE_FLOW", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "mule:flow", "--graph-file", GRAPH_FILE]
 ```
 
 Run the argv array to list all sub-flows:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "MULE_SUB_FLOW", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "mule:sub-flow", "--graph-file", GRAPH_FILE]
 ```
 
 Separately scan the selected Mule XML boundary for every `<flow>` and `<sub-flow>` definition. Record parse failures,
@@ -89,13 +89,13 @@ These are coverage facts, not empty results.
 
 For each flow, bind its returned full node ID to `FLOW_NODE_ID` and query its children:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", FLOW_NODE_ID, "--direction", "out", "--edge-type", "MULE_FLOW_CONTAINS", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", FLOW_NODE_ID, "--direction", "out", "--edge-type", "mule:flow-contains", "--graph-file", GRAPH_FILE]
 ```
 
 For each flow, list after source reconciliation:
 - Parsed message source, if present (listener, connector source, scheduler, or poller); do not infer a source solely from
-  the first `MULE_ENDPOINT` graph child
-- Sink endpoints (subsequent `MULE_ENDPOINT` children — requests/publishers)
+  the first `mule:endpoint` graph child
+- Sink endpoints (subsequent `mule:endpoint` children — requests/publishers)
 - Processors in order (by edge `order` property)
 - Transforms (DataWeave)
 - Error handlers
@@ -108,20 +108,20 @@ Build the **Component Inventory**: extract all unique endpoint element types (e.
 
 Query both flow and sub-flow nodes:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "MULE_FLOW", "--graph-file", GRAPH_FILE]
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "MULE_SUB_FLOW", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "mule:flow", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "mule:sub-flow", "--graph-file", GRAPH_FILE]
 ```
 
 For each flow, bind its returned full node ID to `FLOW_NODE_ID` and query both callees and callers:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", FLOW_NODE_ID, "--direction", "out", "--edge-type", "MULE_CALLS_SUBFLOW", "--graph-file", GRAPH_FILE]
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", FLOW_NODE_ID, "--direction", "in", "--edge-type", "MULE_CALLS_SUBFLOW", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", FLOW_NODE_ID, "--direction", "out", "--edge-type", "mule:calls-subflow", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", FLOW_NODE_ID, "--direction", "in", "--edge-type", "mule:calls-subflow", "--graph-file", GRAPH_FILE]
 ```
 
 For each sub-flow, bind its returned full node ID to `SUB_FLOW_NODE_ID` and query both callees and callers:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", SUB_FLOW_NODE_ID, "--direction", "out", "--edge-type", "MULE_CALLS_SUBFLOW", "--graph-file", GRAPH_FILE]
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", SUB_FLOW_NODE_ID, "--direction", "in", "--edge-type", "MULE_CALLS_SUBFLOW", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", SUB_FLOW_NODE_ID, "--direction", "out", "--edge-type", "mule:calls-subflow", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", SUB_FLOW_NODE_ID, "--direction", "in", "--edge-type", "mule:calls-subflow", "--graph-file", GRAPH_FILE]
 ```
 
 Build provisional caller-to-target and target-to-caller maps. A node with no returned caller is only a graph coverage
@@ -145,12 +145,12 @@ those constant references. Reconcile every source reference with the graph maps:
 
 Run the argv array:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "MULE_CONNECTOR", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "mule:connector", "--graph-file", GRAPH_FILE]
 ```
 
 For each connector, bind its returned full node ID to `CONNECTOR_NODE_ID` and find which endpoints reference it:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", CONNECTOR_NODE_ID, "--direction", "in", "--edge-type", "MULE_USES_CONNECTOR", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", CONNECTOR_NODE_ID, "--direction", "in", "--edge-type", "mule:uses-connector", "--graph-file", GRAPH_FILE]
 ```
 
 Record connector names, types, and which endpoints use each connector. This identifies shared configuration (e.g., a single HTTP listener config used by multiple flows).
@@ -161,17 +161,17 @@ Record connector names, types, and which endpoints use each connector. This iden
 
 Run the argv array:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "MULE_TRANSFORM", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "mule:transform", "--graph-file", GRAPH_FILE]
 ```
 
 For each transform, bind its returned full node ID to `TRANSFORM_NODE_ID` and check for external DWL references:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "neighbors", TRANSFORM_NODE_ID, "--direction", "out", "--edge-type", "MULE_REFERENCES_DWL", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "neighbors", TRANSFORM_NODE_ID, "--direction", "out", "--edge-type", "mule:references-dwl", "--graph-file", GRAPH_FILE]
 ```
 
 List all DataWeave scripts:
 ```text
-[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "DATAWEAVE_SCRIPT", "--graph-file", GRAPH_FILE]
+[*COMMAND_PREFIX_ARGV, "graph", "find", "--type", "mule:dataweave-script", "--graph-file", GRAPH_FILE]
 ```
 
 Record:
@@ -223,7 +223,7 @@ recorded by the downstream source-retirement audit.
 **Structural warnings:**
 - **Graph-unreferenced definitions:** Flows or sub-flows with no graph-returned caller. Classify as `Unknown` until a
   complete bounded source closure supports a stronger classification.
-- **Potential missing connectors:** An endpoint has a constant `config-ref` but no matching `MULE_CONNECTOR` graph node.
+- **Potential missing connectors:** An endpoint has a constant `config-ref` but no matching `mule:connector` graph node.
   Reconcile bounded source and shared/domain configuration; classify `Broken reference` only after complete confirmed
   target-resolution closure, otherwise `Unknown`.
 - **Unresolved flow-refs:** Constant source `flow-ref` targets confirmed absent after complete target-resolution closure

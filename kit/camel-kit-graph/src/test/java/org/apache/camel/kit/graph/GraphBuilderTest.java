@@ -54,7 +54,7 @@ class GraphBuilderTest {
     void crossLinkerRuns() {
         ProjectGraph graph = new GraphBuilder().build(TEST_PROJECT);
         long linksToCount = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.LINKS_TO)
+                .filter(e -> e.type().equals(EdgeType.LINKS_TO))
                 .count();
         assertTrue(linksToCount >= 1, "Expected at least one LINKS_TO edge");
     }
@@ -78,7 +78,7 @@ class GraphBuilderTest {
     void buildsPropertyBindingEdges() {
         ProjectGraph graph = new GraphBuilder().build(Path.of("src/test/resources/testdata/di"));
         var edges = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.INSTANTIATES || e.type() == EdgeType.REFERENCES_BEAN)
+                .filter(e -> e.type().equals(EdgeType.INSTANTIATES) || e.type().equals(EdgeType.REFERENCES_BEAN))
                 .toList();
         assertFalse(edges.isEmpty(),
                 "GraphBuilder should run PropertyBindingParser to create INSTANTIATES/REFERENCES_BEAN edges");
@@ -88,7 +88,7 @@ class GraphBuilderTest {
     void buildsInterfaceExpansionEdges() {
         ProjectGraph graph = new GraphBuilder().build(Path.of("src/test/resources/testdata/di"));
         var edges = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.DEPENDS_ON_VIA_INTERFACE)
+                .filter(e -> e.type().equals(EdgeType.DEPENDS_ON_VIA_INTERFACE))
                 .toList();
         assertFalse(edges.isEmpty(),
                 "GraphBuilder should run CrossLinker.expandInterfaces to create DEPENDS_ON_VIA_INTERFACE edges");
@@ -188,7 +188,7 @@ class GraphBuilderTest {
         GraphBuildResult result = builder.buildWithDiagnostics(tempDir);
 
         List<String> edgeSources = result.graph().getEdges().stream()
-                .filter(edge -> edge.type() == EdgeType.CALLS)
+                .filter(edge -> edge.type().equals(EdgeType.CALLS))
                 .map(GraphEdge::from)
                 .toList();
         assertEquals(List.of("class:first", "class:second"), edgeSources);

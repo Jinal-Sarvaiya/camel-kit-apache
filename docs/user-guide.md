@@ -30,7 +30,7 @@ Camel-Kit is an AI-powered toolkit that guides you through designing, planning, 
 | **Design Spec** | The pipeline design contract. Describes each flow's source, processing steps, sink, error handling, data transformation, configuration, dependencies, and test criteria. |
 | **MCP** (Model Context Protocol) | Real-time catalog queries. The AI assistant queries the Camel MCP server to verify components, EIPs, data formats, and expression languages exist in your exact Camel version -- never relying on training data. |
 | **Constitution** | Eight route quality rules enforced on every generated route: route structure, single responsibility, separation of concerns, naming conventions, observability, external configuration, component support verification, and infrastructure via Forage. |
-| **Iron Laws** | Six non-negotiable pipeline rules: MCP catalog verification, constitution compliance, no code without an approved design and task plan, spec compliance before quality, adversarial review before staged review, and surgical changes. |
+| **Iron Laws** | Seven non-negotiable pipeline rules: MCP catalog verification, constitution compliance, no code without an approved design and task plan, spec compliance before quality, adversarial review before staged review, surgical changes, and deliverables in project directory. |
 
 ---
 
@@ -841,9 +841,9 @@ camel-kit graph migration-context order-ingestion-route --depth 5
 
 Interface expansion lets the traversal cross interface/implementation relationships, but the depth and 50-node limits still apply. The command itself makes no Knowledge MCP calls; documentation, CVE, release, or JIRA lookups are separate MCP operations.
 
-For MuleSoft projects, `graph generate` automatically detects Mule XML files (namespace sniffing for `mulesoft.org/schema/mule`) and parses them using the `MuleXmlFlowParser`. DataWeave `.dwl` files are parsed by the `DataWeaveParser`. No explicit configuration is required -- if the project contains MuleSoft artifacts, they are included in the graph automatically. Use `graph stats` to see MuleSoft-specific node counts (`MULE_FLOW`, `MULE_SUB_FLOW`, `MULE_CONNECTOR`, `MULE_ENDPOINT`, `MULE_PROCESSOR`, `MULE_TRANSFORM`, `MULE_ERROR_HANDLER`, `DATAWEAVE_SCRIPT`).
+For MuleSoft projects, `graph generate` automatically detects Mule XML files (namespace sniffing for `mulesoft.org/schema/mule`) and parses them using the `MuleXmlFlowParser`. DataWeave `.dwl` files are parsed by the `DataWeaveParser`. No explicit configuration is required -- if the project contains MuleSoft artifacts, they are included in the graph automatically. Use `graph stats` to see MuleSoft-specific node counts (`mule:flow`, `mule:sub-flow`, `mule:connector`, `mule:endpoint`, `mule:processor`, `mule:transform`, `mule:error-handler`, `mule:dataweave-script`).
 
-For BizTalk projects, `graph generate` automatically detects BizTalk artifacts (namespace sniffing for `schemas.microsoft.com/BizTalk`) and parses them using the `BizTalkParser`. Orchestration (.odx), map (.btm), pipeline (.btp), and binding (.xml) files are analyzed. Use `graph stats` to see BizTalk-specific node counts (`BIZTALK_ORCHESTRATION`, `BIZTALK_SHAPE`, `BIZTALK_MAP`, `BIZTALK_FUNCTOID`, `BIZTALK_SCHEMA`, `BIZTALK_PIPELINE`, `BIZTALK_PIPELINE_COMPONENT`, `BIZTALK_PORT`, `BIZTALK_ADAPTER`, `BIZTALK_MESSAGE`).
+For BizTalk projects, `graph generate` automatically detects BizTalk artifacts (namespace sniffing for `schemas.microsoft.com/BizTalk`) and parses them using the `BizTalkParser`. Orchestration (.odx), map (.btm), pipeline (.btp), and binding (.xml) files are analyzed. Use `graph stats` to see BizTalk-specific node counts (`biztalk:orchestration`, `biztalk:shape`, `biztalk:map`, `biztalk:functoid`, `biztalk:schema`, `biztalk:pipeline`, `biztalk:pipeline-component`, `biztalk:port`, `biztalk:adapter`, `biztalk:message`).
 
 ---
 
@@ -912,7 +912,7 @@ Pi executes these contracts inline and records the missing isolation. Other targ
 
 Skills are shared markdown instruction files that every supported AI target loads and follows. The equalization layer keeps these behaviors consistent:
 
-- The same six Iron Laws are enforced, with inline targets recording the absence of independent reviewer contexts
+- The same seven Iron Laws are enforced, with inline targets recording the absence of independent reviewer contexts
 - The same constitution rules are checked
 - The same MCP tools are called
 - The same output formats are produced

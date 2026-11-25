@@ -41,7 +41,7 @@ class PomParserTest {
     @Test
     void createsDependsOnEdges() {
         long depEdges = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.DEPENDS_ON)
+                .filter(e -> e.type().equals(EdgeType.DEPENDS_ON))
                 .filter(e -> e.from().equals("maven:com.example:order-service"))
                 .count();
         assertEquals(3, depEdges);

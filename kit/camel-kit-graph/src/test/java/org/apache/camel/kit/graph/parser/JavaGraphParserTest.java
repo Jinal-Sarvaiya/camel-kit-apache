@@ -33,7 +33,7 @@ class JavaGraphParserTest {
     @Test
     void parsesInheritance() {
         List<GraphEdge> extendsEdges = graph.getOutgoingEdges("class:com.example.OrderRoute").stream()
-                .filter(e -> e.type() == EdgeType.EXTENDS)
+                .filter(e -> e.type().equals(EdgeType.EXTENDS))
                 .toList();
         assertEquals(1, extendsEdges.size());
         assertEquals("class:com.example.BaseRoute", extendsEdges.get(0).to());
@@ -48,7 +48,7 @@ class JavaGraphParserTest {
     @Test
     void createsDeclareEdges() {
         List<GraphEdge> declareEdges = graph.getOutgoingEdges("class:com.example.OrderProcessor").stream()
-                .filter(e -> e.type() == EdgeType.DECLARES)
+                .filter(e -> e.type().equals(EdgeType.DECLARES))
                 .toList();
         assertTrue(declareEdges.size() >= 2);
     }
@@ -77,7 +77,7 @@ class JavaGraphParserTest {
     @Test
     void createsRoutesFromEdges() {
         List<GraphEdge> routesFrom = graph.getOutgoingEdges("route:processOrders").stream()
-                .filter(e -> e.type() == EdgeType.ROUTES_FROM)
+                .filter(e -> e.type().equals(EdgeType.ROUTES_FROM))
                 .toList();
         assertEquals(1, routesFrom.size());
         assertEquals("endpoint:kafka:orders", routesFrom.get(0).to());
@@ -86,7 +86,7 @@ class JavaGraphParserTest {
     @Test
     void createsRoutesToEdges() {
         List<GraphEdge> routesTo = graph.getOutgoingEdges("route:processOrders").stream()
-                .filter(e -> e.type() == EdgeType.ROUTES_TO)
+                .filter(e -> e.type().equals(EdgeType.ROUTES_TO))
                 .toList();
         assertEquals(1, routesTo.size());
         assertEquals("endpoint:direct:enrichOrder", routesTo.get(0).to());
@@ -101,7 +101,7 @@ class JavaGraphParserTest {
     @Test
     void enrichRouteHasCorrectEndpoints() {
         List<GraphEdge> routesTo = graph.getOutgoingEdges("route:enrichOrder").stream()
-                .filter(e -> e.type() == EdgeType.ROUTES_TO)
+                .filter(e -> e.type().equals(EdgeType.ROUTES_TO))
                 .toList();
         assertTrue(routesTo.size() >= 2,
                 "enrichOrder route should have at least 2 endpoints (log:enriched and seda:storeOrder)");
@@ -122,7 +122,7 @@ class JavaGraphParserTest {
         @Test
         void createsUsesTypeEdgeForInjectedField() {
             var edges = graph.getOutgoingEdges("class:com.example.di.OrderRoute").stream()
-                    .filter(e -> e.type() == EdgeType.USES_TYPE)
+                    .filter(e -> e.type().equals(EdgeType.USES_TYPE))
                     .toList();
             assertTrue(edges.stream().anyMatch(e -> e.to().equals("class:com.example.di.OrderService")),
                     "OrderRoute should have USES_TYPE edge to OrderService");
@@ -131,7 +131,8 @@ class JavaGraphParserTest {
         @Test
         void marksInjectedEdge() {
             var edge = graph.getOutgoingEdges("class:com.example.di.OrderRoute").stream()
-                    .filter(e -> e.type() == EdgeType.USES_TYPE && e.to().equals("class:com.example.di.OrderService"))
+                    .filter(e -> e.type().equals(EdgeType.USES_TYPE)
+                            && e.to().equals("class:com.example.di.OrderService"))
                     .findFirst()
                     .orElseThrow();
             assertEquals("true", edge.properties().get("injection"));
@@ -156,7 +157,8 @@ class JavaGraphParserTest {
         @Test
         void createsUsesTypeForAutowiredField() {
             var edges = graph.getOutgoingEdges("class:com.example.di.PaymentProcessor").stream()
-                    .filter(e -> e.type() == EdgeType.USES_TYPE && e.to().equals("class:com.example.di.OrderService"))
+                    .filter(e -> e.type().equals(EdgeType.USES_TYPE)
+                            && e.to().equals("class:com.example.di.OrderService"))
                     .toList();
             assertFalse(edges.isEmpty(), "PaymentProcessor should have USES_TYPE to OrderService via @Autowired");
             assertEquals("true", edges.get(0).properties().get("injection"));
@@ -165,7 +167,7 @@ class JavaGraphParserTest {
         @Test
         void skipsJdkTypes() {
             var edges = graph.getOutgoingEdges("class:com.example.di.PaymentProcessor").stream()
-                    .filter(e -> e.type() == EdgeType.USES_TYPE)
+                    .filter(e -> e.type().equals(EdgeType.USES_TYPE))
                     .toList();
             assertTrue(edges.stream().noneMatch(e -> e.to().contains("java.lang.String")),
                     "Should NOT create USES_TYPE edge to String");

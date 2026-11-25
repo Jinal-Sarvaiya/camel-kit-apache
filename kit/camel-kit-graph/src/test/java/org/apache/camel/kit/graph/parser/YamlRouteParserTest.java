@@ -38,7 +38,7 @@ class YamlRouteParserTest {
     @Test
     void parsesToEndpoints() {
         List<GraphEdge> routesTo = graph.getOutgoingEdges("route:yamlHttpRoute").stream()
-                .filter(e -> e.type() == EdgeType.ROUTES_TO)
+                .filter(e -> e.type().equals(EdgeType.ROUTES_TO))
                 .toList();
         assertEquals(1, routesTo.size());
         assertEquals("endpoint:direct:enrichOrder", routesTo.get(0).to());
@@ -47,7 +47,7 @@ class YamlRouteParserTest {
     @Test
     void parsesProcessors() {
         List<GraphEdge> processors = graph.getOutgoingEdges("route:yamlHttpRoute").stream()
-                .filter(e -> e.type() == EdgeType.PROCESSES)
+                .filter(e -> e.type().equals(EdgeType.PROCESSES))
                 .toList();
         assertTrue(processors.size() >= 1); // log step
     }

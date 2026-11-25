@@ -45,7 +45,7 @@ Each agent uses a different architecture designed to **maximize that agent's nat
 
 **What equalization covers:**
 - Workflow content (shared `SKILL.md` and guides for all targets)
-- Six Iron Laws (inline targets record missing independent reviewer context)
+- Iron Laws (inline targets record missing independent reviewer context)
 - Constitution rules (enforced identically)
 - MCP tool calls (same tools, same parameters)
 - Output formats (same YAML routes, properties, test files)

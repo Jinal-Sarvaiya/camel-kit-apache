@@ -6,10 +6,9 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.camel.kit.graph.ProjectGraph;
-import org.apache.camel.kit.graph.model.EdgeType;
+import org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter;
 import org.apache.camel.kit.graph.model.GraphEdge;
 import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 
 import org.junit.jupiter.api.Test;
 
@@ -27,7 +26,7 @@ class BizTalkOdxParserTest {
 
         parser.parse(TEST_ODX, graph);
 
-        List<GraphNode> orchestrations = graph.findByType(NodeType.BIZTALK_ORCHESTRATION);
+        List<GraphNode> orchestrations = graph.findByType(BizTalkGraphAdapter.ORCHESTRATION);
         assertEquals(1, orchestrations.size(), "Should parse exactly one orchestration");
 
         GraphNode orch = orchestrations.get(0);
@@ -43,7 +42,7 @@ class BizTalkOdxParserTest {
 
         parser.parse(TEST_ODX, graph);
 
-        List<GraphNode> messages = graph.findByType(NodeType.BIZTALK_MESSAGE);
+        List<GraphNode> messages = graph.findByType(BizTalkGraphAdapter.MESSAGE);
         assertEquals(2, messages.size(), "Should parse 2 messages");
 
         Map<String, GraphNode> messageMap = Map.of(
@@ -70,7 +69,7 @@ class BizTalkOdxParserTest {
 
         parser.parse(TEST_ODX, graph);
 
-        List<GraphNode> ports = graph.findByType(NodeType.BIZTALK_PORT);
+        List<GraphNode> ports = graph.findByType(BizTalkGraphAdapter.PORT);
         assertEquals(2, ports.size(), "Should parse 2 ports");
 
         Map<String, GraphNode> portMap = Map.of(
@@ -99,7 +98,7 @@ class BizTalkOdxParserTest {
 
         parser.parse(TEST_ODX, graph);
 
-        List<GraphNode> shapes = graph.findByType(NodeType.BIZTALK_SHAPE);
+        List<GraphNode> shapes = graph.findByType(BizTalkGraphAdapter.SHAPE);
         assertTrue(shapes.size() >= 5, "Should parse at least 5 shapes (Receive, Decide, Construct, Transform, Send)");
 
         Map<String, GraphNode> shapeMap = shapes.stream()
@@ -133,17 +132,17 @@ class BizTalkOdxParserTest {
 
         List<GraphEdge> edges = graph.getEdges();
         long containsEdges = edges.stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_ORCHESTRATION_CONTAINS)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.ORCHESTRATION_CONTAINS))
                 .count();
 
         assertTrue(containsEdges >= 9,
                 "Should have at least 9 BIZTALK_ORCHESTRATION_CONTAINS edges (2 messages + 2 ports + 5 shapes)");
 
-        GraphNode orch = graph.findByType(NodeType.BIZTALK_ORCHESTRATION).get(0);
+        GraphNode orch = graph.findByType(BizTalkGraphAdapter.ORCHESTRATION).get(0);
         List<GraphEdge> orchEdges = graph.getOutgoingEdges(orch.id());
 
         assertTrue(orchEdges.stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_ORCHESTRATION_CONTAINS)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.ORCHESTRATION_CONTAINS))
                 .anyMatch(e -> e.properties().containsKey("order")),
                 "BIZTALK_ORCHESTRATION_CONTAINS edges should have order attribute");
     }
@@ -157,13 +156,13 @@ class BizTalkOdxParserTest {
 
         List<GraphEdge> edges = graph.getEdges();
         long usesMapEdges = edges.stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_USES_MAP)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.USES_MAP))
                 .count();
 
         assertEquals(1, usesMapEdges, "Should have 1 BIZTALK_USES_MAP edge from Transform shape");
 
         GraphEdge mapEdge = edges.stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_USES_MAP)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.USES_MAP))
                 .findFirst()
                 .orElse(null);
 
@@ -182,13 +181,13 @@ class BizTalkOdxParserTest {
 
         List<GraphEdge> edges = graph.getEdges();
         long usesSchemaEdges = edges.stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_USES_SCHEMA)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.USES_SCHEMA))
                 .count();
 
         assertEquals(2, usesSchemaEdges, "Should have 2 BIZTALK_USES_SCHEMA edges from messages");
 
         List<String> schemaTargets = edges.stream()
-                .filter(e -> e.type() == EdgeType.BIZTALK_USES_SCHEMA)
+                .filter(e -> e.type().equals(BizTalkGraphAdapter.USES_SCHEMA))
                 .map(GraphEdge::to)
                 .toList();
 

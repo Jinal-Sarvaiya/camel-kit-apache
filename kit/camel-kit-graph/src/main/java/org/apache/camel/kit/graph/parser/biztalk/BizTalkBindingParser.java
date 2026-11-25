@@ -16,8 +16,8 @@ import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamReader;
 
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter;
 import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 
 /**
  * Parser for BizTalk binding XML files.
@@ -152,7 +152,7 @@ public class BizTalkBindingParser {
                 nodeProps.put("pollingInterval", pollingInterval);
             }
 
-            GraphNode adapterNode = new GraphNode(adapterId, NodeType.BIZTALK_ADAPTER, nodeProps);
+            GraphNode adapterNode = new GraphNode(adapterId, BizTalkGraphAdapter.ADAPTER, nodeProps);
             pendingNodes.add(adapterNode);
         }
     }
@@ -207,7 +207,7 @@ public class BizTalkBindingParser {
                 nodeProps.put("pipelineName", pipelineName);
             }
 
-            GraphNode adapterNode = new GraphNode(adapterId, NodeType.BIZTALK_ADAPTER, nodeProps);
+            GraphNode adapterNode = new GraphNode(adapterId, BizTalkGraphAdapter.ADAPTER, nodeProps);
             pendingNodes.add(adapterNode);
         }
     }

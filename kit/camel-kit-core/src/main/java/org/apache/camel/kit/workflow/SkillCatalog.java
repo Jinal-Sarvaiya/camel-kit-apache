@@ -3,8 +3,10 @@ package org.apache.camel.kit.workflow;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.reflect.InvocationTargetException;
 import java.net.URL;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -12,6 +14,9 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
+
+import org.apache.camel.kit.graph.GraphTypeRegistry;
+import org.apache.camel.kit.graph.model.GraphTypeAdapter;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -34,6 +39,21 @@ public final class SkillCatalog {
             @JsonInclude(JsonInclude.Include.NON_EMPTY) List<String> handles) {
         public Binding(String pack, int contract, List<String> requires, String path, Provider provider) {
             this(pack, contract, requires, path, provider, null, List.of());
+        }
+
+        <T> T instantiate(String id, Class<T> service) throws IOException {
+            try {
+                var type = Class.forName(provider.implementation(), false, SkillCatalog.class.getClassLoader())
+                        .asSubclass(service);
+                return type.getConstructor().newInstance();
+            } catch (ReflectiveOperationException | ClassCastException | LinkageError e) {
+                Throwable cause
+                        = e instanceof InvocationTargetException invocation ? invocation.getTargetException() : e;
+                throw new IOException(
+                        "Cannot load " + pack + ": provider/" + id + " (" + provider.implementation()
+                                      + "): " + cause,
+                        cause);
+            }
         }
 
         public Binding {
@@ -133,6 +153,40 @@ public final class SkillCatalog {
 
     public Manifest manifest() {
         return manifest;
+    }
+
+    Map<String, Binding> providers(Class<?> service) throws IOException {
+        Map<String, Binding> bindings = new TreeMap<>();
+        for (var entry : manifest.contributions().entrySet()) {
+            Binding binding = entry.getValue();
+            if (binding.provider() != null && service.getName().equals(binding.provider().service())) {
+                if (!entry.getKey().matches("provider/" + SkillPack.ID)) {
+                    throw new IOException(
+                            "Invalid " + service.getSimpleName() + " contribution in " + binding.pack() + ": "
+                                          + entry.getKey());
+                }
+                bindings.put(entry.getKey().substring("provider/".length()), binding);
+            }
+        }
+        return bindings;
+    }
+
+    public GraphTypeRegistry graphTypes() throws IOException {
+        var bindings = providers(GraphTypeAdapter.class);
+        // Register core aliases before optional packs, with a stable namespace order within each group.
+        var order = Comparator.<String, Boolean>comparing(id -> !"core".equals(bindings.get(id).pack()))
+                .thenComparing(Comparator.naturalOrder());
+        Map<String, GraphTypeAdapter> adapters = new TreeMap<>(order);
+        Map<String, String> unavailable = new TreeMap<>();
+        for (var entry : bindings.entrySet()) {
+            String id = entry.getKey();
+            try {
+                adapters.put(id, entry.getValue().instantiate(id, GraphTypeAdapter.class));
+            } catch (IOException e) {
+                unavailable.put(id, e.getMessage());
+            }
+        }
+        return new GraphTypeRegistry(adapters, unavailable);
     }
 
     public Set<String> paths() {

@@ -334,7 +334,8 @@ camel-kit graph <subcommand> [options]
 | Subcommand | Description |
 |------------|-------------|
 | `generate [--require-parser <id>]` | Rebuild the graph. A required migration parser must be available in the distribution. |
-| `stats` | Show graph statistics (node counts by type, edge counts by type) |
+| `stats` | Show node and edge totals and node counts by type. |
+| `analyze <namespace>` | Run the selected graph adapter. A missing adapter exits with status 1. |
 | `find <query>` | Find nodes by name, type, or pattern |
 | `neighbors <nodeId>` | Show direct neighbors of a node |
 | `impact <nodeId>` | Show all downstream dependencies of a node |

@@ -1,7 +1,6 @@
 package org.apache.camel.kit.command.graph;
 
-import java.util.Arrays;
-import java.util.stream.Collectors;
+import java.util.TreeSet;
 
 import org.apache.camel.kit.command.KitOptionParser;
 import org.apache.camel.kit.graph.ProjectGraph;
@@ -27,18 +26,14 @@ public class GraphNeighborsCommand extends GraphQueryCommand {
     @Override
     protected String execute(ProjectGraph graph) {
         GraphQuery query = new GraphQuery(graph);
-        EdgeType et = null;
-        if (edgeType != null) {
-            try {
-                et = EdgeType.valueOf(edgeType);
-            } catch (IllegalArgumentException e) {
-                ObjectNode error = GraphJsonWriter.createObject();
-                error.put("error", "Invalid edge type: " + edgeType);
-                error.put("validTypes",
-                        Arrays.stream(EdgeType.values()).map(Enum::name).collect(Collectors.joining(", ")));
-                return GraphJsonWriter.toJson(error);
+        if (edgeType != null && !types.edgeNames().contains(edgeType)) {
+            var names = new TreeSet<>(types.edgeNames());
+            graph.getEdges().forEach(edge -> names.add(edge.type().name()));
+            if (!names.contains(edgeType)) {
+                return invalidType("edge", edgeType, names);
             }
         }
+        EdgeType et = edgeType == null ? null : types.edgeType(edgeType);
         GraphQuery.NeighborResult result = query.neighbors(nodeId, direction, et, depth);
         ObjectNode root = GraphJsonWriter.createObject();
         root.put("found", !result.nodes().isEmpty());

@@ -21,6 +21,7 @@ skill. Legacy command stubs remain installed for compatibility.
 3. No implementation without user-approved spec (exception: `camel-migrate` direct mode implements under Iron Laws 1 and 2 with inline validation)
 4. Camel version: ONLY from `.camel-kit/config.properties`
 5. Run app after implementation; use `/camel-execute` for the structured verification loop and report
+6. Write deliverables into the project from the start and iterate in place — NEVER use temporary directories for routes, config, or application code (exception: environment probe uses temp per `{SKILLS_DIR}/camel-execute/guides/environment-probe.md`)
 
 ## Camel 4.22 rules
 

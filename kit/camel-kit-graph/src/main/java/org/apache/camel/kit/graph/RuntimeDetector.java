@@ -23,4 +23,28 @@ public final class RuntimeDetector {
         }
         return "main";
     }
+
+    public static String findMavenProperty(ProjectGraph graph, String propertyName) {
+        var node = graph.getNode("maven-property:" + propertyName);
+        if (node != null) {
+            String value = node.properties().get("value");
+            if (value != null && !value.isEmpty() && !value.contains("${")) {
+                return value;
+            }
+        }
+        return null;
+    }
+
+    public static String findArtifactVersion(ProjectGraph graph, String groupId, String artifactId) {
+        String nodeId = "maven:" + groupId + ":" + artifactId;
+        var node = graph.getNode(nodeId);
+        if (node != null) {
+            String version = node.properties().get("version");
+            if (version != null && !"managed".equals(version) && !"unknown".equals(version)
+                    && !version.contains("${")) {
+                return version;
+            }
+        }
+        return null;
+    }
 }

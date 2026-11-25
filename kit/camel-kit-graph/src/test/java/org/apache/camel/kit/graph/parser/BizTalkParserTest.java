@@ -6,6 +6,7 @@ import java.nio.file.Paths;
 import java.util.Set;
 
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter;
 import org.apache.camel.kit.graph.model.*;
 
 import org.junit.jupiter.api.Test;
@@ -34,42 +35,42 @@ class BizTalkParserTest {
                 .collect(java.util.stream.Collectors.toSet());
 
         // At least 1 BIZTALK_ORCHESTRATION (from SimpleOrchestration.odx)
-        assertTrue(nodeTypes.contains(NodeType.BIZTALK_ORCHESTRATION),
+        assertTrue(nodeTypes.contains(BizTalkGraphAdapter.ORCHESTRATION),
                 "Should find at least one BIZTALK_ORCHESTRATION node from .odx file");
 
         // At least 1 BIZTALK_MAP (from OrderToInvoice.btm)
-        assertTrue(nodeTypes.contains(NodeType.BIZTALK_MAP),
+        assertTrue(nodeTypes.contains(BizTalkGraphAdapter.MAP),
                 "Should find at least one BIZTALK_MAP node from .btm file");
 
         // At least 1 BIZTALK_PIPELINE (from XMLReceive.btp)
-        assertTrue(nodeTypes.contains(NodeType.BIZTALK_PIPELINE),
+        assertTrue(nodeTypes.contains(BizTalkGraphAdapter.PIPELINE),
                 "Should find at least one BIZTALK_PIPELINE node from .btp file");
 
         // At least 1 BIZTALK_ADAPTER (from PortBindings.xml)
-        assertTrue(nodeTypes.contains(NodeType.BIZTALK_ADAPTER),
+        assertTrue(nodeTypes.contains(BizTalkGraphAdapter.ADAPTER),
                 "Should find at least one BIZTALK_ADAPTER node from binding XML file");
 
         // Verify specific nodes exist
         long orchestrationCount = graph.getNodes().values().stream()
-                .filter(n -> n.type() == NodeType.BIZTALK_ORCHESTRATION)
+                .filter(n -> n.type().equals(BizTalkGraphAdapter.ORCHESTRATION))
                 .count();
         assertTrue(orchestrationCount > 0,
                 "Should have at least one orchestration");
 
         long mapCount = graph.getNodes().values().stream()
-                .filter(n -> n.type() == NodeType.BIZTALK_MAP)
+                .filter(n -> n.type().equals(BizTalkGraphAdapter.MAP))
                 .count();
         assertTrue(mapCount > 0,
                 "Should have at least one map");
 
         long pipelineCount = graph.getNodes().values().stream()
-                .filter(n -> n.type() == NodeType.BIZTALK_PIPELINE)
+                .filter(n -> n.type().equals(BizTalkGraphAdapter.PIPELINE))
                 .count();
         assertTrue(pipelineCount > 0,
                 "Should have at least one pipeline");
 
         long adapterCount = graph.getNodes().values().stream()
-                .filter(n -> n.type() == NodeType.BIZTALK_ADAPTER)
+                .filter(n -> n.type().equals(BizTalkGraphAdapter.ADAPTER))
                 .count();
         assertTrue(adapterCount > 0,
                 "Should have at least one adapter");
@@ -88,7 +89,7 @@ class BizTalkParserTest {
 
         // Then: verify NO CAMEL_ROUTE nodes are created from BizTalk XML files
         long camelRouteCount = graph.getNodes().values().stream()
-                .filter(n -> n.type() == NodeType.CAMEL_ROUTE)
+                .filter(n -> n.type().equals(NodeType.CAMEL_ROUTE))
                 .count();
 
         assertEquals(0, camelRouteCount,

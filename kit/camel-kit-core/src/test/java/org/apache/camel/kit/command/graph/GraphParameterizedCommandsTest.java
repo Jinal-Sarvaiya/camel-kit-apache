@@ -2,7 +2,9 @@ package org.apache.camel.kit.command.graph;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 
 import org.apache.camel.kit.CommandRunner;
 
@@ -11,6 +13,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -30,6 +34,51 @@ class GraphParameterizedCommandsTest {
         JsonNode r = MAPPER.readTree(run(new GraphFindCommand(), "--type", "CAMEL_ROUTE"));
         assertTrue(r.get("found").asBoolean());
         assertEquals(2, r.get("total").asInt());
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "mule, MULE_FLOW, mule:flow, MULE_CALLS_SUBFLOW, mule:calls-subflow",
+            "biztalk, BIZTALK_ORCHESTRATION, biztalk:orchestration, BIZTALK_USES_MAP, biztalk:uses-map"
+    })
+    void legacyGraphAndFiltersUseTheBundledAdapter(
+            String adapter, String oldNode, String nodeType,
+            String oldEdge, String edgeType)
+            throws Exception {
+        Files.writeString(graphFile, String.format(Locale.ROOT, """
+                {"version":"1.0","nodes":{"a":{"type":"%s"},"b":{"type":"RESOURCE_FILE"}},
+                 "edges":[{"from":"a","to":"b","type":"%s"}]}
+                """, oldNode, oldEdge));
+        var found = MAPPER.readTree(run(new GraphFindCommand(), "--type", oldNode)).required("nodes");
+        assertEquals(nodeType, found.required(0).required("type").textValue());
+        assertEquals(found, MAPPER.readTree(run(new GraphFindCommand(), "--type", nodeType)).required("nodes"));
+        var neighbors = MAPPER.readTree(run(new GraphNeighborsCommand(), "a", "--edge-type", oldEdge));
+        assertEquals(edgeType, neighbors.required("edges").required(0).required("type").textValue());
+        assertEquals("b", neighbors.required("nodes").required(0).required("id").textValue());
+        assertTrue(MAPPER.readTree(run(new GraphAnalyzeCommand(), adapter)).required("matched").booleanValue());
+    }
+
+    @Test
+    void filterDiagnosticsIncludeOpaqueTypesPresentInThisGraph() throws Exception {
+        Files.writeString(graphFile, """
+                {"version":"1.1","nodes":{"a":{"type":"VENDOR_NODE"},"b":{"type":"vendor:item"}},
+                 "edges":[{"from":"a","to":"b","type":"vendor:contains"}]}
+                """);
+        var badNode = MAPPER.readTree(run(new GraphFindCommand(), "--type", "CAMEL_ROUT"));
+        assertEquals("Invalid node type: CAMEL_ROUT", badNode.required("error").textValue());
+        assertTrue(badNode.required("validTypes").textValue().contains("VENDOR_NODE"));
+        var badEdge = MAPPER.readTree(run(new GraphNeighborsCommand(), "a", "--edge-type", "ROUTES_TOO"));
+        assertEquals("Invalid edge type: ROUTES_TOO", badEdge.required("error").textValue());
+        assertTrue(badEdge.required("validTypes").textValue().contains("vendor:contains"));
+        for (String name : new String[]{"VENDOR_NODE", "vendor:item"}) {
+            assertEquals(1, MAPPER.readTree(run(new GraphFindCommand(), "--type", name)).required("total").intValue());
+        }
+        assertEquals(1, MAPPER.readTree(run(new GraphNeighborsCommand(), "a", "--edge-type", "vendor:contains"))
+                .required("total").intValue());
+        assertEquals(0,
+                MAPPER.readTree(run(new GraphFindCommand(), "--type", "MULE_FLOW")).required("total").intValue());
+        assertEquals(0, MAPPER.readTree(run(new GraphNeighborsCommand(), "a", "--edge-type", "ROUTES_TO"))
+                .required("total").intValue());
     }
 
     @Test

@@ -8,7 +8,8 @@ import org.aesh.command.CommandDefinition;
 @CommandDefinition(name = "graph",
                    description = "Project graph analysis, generation, and visualization",
                    groupCommands = {
-                           GraphStatsCommand.class, GraphFindCommand.class, GraphNeighborsCommand.class,
+                           GraphAnalyzeCommand.class, GraphStatsCommand.class, GraphFindCommand.class,
+                           GraphNeighborsCommand.class,
                            GraphPathCommand.class, GraphSubgraphCommand.class, GraphRouteFlowCommand.class,
                            GraphImpactCommand.class, GraphRouteTopologyCommand.class, GraphDeadCodeCommand.class,
                            GraphProjectNormsCommand.class, GraphProjectContextCommand.class,

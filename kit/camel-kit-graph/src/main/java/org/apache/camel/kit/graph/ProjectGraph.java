@@ -40,7 +40,7 @@ public class ProjectGraph {
 
     public synchronized List<GraphNode> findByType(NodeType type) {
         return nodes.values().stream()
-                .filter(n -> n.type() == type)
+                .filter(n -> n.type().equals(type))
                 .collect(Collectors.toList());
     }
 

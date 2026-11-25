@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.camel.kit.catalog.CitrusSchemaDownloader;
@@ -34,10 +35,12 @@ import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ParserDiagnostic;
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.RuntimeDetector;
 import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.util.ConfinedPaths;
 import org.apache.camel.kit.util.TemplateUtils;
 import org.apache.camel.kit.workflow.MigrationParsers;
+import org.apache.camel.kit.workflow.SkillCatalog;
 
 /**
  * Initializes Camel-Kit workspaces.
@@ -446,7 +449,7 @@ public class InitService {
                     Files.deleteIfExists(temporary);
                 }
                 createdPaths.add(graphFile);
-                String detectedProjectType = detectProjectType(projectGraph);
+                String detectedProjectType = detectProjectType(projectGraph, request, warnings);
                 String detectedRuntime
                         = updateConfigWithRuntime(camelKitDir, projectGraph, request.distribution(), request, warnings,
                                 targetDir);
@@ -768,32 +771,25 @@ public class InitService {
         return false;
     }
 
-    private String detectProjectType(ProjectGraph graph) {
+    private String detectProjectType(ProjectGraph graph, InitRequest request, List<InitWarning> warnings) {
         var types = new ArrayList<String>();
 
-        if (!graph.findByType(NodeType.MULE_FLOW).isEmpty()) {
-            int flows = graph.findByType(NodeType.MULE_FLOW).size();
-            int subFlows = graph.findByType(NodeType.MULE_SUB_FLOW).size();
-            int dwl = graph.findByType(NodeType.DATAWEAVE_SCRIPT).size();
-            String muleVersion = findMavenProperty(graph, "mule.version");
-            if (muleVersion == null)
-                muleVersion = findMavenProperty(graph, "app.runtime");
-            if (muleVersion == null)
-                muleVersion = findArtifactVersion(graph, "org.mule.runtime", "mule-core");
-            if (muleVersion == null)
-                muleVersion = findArtifactVersion(graph, "org.mule", "mule-core");
-            types.add("MuleSoft Mule" + (muleVersion != null ? " " + muleVersion : "")
-                      + " (" + flows + " flows, " + subFlows + " sub-flows"
-                      + (dwl > 0 ? ", " + dwl + " DataWeave scripts" : "") + ")");
-        }
-
-        int orchs = graph.findByType(NodeType.BIZTALK_ORCHESTRATION).size();
-        int maps = graph.findByType(NodeType.BIZTALK_MAP).size();
-        int pipelines = graph.findByType(NodeType.BIZTALK_PIPELINE).size();
-        if (orchs > 0 || maps > 0 || pipelines > 0) {
-            types.add("Microsoft BizTalk (" + orchs + " orchestrations"
-                      + (maps > 0 ? ", " + maps + " maps" : "")
-                      + (pipelines > 0 ? ", " + pipelines + " pipelines" : "") + ")");
+        try {
+            var registry = SkillCatalog.bundled().graphTypes();
+            registry.unavailable().forEach((id, reason) -> reportWarning(request, warnings,
+                    "Graph summary unavailable for provider/" + id + ": " + reason));
+            var summaries = new TreeMap<Integer, List<String>>();
+            registry.adapters().forEach((id, adapter) -> {
+                try {
+                    adapter.summarize(graph).ifPresent(summary -> summaries
+                            .computeIfAbsent(adapter.summaryOrder(), order -> new ArrayList<>()).add(summary));
+                } catch (RuntimeException | LinkageError e) {
+                    reportWarning(request, warnings, "Graph summary failed for provider/" + id + ": " + e);
+                }
+            });
+            summaries.values().forEach(types::addAll);
+        } catch (IOException e) {
+            reportWarning(request, warnings, "Could not load graph adapters: " + e);
         }
 
         if (!graph.findByType(NodeType.CAMEL_ROUTE).isEmpty()) {
@@ -812,15 +808,15 @@ public class InitService {
     }
 
     private String detectCamelVersion(ProjectGraph graph) {
-        String version = findMavenProperty(graph, "camel.version");
+        String version = RuntimeDetector.findMavenProperty(graph, "camel.version");
         if (version != null)
             return version;
 
-        version = findArtifactVersion(graph, "org.apache.camel", "camel-core");
+        version = RuntimeDetector.findArtifactVersion(graph, "org.apache.camel", "camel-core");
         if (version != null)
             return version;
 
-        version = findArtifactVersion(graph, "org.apache.camel", "camel-bom");
+        version = RuntimeDetector.findArtifactVersion(graph, "org.apache.camel", "camel-bom");
         if (version != null)
             return version;
 
@@ -855,30 +851,6 @@ public class InitService {
         }
 
         return "Apache Camel";
-    }
-
-    private String findMavenProperty(ProjectGraph graph, String propertyName) {
-        var node = graph.getNode("maven-property:" + propertyName);
-        if (node != null) {
-            String value = node.properties().get("value");
-            if (value != null && !value.isEmpty() && !value.contains("${")) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private String findArtifactVersion(ProjectGraph graph, String groupId, String artifactId) {
-        String nodeId = "maven:" + groupId + ":" + artifactId;
-        var node = graph.getNode(nodeId);
-        if (node != null) {
-            String version = node.properties().get("version");
-            if (version != null && !"managed".equals(version) && !"unknown".equals(version)
-                    && !version.contains("${")) {
-                return version;
-            }
-        }
-        return null;
     }
 
     private InitResult performDryRun(InitRequest request, AgentConfig agent) throws Exception {

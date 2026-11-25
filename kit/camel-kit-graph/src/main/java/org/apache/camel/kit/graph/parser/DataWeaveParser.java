@@ -9,8 +9,8 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.adapter.mule.MuleGraphAdapter;
 import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 
 public class DataWeaveParser implements GraphParser {
 
@@ -79,7 +79,7 @@ public class DataWeaveParser implements GraphParser {
             properties.put("fields", fields);
         }
 
-        graph.addNode(new GraphNode(nodeId, NodeType.DATAWEAVE_SCRIPT, properties));
+        graph.addNode(new GraphNode(nodeId, MuleGraphAdapter.DATAWEAVE_SCRIPT, properties));
     }
 
     private static boolean isDataWeaveFile(Path file) {

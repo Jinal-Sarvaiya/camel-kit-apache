@@ -34,7 +34,7 @@ public class RouteTopology {
         Map<String, List<String>> endpointConsumers = new HashMap<>();
         for (GraphNode route : graph.findByType(NodeType.CAMEL_ROUTE)) {
             for (GraphEdge edge : graph.getOutgoingEdges(route.id())) {
-                if (edge.type() == EdgeType.ROUTES_FROM) {
+                if (edge.type().equals(EdgeType.ROUTES_FROM)) {
                     GraphNode endpoint = graph.getNode(edge.to());
                     if (endpoint != null) {
                         endpointConsumers
@@ -51,7 +51,7 @@ public class RouteTopology {
             List<RouteConnection> connections = new ArrayList<>();
 
             for (GraphEdge edge : graph.getOutgoingEdges(route.id())) {
-                if (edge.type() == EdgeType.ROUTES_TO) {
+                if (edge.type().equals(EdgeType.ROUTES_TO)) {
                     GraphNode endpoint = graph.getNode(edge.to());
                     if (endpoint != null) {
                         String uri = endpoint.properties().get("uri");

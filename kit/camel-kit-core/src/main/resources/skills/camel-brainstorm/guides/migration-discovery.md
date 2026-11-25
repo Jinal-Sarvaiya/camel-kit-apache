@@ -62,8 +62,8 @@ discrete argv and the exact validated `--graph-file`. Never use `project.command
 | Node type in stats | Vendor | Guide to load |
 |--------------------|--------|---------------|
 | `CAMEL_ROUTE` | Apache Camel | `guides/migration-graph-analysis.md` |
-| `MULE_FLOW` | MuleSoft Mule | `guides/migration-mule-graph-analysis.md` |
-| `BIZTALK_ORCHESTRATION` | Microsoft BizTalk | `guides/migration-biztalk-graph-analysis.md` |
+| `mule:flow` | MuleSoft Mule | `guides/migration-mule-graph-analysis.md` |
+| `biztalk:orchestration` | Microsoft BizTalk | `guides/migration-biztalk-graph-analysis.md` |
 
 If the graph contains none of these node types, it may be incomplete or from an unsupported vendor. Continue with manual scanning below (Steps 2-4).
 

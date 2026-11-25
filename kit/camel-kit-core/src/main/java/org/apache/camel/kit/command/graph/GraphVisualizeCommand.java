@@ -11,6 +11,7 @@ import org.apache.camel.kit.command.PathConverter;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.GraphVisualizer;
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.workflow.SkillCatalog;
 
 import org.aesh.command.CommandDefinition;
 import org.aesh.command.completer.CompleterInvocation;
@@ -48,7 +49,7 @@ public class GraphVisualizeCommand extends CliCommand {
             return 1;
         }
         try {
-            ProjectGraph graph = GraphSerializer.read(input);
+            ProjectGraph graph = GraphSerializer.read(input, SkillCatalog.bundled().graphTypes());
             err.println("Reading: " + input + " (" + graph.nodeCount() + " nodes, " + graph.edgeCount() + " edges)");
             String html = GraphVisualizer.generate(graph, library);
             Files.createDirectories(output.getParent());

@@ -9,3 +9,13 @@ add:
     provider:
       service: org.apache.camel.kit.graph.parser.MigrationParser
       implementation: org.apache.camel.kit.graph.parser.MuleXmlFlowParser
+  provider/mule:
+    contract: 1
+    provider:
+      service: org.apache.camel.kit.graph.model.GraphTypeAdapter
+      implementation: org.apache.camel.kit.graph.adapter.mule.MuleGraphAdapter
+  provider/biztalk:
+    contract: 1
+    provider:
+      service: org.apache.camel.kit.graph.model.GraphTypeAdapter
+      implementation: org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter

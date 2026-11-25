@@ -13,6 +13,7 @@ import javax.xml.parsers.DocumentBuilder;
 import org.w3c.dom.*;
 
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.adapter.mule.MuleGraphAdapter;
 import org.apache.camel.kit.graph.model.*;
 
 public class MuleXmlFlowParser implements MigrationParser {
@@ -118,9 +119,9 @@ public class MuleXmlFlowParser implements MigrationParser {
         for (Element el : document.topLevelElements()) {
             String localName = el.getLocalName();
             if ("flow".equals(localName)) {
-                addFlowNode(el, document.relPath(), graph, NodeType.MULE_FLOW, "mule-flow:");
+                addFlowNode(el, document.relPath(), graph, MuleGraphAdapter.FLOW, "mule-flow:");
             } else if ("sub-flow".equals(localName)) {
-                addFlowNode(el, document.relPath(), graph, NodeType.MULE_SUB_FLOW, "mule-subflow:");
+                addFlowNode(el, document.relPath(), graph, MuleGraphAdapter.SUB_FLOW, "mule-subflow:");
             } else if (isConnectorElement(el)) {
                 parseConnector(el, document.relPath(), graph);
             }
@@ -178,7 +179,7 @@ public class MuleXmlFlowParser implements MigrationParser {
         Map<String, String> props = new HashMap<>();
         props.put("file", relPath);
         props.put("element", el.getLocalName());
-        graph.addNode(new GraphNode(nodeId, NodeType.MULE_CONNECTOR, props));
+        graph.addNode(new GraphNode(nodeId, MuleGraphAdapter.CONNECTOR, props));
     }
 
     private void addFlowNode(
@@ -260,7 +261,7 @@ public class MuleXmlFlowParser implements MigrationParser {
 
         graph.addEdge(new GraphEdge(
                 flowId, targetId,
-                EdgeType.MULE_CALLS_SUBFLOW, Map.of()));
+                MuleGraphAdapter.CALLS_SUBFLOW, Map.of()));
     }
 
     private int handleEndpoint(
@@ -273,10 +274,10 @@ public class MuleXmlFlowParser implements MigrationParser {
         props.put("file", relPath);
         props.put("element", localName);
 
-        graph.addNode(new GraphNode(nodeId, NodeType.MULE_ENDPOINT, props));
+        graph.addNode(new GraphNode(nodeId, MuleGraphAdapter.ENDPOINT, props));
         graph.addEdge(new GraphEdge(
                 flowId, nodeId,
-                EdgeType.MULE_FLOW_CONTAINS, Map.of("order", String.valueOf(order))));
+                MuleGraphAdapter.FLOW_CONTAINS, Map.of("order", String.valueOf(order))));
 
         // Connector reference: config-ref (Mule 4) or connector-ref (Mule 3)
         String configRef = el.getAttribute("config-ref");
@@ -287,7 +288,7 @@ public class MuleXmlFlowParser implements MigrationParser {
             String connectorId = "mule-connector:" + configRef;
             graph.addEdge(new GraphEdge(
                     nodeId, connectorId,
-                    EdgeType.MULE_USES_CONNECTOR, Map.of()));
+                    MuleGraphAdapter.USES_CONNECTOR, Map.of()));
         }
 
         return order + 1;
@@ -302,10 +303,10 @@ public class MuleXmlFlowParser implements MigrationParser {
         props.put("file", relPath);
         props.put("element", el.getLocalName());
 
-        graph.addNode(new GraphNode(nodeId, NodeType.MULE_TRANSFORM, props));
+        graph.addNode(new GraphNode(nodeId, MuleGraphAdapter.TRANSFORM, props));
         graph.addEdge(new GraphEdge(
                 flowId, nodeId,
-                EdgeType.MULE_FLOW_CONTAINS, Map.of("order", String.valueOf(order))));
+                MuleGraphAdapter.FLOW_CONTAINS, Map.of("order", String.valueOf(order))));
 
         // Look for DWL resource reference in set-payload child
         findDwlResource(el, nodeId, graph);
@@ -333,11 +334,11 @@ public class MuleXmlFlowParser implements MigrationParser {
                 String normalizedPath = dwlPath.replace('\\', '/');
                 String dwlNodeId = "dataweave:" + normalizedPath;
                 graph.addNode(new GraphNode(
-                        dwlNodeId, NodeType.DATAWEAVE_SCRIPT,
+                        dwlNodeId, MuleGraphAdapter.DATAWEAVE_SCRIPT,
                         Map.of("path", normalizedPath)));
                 graph.addEdge(new GraphEdge(
                         transformNodeId, dwlNodeId,
-                        EdgeType.MULE_REFERENCES_DWL, Map.of()));
+                        MuleGraphAdapter.REFERENCES_DWL, Map.of()));
             }
         }
     }
@@ -351,10 +352,10 @@ public class MuleXmlFlowParser implements MigrationParser {
         props.put("file", relPath);
         props.put("element", el.getLocalName());
 
-        graph.addNode(new GraphNode(nodeId, NodeType.MULE_ERROR_HANDLER, props));
+        graph.addNode(new GraphNode(nodeId, MuleGraphAdapter.ERROR_HANDLER, props));
         graph.addEdge(new GraphEdge(
                 flowId, nodeId,
-                EdgeType.MULE_FLOW_CONTAINS, Map.of("order", String.valueOf(order))));
+                MuleGraphAdapter.FLOW_CONTAINS, Map.of("order", String.valueOf(order))));
 
         return order + 1;
     }
@@ -369,10 +370,10 @@ public class MuleXmlFlowParser implements MigrationParser {
         props.put("file", relPath);
         props.put("element", localName);
 
-        graph.addNode(new GraphNode(nodeId, NodeType.MULE_PROCESSOR, props));
+        graph.addNode(new GraphNode(nodeId, MuleGraphAdapter.PROCESSOR, props));
         graph.addEdge(new GraphEdge(
                 flowId, nodeId,
-                EdgeType.MULE_FLOW_CONTAINS, Map.of("order", String.valueOf(order))));
+                MuleGraphAdapter.FLOW_CONTAINS, Map.of("order", String.valueOf(order))));
 
         return order + 1;
     }

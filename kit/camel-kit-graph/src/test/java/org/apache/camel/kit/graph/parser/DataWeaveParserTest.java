@@ -4,7 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import org.apache.camel.kit.graph.ProjectGraph;
-import org.apache.camel.kit.graph.model.NodeType;
+import org.apache.camel.kit.graph.adapter.mule.MuleGraphAdapter;
 
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -27,7 +27,7 @@ class DataWeaveParserTest {
     @Test
     void parsesDataWeaveFile() {
         assertTrue(graph.hasNode(TRANSFORM_ID));
-        assertEquals(NodeType.DATAWEAVE_SCRIPT,
+        assertEquals(MuleGraphAdapter.DATAWEAVE_SCRIPT,
                 graph.getNode(TRANSFORM_ID).type());
     }
 

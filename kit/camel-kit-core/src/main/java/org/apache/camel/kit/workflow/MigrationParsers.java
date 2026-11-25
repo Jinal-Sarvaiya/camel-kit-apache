@@ -1,7 +1,6 @@
 package org.apache.camel.kit.workflow;
 
 import java.io.IOException;
-import java.lang.reflect.InvocationTargetException;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -19,29 +18,8 @@ public final class MigrationParsers {
 
     public static GraphBuilder newGraphBuilder(String requiredId) throws IOException {
         Map<String, MigrationParser> parsers = new TreeMap<>();
-        for (var entry : new TreeMap<>(SkillCatalog.bundled().manifest().contributions()).entrySet()) {
-            var binding = entry.getValue();
-            var provider = binding.provider();
-            if (provider == null || !MigrationParser.class.getName().equals(provider.service())) {
-                continue;
-            }
-            if (!entry.getKey().matches("provider/" + SkillPack.ID)) {
-                throw new IOException(
-                        "Invalid migration parser contribution in " + binding.pack() + ": " + entry.getKey());
-            }
-            String id = entry.getKey().substring("provider/".length());
-            try {
-                var type = Class.forName(provider.implementation(), false, MigrationParsers.class.getClassLoader())
-                        .asSubclass(MigrationParser.class);
-                parsers.put(id, type.getConstructor().newInstance());
-            } catch (ReflectiveOperationException | ClassCastException | LinkageError e) {
-                Throwable cause
-                        = e instanceof InvocationTargetException invocation ? invocation.getTargetException() : e;
-                throw new IOException(
-                        "Cannot load " + binding.pack() + ": " + entry.getKey() + " ("
-                                      + provider.implementation() + "): " + cause,
-                        cause);
-            }
+        for (var entry : SkillCatalog.bundled().providers(MigrationParser.class).entrySet()) {
+            parsers.put(entry.getKey(), entry.getValue().instantiate(entry.getKey(), MigrationParser.class));
         }
         if (requiredId != null && !parsers.containsKey(requiredId)) {
             throw new IOException(

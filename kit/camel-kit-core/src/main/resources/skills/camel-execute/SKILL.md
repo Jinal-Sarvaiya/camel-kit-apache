@@ -44,6 +44,11 @@ AUTONOMOUS EXECUTION: Execute ALL validated tasks from the plan using wave analy
 
 ---
 
+For a migration, use `{COMMAND_PREFIX} target --migration`. Compare its complete profile to the approved
+destination and pass it to every worker. In this workflow all runtime/version references below mean the
+destination. Existing-project version locks apply to in-place additions. Preserve source modules and scope
+migration edits to the approved destination. If the profile changes, refresh the design, POM and catalog evidence.
+
 ## Invocation Modes
 
 This skill supports two invocation modes (see `shared/pipeline-infrastructure.md` for details):
@@ -200,7 +205,8 @@ The probe prevents wasting implementation cycles on environments that cannot sup
 **Before executing any tasks, check if this is an existing project:**
 
 Read `.camel-kit/config.properties`:
-- If `project.type=existing` → **enforce existing project constraints**
+- For migrations, honor baseline and approved scope, using the destination for runtime and dependency versions.
+- For additions, if `project.type=existing` → **enforce existing project constraints**
 - If `project.type=greenfield` or missing → **skip to Step 1**
 
 ### For Existing Projects: Pre-Execution Validation

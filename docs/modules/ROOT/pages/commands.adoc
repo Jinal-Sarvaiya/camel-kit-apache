@@ -9,7 +9,7 @@ CLI, "Use the `/camel-start` skill" in GitHub Copilot CLI, `/skill:camel-start` 
 [[cli]]
 == CLI commands
 
-Development builds use Aesh for one-shot execution. Use `-h`/`--help` on the root, `init`, `doctor`, `hook` or `ship`,
+Development builds use Aesh for one-shot execution. Use `-h`/`--help` on the root, `init`, `doctor`, `target`, `hook` or `ship`,
 and the `help` subcommand for `doc`, `graph` and `plan`. Use `-V`/`--version`
 at the CLI root for the Kit version. See xref:getting-started.adoc#cli-host[development host compatibility].
 `init -p one=1 two=2` accepts several property values; Ship's `-p` consumes one value per occurrence.
@@ -85,6 +85,24 @@ Changing the group alone would request an artifact that was never published.
 `init` checks Java, JBang, Camel JBang and the Camel test plugin and reports missing tools as warnings; it never
 fails on them. On terminals with a native image protocol it shows a split-screen progress view, falling back to
 coloured text elsewhere.
+
+[[target]]
+=== target
+
+Print the active runtime profile as JSON. Add `--migration` for the destination saved by
+xref:migration.adoc#target-profile[the migration workflow]. An incomplete selection returns exit code 1.
+
+----
+camel-kit target [--project-dir <path>] [--migration] [--pom-template | --check-effective-pom <xml> | --check-catalog <json>]
+----
+
+`--pom-template` prints a runtime-specific Maven template ready for the four project identity fields.
+`--check-effective-pom` reads a leaf module's `help:effective-pom` XML and checks the managed core,
+framework, starter or extension versions and the build plugin. Both checks accept workspace-relative paths.
+`--check-catalog` reads a JSON evidence file. It contains the captured profile under `profile`
+and the two MCP calls under `list` and `maven`. Each call contains its tool `name`, actual `arguments` and
+original `result`. A successful check prints the profile. Stale or mismatched evidence exits 1 with
+xref:mcp.adoc#binding[an incomplete catalog diagnostic].
 
 [[doctor]]
 === doctor

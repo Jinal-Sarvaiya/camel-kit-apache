@@ -40,6 +40,11 @@ Do NOT generate any implementation artifacts (YAML, properties, POM, Docker Comp
 
 ---
 
+For a migration, use `{COMMAND_PREFIX} target --migration`. Compare its complete profile to the approved
+destination and pass it to every worker. In this workflow all runtime/version references below mean the
+destination. Existing-project version locks apply to in-place additions. Preserve source modules and scope
+migration edits to the approved destination. If the profile changes, refresh the design, POM and catalog evidence.
+
 ## Invocation Modes
 
 This skill supports two invocation modes (see `shared/pipeline-infrastructure.md` for details):
@@ -155,7 +160,7 @@ otherwise unauthorized action is genuinely required, return `NEEDS_USER_CONFIRMA
 
 ## Existing Project Scope Protection
 
-**Check `.camel-kit/config.properties` for `project.type=existing`.**
+**Check `.camel-kit/config.properties` for `project.type=existing`.** Apply source version locks only when adding to the existing application. For a migration plan use the approved destination.
 
 If this is an existing project, enforce these additional constraints during planning:
 
@@ -168,7 +173,8 @@ project.type=existing              # Confirms existing project mode
 project.camelVersion=4.8.0         # LOCKED - cannot upgrade
 project.detectedCamelVersion=4.8.0 # Original detected version
 project.runtime=spring-boot        # LOCKED - cannot change
-project.platformBomVersion=3.3.4   # LOCKED - cannot upgrade
+project.applicationBom=org.apache.camel.springboot:camel-spring-boot-bom:4.8.0  # Observed import, when available
+project.platformBomVersion=4.8.0   # LOCKED - cannot upgrade
 project.springBootVersion=3.3.4    # Spring Boot framework version read from the pom - LOCKED, never taken from the version tables
 project.primaryDsl=yaml            # LOCKED - all new routes must use this DSL
 project.dslTypes=YAML              # All detected DSL types

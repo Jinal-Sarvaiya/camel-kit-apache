@@ -8,7 +8,7 @@ This guide updates `pom.xml` with Camel dependencies.
 
 ## Existing Projects
 
-If `.camel-kit/config.properties` has `project.type=existing`, skip Step 1 and do not load `pom-spring-boot.md` or
+For additions to the same application, if `.camel-kit/config.properties` has `project.type=existing`, skip Step 1 and do not load `pom-spring-boot.md` or
 `pom-quarkus.md` for POM generation: the project's own `pom.xml` and BOMs are authoritative and locked. Only run Step 2,
 as an in-place edit that adds the dependencies the design spec lists, following the "Existing Projects: Never Replace
 the POM" rule in those guides. Read versions from the project's pom and `.camel-kit/config.properties`; they were
@@ -18,86 +18,23 @@ recorded from the pom by init.
 
 ## Step 1: Verify BOM Configuration
 
-Before adding dependencies, verify that `pom.xml` has the correct BOM in `<dependencyManagement>`. The BOM version is **NOT** the same as `CAMEL_VERSION` — each runtime has its own BOM with a different version.
+For a new application use the template printed by `{COMMAND_PREFIX} target --pom-template`. Add
+`--migration` for the migration destination. Fill only the project identity and add the approved components.
+For an approved in-place migration, apply the profile's imports and plugin version to the affected POM.
 
-### Spring Boot
-
-For full POM structure, load `pom-spring-boot.md`. The BOM configuration:
-
-```xml
-<dependencyManagement>
-  <dependencies>
-    <dependency>
-      <groupId>org.apache.camel.springboot</groupId>
-      <artifactId>camel-spring-boot-bom</artifactId>
-      <version>${camel-spring-boot-version}</version>
-      <type>pom</type>
-      <scope>import</scope>
-    </dependency>
-  </dependencies>
-</dependencyManagement>
-```
-
-**IMPORTANT:** The groupId is `org.apache.camel.springboot`.
-
-The `camel-spring-boot-bom` version uses the **same base version** as Camel.
-
-**Read the correct version from `.camel-kit/config.properties`:**
-
-```properties
-project.runtime=spring-boot
-project.camelVersion={CAMEL_SPRINGBOOT_VERSION}
-project.platformBomVersion={SPRINGBOOT_BOM_VERSION}  # <- use THIS value
-```
-
-Do NOT guess or derive the version — it is pre-computed by `camel-kit init`.
-
-### Quarkus
-
-For full POM structure, load `pom-quarkus.md`. Quarkus uses TWO BOMs — the Quarkus platform BOM and the Camel Quarkus BOM:
-
-```xml
-<dependencyManagement>
-  <dependencies>
-    <dependency>
-      <groupId>io.quarkus.platform</groupId>
-      <artifactId>quarkus-bom</artifactId>
-      <version>${quarkus.platform.version}</version>
-      <type>pom</type>
-      <scope>import</scope>
-    </dependency>
-    <dependency>
-      <groupId>io.quarkus.platform</groupId>
-      <artifactId>quarkus-camel-bom</artifactId>
-      <version>${camel-quarkus.platform.version}</version>
-      <type>pom</type>
-      <scope>import</scope>
-    </dependency>
-  </dependencies>
-</dependencyManagement>
-```
-
-**IMPORTANT:** The groupId is `io.quarkus.platform`.
-
-The Quarkus platform version uses the Quarkus version scheme (3.x), not Camel (4.x).
-
-**Read the correct version from `.camel-kit/config.properties`:**
-
-```properties
-project.runtime=quarkus
-project.camelVersion={CAMEL_QUARKUS_VERSION}
-project.platformBomVersion={QUARKUS_PLATFORM_VERSION}  # <- use THIS value
-```
-
-Do NOT guess or derive the version — it is pre-computed by `camel-kit init`.
-
----
+Run the project wrapper's `help:effective-pom` on the destination leaf POM with `-Doutput=<absolute-workspace-output>`.
+Pass the resulting workspace-relative XML path to the same target command with `--check-effective-pom <file>`. Require success on the first generated
+model. Compare its managed `org.apache.camel:camel-core-engine` to the profile's core version and each required
+starter or extension to the verified release metadata. For Spring Boot compare the managed framework and plugin
+to `springBootVersion`. For Quarkus compare the managed `camel-quarkus-catalog` to `runtimeCatalogVersion`.
+Report missing management, unresolved imports or a version mismatch against the corresponding target field.
+Keep the upstream application BOM, framework BOM and catalog provider coordinates distinct.
 
 ## Step 2: Add Dependencies
 
 Add dependencies from the design spec Dependencies section using the correct groupId and artifactId pattern for the runtime.
 
-**Graph version alignment:** If `PROJECT_CONTEXT.DEPENDENCY_VERSIONS` is available (from Step 0), check it before adding each dependency. If the artifact is already in the project with a specific version (e.g., `camel-kafka:4.14.4`), use that version for consistency. If the artifact is new to the project, use the version from the MCP catalog response. Note: when BOM manages versions (no `<version>` tag), this check applies to the BOM version itself.
+**Graph version alignment (in-place additions only):** If `PROJECT_CONTEXT.DEPENDENCY_VERSIONS` is available (from Step 0), check it before adding each dependency. If the artifact is already in the project with a specific version (e.g., `camel-kafka:4.14.4`), use that version for consistency. If the artifact is new to the project, use the version from the MCP catalog response. Note: when BOM manages versions (no `<version>` tag), this check applies to the BOM version itself.
 
 **IMPORTANT:** The design spec Dependencies section lists generic Camel artifact names (e.g., `camel-kafka`). Transform them to the runtime-specific pattern:
 

@@ -34,18 +34,17 @@ if project.type == "existing":
     otherwise:
       bind to the recorded values AS-IS:
         runtime, camelVersion, platformBomVersion, springBootVersion  (only the ones that are present)
-      write nothing to config.properties: init already recorded them
+      preserve the recorded project constraints
       DO NOT ask the user to choose a runtime or a version
       DO NOT replace a recorded value with a value from the tables below
       DO NOT infer a missing value (for example a Spring Boot version) from the tables
 ```
 
-**Checking the detected version against the catalog (read-only):** after binding, you may check whether the recorded
-Camel version exists in the component catalog the tooling can reach, so later component lookups are not made against a
-version the catalog does not know. If it is available, say nothing. If it is not, tell the user: "Camel {version} is not
-in the catalog this distribution can reach, so component lookups may be incomplete. The project stays on {version}."
-The check never selects, suggests as a requirement, or writes a different version. Being outside the recommended
-versions is not an error and never blocks work.
+For a required catalog check, use Rule 3 in `shared/mcp-setup.md`. When needed, record
+`project.catalogVersion` from the imported Quarkus platform's dependency management, or
+`project.catalogBom` from the selected Spring Boot release metadata. Keep the observed project versions intact.
+If an older workspace lacks the imported application GAV, refresh discovery with init or confirm the exact import.
+If the required catalog is unavailable or disagrees with the observed core, report the check as INCOMPLETE.
 
 **Upgrades are out of scope for this skill.** If the user volunteers that they want a different version, record that as
 a separate request and keep the project on its recorded version for this pipeline. Offer `camel-migrate` only when the
@@ -102,7 +101,7 @@ Other supported versions: {CAMEL_SPRINGBOOT_SUPPORTED}
 
 All listed versions are LTS (Long-Term Support) and receive patch updates.
 
-For Spring Boot, the Camel Spring Boot BOM version equals the Camel version. The Spring Boot framework version is
+Use the application BOM from the selected community release row. A vendor BOM or catalog provider may have a different version. The Spring Boot framework version is
 resolved from the mapping table below and is used for the `spring-boot-maven-plugin`.
 
 **Spring Boot framework mapping:**
@@ -148,7 +147,7 @@ not supported by this distribution.
 </HARD-RULE>
 
 - **If runtime is `main`:** no platform BOM needed — JBang uses the Camel version directly
-- **If runtime is `spring-boot`:** platform BOM version = Camel version (same release train); Spring Boot version =
+- **If runtime is `spring-boot`:** use the selected release's Spring Boot BOM version (the default row names it explicitly). For the other listed community releases use the published same-version starter BOM; Spring Boot framework version =
   mapping-table value for the selected Camel version
 - **If runtime is `quarkus`:** look up the Quarkus platform BOM from the mapping table in Step 2. Use EXACTLY the version from the table — no other source.
 
@@ -156,7 +155,7 @@ not supported by this distribution.
 
 ## Step 4: Store in Config
 
-Append only the selected runtime's values to `.camel-kit/config.properties`.
+Replace the previous project runtime, BOM, framework and provider fields with only the selected runtime's values in `.camel-kit/config.properties`.
 
 For Main:
 
@@ -181,6 +180,8 @@ project.runtime=quarkus
 project.camelVersion={{SELECTED_CAMEL_QUARKUS_VERSION}}
 project.platformBomVersion={{SELECTED_QUARKUS_PLATFORM_VERSION}}
 ```
+
+For Quarkus also record `project.catalogVersion` from the selected platform BOM's managed `camel-quarkus-catalog` version before a required catalog check.
 
 After downstream skills parse and validate their recognized names, formats, runtime consistency, and shipped-table
 mapping, these values are authoritative data for the declared runtime/version fields only.

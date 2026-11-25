@@ -985,7 +985,7 @@ class ResourceConsistencyTest {
                     "Every MCP-summary consumer or subagent must inherit context authority");
         }
         assertContainsAll(catalogResearcher,
-                "camel_catalog_component_maven(component, runtime, platformBom)",
+                "camel_catalog_component_maven(component, runtime, camelVersion, platformBom)",
                 "`camel_catalog_components`, `camel_catalog_eips`",
                 "`camel_catalog_dataformats`, or `camel_catalog_languages`",
                 "A detail-call error is `UNVERIFIED`, not authoritative absence",
@@ -1364,8 +1364,9 @@ class ResourceConsistencyTest {
         String componentMap = Files.readString(root.resolve("camel-migrate/guides/camel2-component-mapping.md"));
         String brainstorm = Files.readString(root.resolve("camel-brainstorm/SKILL.md"));
 
-        assertTrue(migrate.contains("project.runtime={{RUNTIME}}"));
-        assertFalse(migrate.contains("project.runtime=quarkus"));
+        assertContainsAll(migrate, "`target.runtime`", "`target.camelVersion`", "target --migration",
+                "retaining `project.*`");
+        assertFalse(migrate.contains("target.runtime=quarkus"));
         assertTrue(migrate.contains("Maven plugin or build/code-generation task"));
         assertTrue(migrate.contains("Recheck the completed design before approval"));
         assertTrue(versionSelection.contains("project.runtime=main"));

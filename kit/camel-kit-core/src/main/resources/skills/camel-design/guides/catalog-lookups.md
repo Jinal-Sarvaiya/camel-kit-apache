@@ -1,9 +1,9 @@
 # Catalog Lookup Procedures
 
 > **Context variables:**
-> - `CAMEL_VERSION` — from `.camel-kit/config.properties`
-> - `RUNTIME` — from `.camel-kit/config.properties` (`project.runtime`)
-> - `PLATFORM_BOM` — resolved from `CAMEL_VERSION` + `RUNTIME` via the version mapping table in `skills/shared/mcp-setup.md`
+> - `CAMEL_VERSION` — the selected profile’s `camelVersion`
+> - `RUNTIME` — the selected profile’s `runtime`
+> - `PLATFORM_BOM` — the selected profile’s `catalog.platformBom` from `shared/mcp-setup.md`
 
 ## Data Format Lookup (after Question 1)
 

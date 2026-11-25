@@ -536,14 +536,15 @@ class ProjectDiscoveryTest {
                 "maven-property:spring-boot.version", NodeType.CONFIG_PROPERTY,
                 Map.of("value", "3.3.5")));
         graph.addNode(springBootStarter("pom.xml"));
-        graph.addNode(managed("camel-spring-boot-bom", "${camel.version}"));
+        graph.addNode(managed("camel-spring-boot-bom", "4.8.1"));
         graph.addNode(managed("spring-boot-dependencies", "${spring-boot.version}"));
 
         ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
 
         assertEquals("spring-boot", result.runtime());
-        assertEquals("4.8.0", result.camelVersion(), "the Camel BOM version is Camel version evidence");
-        assertEquals("4.8.0", result.platformBomVersion());
+        assertEquals("4.8.0", result.camelVersion(),
+                "explicit core evidence takes precedence over the starter version");
+        assertEquals("4.8.1", result.platformBomVersion());
         assertEquals("3.3.5", result.springBootVersion(), "the framework version is kept apart from the Camel BOM");
         assertTrue(result.coverageGaps().stream()
                 .noneMatch(g -> g.contains("BOM") || g.contains("Spring Boot framework")));
@@ -731,25 +732,28 @@ class ProjectDiscoveryTest {
     }
 
     @Test
-    void camelSpringBootBomProvidesCamelCoreVersion() {
-        // org.apache.camel.springboot:camel-spring-boot-bom version represents Camel core version
+    void conflictingApplicationBomGroupsLeaveTheImportUnresolved() {
         ProjectGraph graph = new ProjectGraph();
+        graph.addNode(springBootStarter("a/pom.xml"));
+        graph.addNode(managed("camel-spring-boot-bom", "4.8.0", "a/pom.xml"));
         graph.addNode(new GraphNode(
-                "maven-managed:org.apache.camel.springboot:camel-spring-boot-bom",
-                NodeType.CONFIG_PROPERTY,
-                Map.of(
-                        "kind", "managed",
-                        "groupId", "org.apache.camel.springboot",
-                        "artifactId", "camel-spring-boot-bom",
-                        "version", "4.8.0",
-                        "type", "pom",
-                        "file", "pom.xml")));
+                "vendor-bom", NodeType.CONFIG_PROPERTY,
+                Map.of("kind", "managed", "groupId", "com.vendor.platform", "artifactId", "camel-spring-boot-bom",
+                        "type", "pom", "scope", "import", "version", "4.8.0", "file", "b/pom.xml")));
+        assertNull(ProjectDiscovery.applicationBom(graph, "spring-boot"));
+        assertNull(ProjectDiscovery.discover(graph).platformBomVersion());
+    }
 
-        ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
+    @Test
+    void springBootBomAloneLeavesCoreVersionUnresolved() {
+        ProjectGraph graph = new ProjectGraph();
+        graph.addNode(managed("camel-spring-boot-bom", "4.8.0"));
 
-        assertEquals("4.8.0", result.camelVersion(),
-                "Camel Spring Boot BOM version should be recognized as Camel core version");
-        assertTrue(result.allCamelVersions().contains("4.8.0"));
+        var result = ProjectDiscovery.discover(graph);
+        assertEquals("spring-boot", result.runtime());
+        assertNull(result.camelVersion());
+        assertEquals("4.8.0", result.platformBomVersion());
+        assertTrue(result.coverageGaps().stream().anyMatch(gap -> gap.contains("Camel core version")));
     }
 
     @Test

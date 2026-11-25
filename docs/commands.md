@@ -13,6 +13,7 @@ retains its single CLI invocation with the supplied options.
 
 - [CLI Commands](#cli-commands)
   - [camel-kit init](#camel-kit-init)
+  - [camel-kit target](#camel-kit-target)
   - [camel-kit doctor](#camel-kit-doctor)
   - [camel-kit graph](#camel-kit-graph)
   - [camel-kit doc](#camel-kit-doc)
@@ -260,6 +261,15 @@ For OpenAI Codex CLI, Camel-Kit generates `AGENTS.md`, native project skills und
 For GitHub Copilot CLI, Camel-Kit also generates `.github/copilot-instructions.md`, project skills under `.github/skills/`, custom agents under `.github/agents/`, and a conservative `.github/hooks/camel-kit-safety.json` hook that denies destructive or secret-sensitive shell commands while leaving normal Copilot permission prompts intact. Copilot users should start by asking Copilot to "Use the `/camel-start` skill." Run `/skills list` to inspect available project skills.
 
 For Pi, Camel-Kit generates `AGENTS.md`, project skills under `.pi/skills/`, prompt templates under `.pi/prompts/`, `.mcp.json` for `pi-mcp-adapter`, and `.pi/extensions/camel-kit-guard.ts` plus a JSON guard policy. Install the adapter with `pi install npm:pi-mcp-adapter@2.11.0`, trust the project with `/trust`, then run `/skill:camel-start`. Headless checks must use `pi -a`.
+
+### camel-kit target
+
+`camel-kit target` prints the current application profile as JSON. Add `--migration` to use the destination
+selected in `target.*` in the workspace configuration. Use `--project-dir` to select the workspace.
+`--pom-template` prints the Maven template with runtime coordinates filled in. To check a generated
+application, supply `--check-effective-pom <xml>` or `--check-catalog <json>` with the workspace-relative
+evidence file. Incomplete checks exit with status 1. The Camel JBang plugin exposes the same options under
+`camel kit target`. See [target selection](modules/ROOT/pages/migration.adoc#target-profile).
 
 ### camel-kit doctor
 
@@ -1231,5 +1241,5 @@ Standalone Ship preserves literal `@` values. The new plugin follows Camel's arg
 `--text @@literal` or `--text=@literal` to pass `@literal`; shell quotes alone do not prevent expansion.
 An unescaped missing file produces `Argument file not found` and exit code 2 before Kit runs.
 Development Kit and Knowledge require Java 21 or later.
-Use `-h`/`--help` on the root, `init`, `doctor` or `ship`, and the `help` subcommand for `doc`, `graph` and `plan`.
+Use `-h`/`--help` on the root, `init`, `doctor`, `target` or `ship`, and the `help` subcommand for `doc`, `graph` and `plan`.
 Use root `-V`/`--version` for the Kit artifact version.

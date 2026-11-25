@@ -113,7 +113,7 @@ For most migrations, continue using `camel-core` — it pulls in all sub-modules
 | 2.x / 3.x | 4.x | Notes |
 |-----------|-----|-------|
 | `camel-spring-boot-starter` | `camel-spring-boot-starter` | Same name — but version must match Camel 4.x |
-| `camel-spring-boot-dependencies` (BOM) | `camel-spring-boot-bom` | BOM artifact renamed |
+| Spring Boot dependency management | Selected target application BOM | Use the verified platform coordinates in `target --migration` |
 
 ## Java DSL API Changes
 

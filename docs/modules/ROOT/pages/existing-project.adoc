@@ -149,7 +149,8 @@ Avro schemas) and `.camel-kit/baseline-contracts.txt` lists them. Init only inve
 protect them; it does not analyse their content (tracked in #111).
 
 Only values your project declares are recorded. `project.camelVersion` comes from the `camel.version` property, an
-`org.apache.camel` dependency, or an imported Camel BOM. `project.platformBomVersion` is the imported
+`org.apache.camel` dependency, or the imported `org.apache.camel:camel-bom`. An imported starter BOM alone leaves the core version unresolved.
+`project.applicationBom` records the imported Camel platform GAV when modules agree. `project.platformBomVersion` is the imported
 `camel-spring-boot-bom` or `quarkus-bom` and `project.springBootVersion` is the imported `spring-boot-dependencies` or
 the `spring-boot-starter-parent`, with `+${property}+` references resolved from the pom. Nothing is filled in from Camel
 Kit's own version tables. If a value cannot be established it is left out and reported as a gap.

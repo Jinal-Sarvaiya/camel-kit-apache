@@ -3,9 +3,9 @@
 > **Context variables provided by the calling question:**
 > - `SYSTEM_DESCRIPTION` — what the user described (e.g., "Kafka topic", "PostgreSQL database")
 > - `SYSTEM_ROLE` — "source" or "sink"
-> - `CAMEL_VERSION` — from `.camel-kit/config.properties`
-> - `RUNTIME` — from `.camel-kit/config.properties` (`project.runtime`, default: `main`)
-> - `PLATFORM_BOM` — resolved from `CAMEL_VERSION` + `RUNTIME` via the version mapping table in `skills/shared/mcp-setup.md`
+> - `CAMEL_VERSION` — the selected profile’s `camelVersion`
+> - `RUNTIME` — the selected profile’s `runtime`
+> - `PLATFORM_BOM` — the selected profile’s `catalog.platformBom` from `shared/mcp-setup.md`
 
 ## Procedure: Select and Verify Component
 
@@ -29,8 +29,8 @@ Based on the user's description, I suggest: [component-name]
 
 Then retrieve both its documentation and runtime-specific Maven coordinates under the same binding:
 
-Record `Catalog binding:` with the runtime, full platform BOM derived from `.camel-kit/config.properties`, and
-`binding=MATCHED`. Retain this binding and the per-artifact `Result:` and `Verification provenance:` fields below for
+Record `Catalog binding:` with the selected profile’s runtime, Camel version and full catalog GAV.
+Record `binding=MATCHED` only after the required catalog check passes. Retain this binding and the per-artifact `Result:` and `Verification provenance:` fields below for
 section 5's `Catalog Verification Evidence` in `camel-brainstorm/guides/design-assembly.md`, using the
 catalog-researcher labels. Emit `VERIFIED` only after the detail calls succeed and their identities and consumed fields
 validate under that same binding.

@@ -8,6 +8,7 @@ import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.command.DoctorCommand;
 import org.apache.camel.kit.command.HookCommand;
 import org.apache.camel.kit.command.InitCommand;
+import org.apache.camel.kit.command.TargetCommand;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.command.graph.GraphCommand;
 import org.apache.camel.kit.command.pipeline.NextIdCommand;
@@ -26,6 +27,7 @@ public class CamelKitPlugin implements Plugin {
         CamelKitMain camelKitMain = new CamelKitMain(new SystemPrinter());
         CommandTree kit = new CommandTree(new KitCommand())
                 .addSubcommand("init", new CommandTree(new InitCommand(camelKitMain)))
+                .addSubcommand("target", new CommandTree(new TargetCommand()))
                 .addSubcommand("doctor", new CommandTree(new DoctorCommand(camelKitMain)))
                 .addSubcommand("doc", new CommandTree(new DocCommand()))
                 .addSubcommand("hook", new CommandTree(new HookCommand()))

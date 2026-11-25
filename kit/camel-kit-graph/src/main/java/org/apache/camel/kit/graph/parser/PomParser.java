@@ -100,8 +100,8 @@ public class PomParser implements GraphParser {
                             "maven-managed:" + pomRelative + ":" + managed.getGroupId() + ":" + managed.getArtifactId(),
                             NodeType.CONFIG_PROPERTY,
                             Map.of("kind", "managed",
-                                    "groupId", managed.getGroupId(),
-                                    "artifactId", managed.getArtifactId(),
+                                    "groupId", resolveProperty(managed.getGroupId(), model),
+                                    "artifactId", resolveProperty(managed.getArtifactId(), model),
                                     "version", resolvedVersion,
                                     "scope", managed.getScope() != null ? managed.getScope() : "compile",
                                     "type", managed.getType() != null ? managed.getType() : "jar",
@@ -148,20 +148,7 @@ public class PomParser implements GraphParser {
                         model);
             }
         }
-        DependencyManagement management = model.getDependencyManagement();
-        if (management != null) {
-            for (Dependency managed : management.getDependencies()) {
-                // Camel core BOMs (org.apache.camel and org.apache.camel.springboot groups) represent Camel core versions.
-                // Camel Quarkus extension BOMs (org.apache.camel.quarkus group) have independent versioning.
-                if ("pom".equals(managed.getType()) && managed.getArtifactId() != null
-                        && managed.getArtifactId().startsWith("camel-") && managed.getArtifactId().endsWith("-bom")
-                        && ("org.apache.camel".equals(managed.getGroupId())
-                                || "org.apache.camel.springboot".equals(managed.getGroupId()))) {
-                    addCamelVersionEvidence(graph, pomRelative, "imported BOM " + managed.getArtifactId(),
-                            managed.getVersion(), model);
-                }
-            }
-        }
+
     }
 
     private void addCamelVersionEvidence(
@@ -176,10 +163,13 @@ public class PomParser implements GraphParser {
     }
 
     private static String resolveProperty(String value, Model model) {
-        if (value == null || !value.startsWith("${") || !value.endsWith("}") || model.getProperties() == null) {
-            return value;
+        for (int depth = 0; depth < 16 && value != null && value.startsWith("${") && value.endsWith("}"); depth++) {
+            String resolved = model.getProperties().getProperty(value.substring(2, value.length() - 1));
+            if (resolved == null) {
+                break;
+            }
+            value = resolved;
         }
-        String resolved = model.getProperties().getProperty(value.substring(2, value.length() - 1));
-        return resolved == null ? value : resolved;
+        return value;
     }
 }

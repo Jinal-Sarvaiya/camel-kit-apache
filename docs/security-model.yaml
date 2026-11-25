@@ -57,7 +57,8 @@ component_families:
   - id: A
     name: Kit workspace CLI (Aesh)
     paths: ["kit/camel-kit-core (command, service, generator, catalog, config)", kit/camel-kit-main, kit/camel-jbang-plugin-kit]
-    entry_points: [init, doctor, doc, nextId, plan analyze, hook, graph]
+    entry_points: [init, doctor, target, doc, nextId, plan analyze, hook, graph]
+    target_profile: Read-only configuration, template rendering and bounded MCP evidence checks. Evidence provenance depends on the capturing harness.
     in_model: true
     reachability: Reachable from a non-operator input (analysed tree via init --here, downloaded catalog content, model-authored pipeline artifact, another local account).
   - id: B

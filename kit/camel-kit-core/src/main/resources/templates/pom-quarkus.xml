@@ -29,7 +29,7 @@
         <camel-quarkus.platform.version>${quarkus.platform.version}</camel-quarkus.platform.version>
 
         <!-- DO NOT CHANGE these groupId/artifactId properties -->
-        <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
+        <quarkus.platform.group-id>[PLATFORM_BOM_GROUP_ID]</quarkus.platform.group-id>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <camel-quarkus.platform.group-id>${quarkus.platform.group-id}</camel-quarkus.platform.group-id>
         <camel-quarkus.platform.artifact-id>quarkus-camel-bom</camel-quarkus.platform.artifact-id>

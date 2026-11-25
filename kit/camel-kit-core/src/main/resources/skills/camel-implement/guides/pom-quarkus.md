@@ -8,7 +8,7 @@
 ## Existing Projects: Never Replace the POM
 
 <HARD-RULE>
-If `.camel-kit/config.properties` has `project.type=existing`, the project already owns its `pom.xml`. Do NOT copy the
+When adding to an existing application, if `.camel-kit/config.properties` has `project.type=existing`, the project already owns its `pom.xml`. Do NOT copy the
 template over it, do NOT replace its placeholders, and do NOT change its parent, BOMs, plugins, Camel version, platform
 BOM version or Spring Boot version. Skip "POM Template File" below entirely.
 
@@ -24,14 +24,9 @@ version table. If the dependency cannot be added without changing a locked versi
 ## POM Template File
 
 <HARD-RULE>
-Do NOT generate the POM from scratch. Read the literal template file `templates/pom-quarkus.xml` and COPY it to `pom.xml`. Then replace ONLY these placeholders:
-- `[PROJECT_GROUP_ID]` — from design spec
-- `[PROJECT_ARTIFACT_ID]` — from design spec
-- `[PROJECT_VERSION]` — from design spec
-- `[PROJECT_NAME]` — from design spec
-- `[PLATFORM_BOM_VERSION]` — from design spec header `platformBomVersion` field
-
-Do NOT modify any other values. The template already contains the correct groupIds, artifactIds, and plugin configuration. Then add project-specific dependencies in the DEPENDENCIES section.
+Use `{COMMAND_PREFIX} target --pom-template` (add `--migration` for a migration destination). Only
+fill in `[PROJECT_GROUP_ID]`, `[PROJECT_ARTIFACT_ID]`, `[PROJECT_VERSION]` and `[PROJECT_NAME]` in its output.
+Add dependencies from the approved design. Verify the effective model as described in `maven-dependencies.md`.
 </HARD-RULE>
 
 ## Reference

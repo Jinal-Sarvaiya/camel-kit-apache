@@ -93,6 +93,11 @@ metadata; Kit configures it for each harness, and it also serves MCP clients tha
   | **Other local accounts on the same host** | Weaker adversary | Camel-Kit must not widen what they can read *(documented — Apache Camel Security Model, "A second, weaker adversary")*. |
   | **Network peers** between the CLI and its HTTPS origins | Untrusted; TLS assumed | §4.5. |
 
+- `target` reads workspace configuration and bounded catalog evidence as data. It prints the selected coordinates
+  or a Maven template. It does not run Maven, fetch coordinates, or change the MCP launcher's repository policy.
+  Required catalog checks compare the actual request parameters, core version and runtime artifact against the
+  selected profile. Recorded evidence depends on the harness faithfully capturing those calls.
+
 - **Component-family table.** Lead with this when routing a finding.
 
   | Family | Representative entry points | Touches outside the process? | In this model? |

@@ -362,6 +362,13 @@ in Camel Kit. Three layers override them, the later winning:
 . `~/.camel-kit/config.properties`, or the file given with `-c`;
 . `-p key=value` flags, repeatable.
 
+The workspace records the effective `camel.catalog.repos` used by the Camel MCP launcher.
+Configure any vendor repository in the Maven settings used for the destination build and in the
+catalog repository list at init. Keep repository credentials in Maven settings.
+`camel-kit target` shows the selected application BOM, core version, repositories and catalog arguments.
+For a migration, `camel-kit target --migration` reads the separate destination selection.
+See xref:migration.adoc#target-profile[Selecting a migration target].
+
 [source,bash]
 ----
 camel-kit init my-integration --ai claude -p "camel.main.version=4.18.4"

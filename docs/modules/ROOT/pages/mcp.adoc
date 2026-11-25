@@ -68,25 +68,23 @@ response's authority rather than increasing it. See xref:skills.adoc#context-aut
 [[binding]]
 == Version binding
 
-Every version-sensitive catalog call passes the project's `runtime` (`main`, `spring-boot` or `quarkus`) and the full
-platform BOM coordinate derived from `.camel-kit/config.properties`; a call without them is answered from the catalog
-bundled in the server, which may be the wrong version.
+Every version-sensitive call uses the `catalog` arguments from `camel-kit target`
+(`--migration` for a migration destination). The `platformBom` tool parameter accepts these coordinates:
 
 [cols="1,3"]
 |===
-| Runtime | Platform BOM
-
-| `main` | `org.apache.camel:camel-catalog:<project.camelVersion>`
-| `spring-boot` | `org.apache.camel.springboot:camel-catalog-provider-springboot:<project.camelVersion>`
-| `quarkus` | `io.quarkus.platform:quarkus-camel-bom:<project.platformBomVersion>`
+| Runtime | Catalog lookup coordinate
+| Main | `org.apache.camel:camel-catalog` at the selected Camel core version
+| Spring Boot | The full `camel-catalog-provider-springboot` coordinate at its provider version
+| Quarkus | The selected platform's `quarkus-camel-bom` coordinate
 |===
 
-The version binding comes from `.camel-kit/config.properties` (`project.runtime`, `project.camelVersion`,
-`project.platformBomVersion`). Every catalog call passes `runtime` and the full `platformBom` GAV derived from those
-properties — those parameters are the binding. Detail tools do not all echo a version, so each artifact is validated
-by type and name against the request instead. A detail-call error is not proof of absence: an artifact is recorded as
-`NOT_FOUND` only after a successful list call with a complete enumeration contains no exact match, and as `UNVERIFIED`
-when completeness or the binding cannot be established.
+The workflow checks the core version reported by `camel_catalog_components` and the runtime-specific
+timer artifact returned by `camel_catalog_component_maven`. It records each request and result against the
+whole profile. A missing tool, a bundled core version different from the selection, or a mismatched runtime
+artifact produces `INCOMPLETE` even when an individual lookup succeeds. Detail tools may omit the core
+version. They use the verified binding and must match the requested artifact identity.
+A complete, successful exact-name list is required to establish absence.
 
 For behaviour questions — YAML shape, runtime configuration, version changes, header propagation — skills call
 `camel_docs_search` on the `camel-knowledge` server, not `camel`. The knowledge server tools (`camel_docs_search`,

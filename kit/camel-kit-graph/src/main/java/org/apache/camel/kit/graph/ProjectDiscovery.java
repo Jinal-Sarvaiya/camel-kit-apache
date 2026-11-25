@@ -91,6 +91,22 @@ public final class ProjectDiscovery {
                 runtimes.computeIfAbsent("karaf", k -> new TreeSet<>()).add(artifactId + " (" + module + ")");
             }
         }
+        for (GraphNode managed : graph.findByType(NodeType.CONFIG_PROPERTY)) {
+            var fields = managed.properties();
+            if ("managed".equals(fields.get("kind")) && "pom".equals(fields.get("type"))
+                    && "import".equals(fields.get("scope"))) {
+                String artifact = fields.getOrDefault("artifactId", "");
+                String runtime = switch (artifact) {
+                    case "quarkus-camel-bom" -> "quarkus";
+                    case "camel-spring-boot-bom" -> "spring-boot";
+                    default -> null;
+                };
+                if (runtime != null) {
+                    runtimes.computeIfAbsent(runtime, k -> new TreeSet<>())
+                            .add(artifact + " (" + fields.get("file") + ")");
+                }
+            }
+        }
         return runtimes;
     }
 
@@ -112,31 +128,21 @@ public final class ProjectDiscovery {
                         "dependency " + node.properties().get("artifactId"));
             }
         }
-        for (GraphNode managed : graph.findByType(NodeType.CONFIG_PROPERTY)) {
-            if ("managed".equals(managed.properties().get("kind"))
-                    && "pom".equals(managed.properties().get("type"))
-                    && isCamelBom(managed.properties().get("groupId"), managed.properties().get("artifactId"))) {
-                addVersion(versions, resolve(graph, managed.properties().get("version")),
-                        "imported BOM " + managed.properties().get("artifactId"));
+        for (GraphNode node : graph.findByType(NodeType.CONFIG_PROPERTY)) {
+            var fields = node.properties();
+            String artifact = fields.getOrDefault("artifactId", "");
+            if ("managed".equals(fields.get("kind")) && "pom".equals(fields.get("type"))
+                    && "import".equals(fields.get("scope")) && "org.apache.camel".equals(fields.get("groupId"))
+                    && artifact.startsWith("camel-") && artifact.endsWith("-bom")) {
+                addVersion(versions, fields.get("version"), "imported BOM " + artifact + " in " + fields.get("file"));
             }
-        }
-        // Per-POM declarations: in a reactor the nodes above collapse to one module's value, these do not.
-        for (GraphNode evidence : graph.findByType(NodeType.CONFIG_PROPERTY)) {
-            if ("camel-version-evidence".equals(evidence.properties().get("kind"))) {
-                addVersion(versions, evidence.properties().get("version"),
-                        evidence.properties().get("source") + " in " + evidence.properties().get("file"));
+            // Older graphs also recorded platform BOMs as core evidence. Read their actual imports above.
+            if ("camel-version-evidence".equals(fields.get("kind"))
+                    && !fields.getOrDefault("source", "").startsWith("imported BOM ")) {
+                addVersion(versions, fields.get("version"), fields.get("source") + " in " + fields.get("file"));
             }
         }
         return versions;
-    }
-
-    private static boolean isCamelBom(String groupId, String artifactId) {
-        // Camel core BOMs (org.apache.camel and org.apache.camel.springboot groups) represent Camel core versions.
-        // Camel Quarkus extension BOMs (org.apache.camel.quarkus group) have independent versioning and are excluded.
-        if (artifactId == null || !artifactId.startsWith("camel-") || !artifactId.endsWith("-bom")) {
-            return false;
-        }
-        return "org.apache.camel".equals(groupId) || "org.apache.camel.springboot".equals(groupId);
     }
 
     private static void addVersion(Map<String, Set<String>> versions, String version, String source) {
@@ -166,21 +172,46 @@ public final class ProjectDiscovery {
      */
     private static String detectPlatformBomVersion(ProjectGraph graph, String runtime) {
         if ("quarkus".equals(runtime)) {
-            String fromBom = firstManaged(graph, "quarkus-bom", "quarkus-camel-bom");
-            if (fromBom != null) {
-                return fromBom;
+            Map<String, Set<String>> imports = collectManagedVersions(graph, "quarkus-bom", "quarkus-camel-bom");
+            if (!imports.isEmpty()) {
+                return imports.size() == 1 ? imports.keySet().iterator().next() : null;
             }
-            GraphNode quarkusBom = graph.getNode("maven:io.quarkus.platform:quarkus-bom");
-            if (quarkusBom != null) {
-                String version = quarkusBom.properties().get("version");
+            GraphNode bom = graph.getNode("maven:io.quarkus.platform:quarkus-bom");
+            if (bom != null) {
+                String version = bom.properties().get("version");
                 if (version != null && !"managed".equals(version) && !version.contains("${")) {
                     return version;
                 }
             }
         } else if ("spring-boot".equals(runtime)) {
-            return firstManaged(graph, "camel-spring-boot-bom");
+            String gav = applicationBom(graph, runtime);
+            return gav == null ? null : gav.substring(gav.lastIndexOf(':') + 1);
         }
         return null;
+    }
+
+    /** Imported Camel platform coordinates, preserving the vendor group and agreement across modules. */
+    public static String applicationBom(ProjectGraph graph, String runtime) {
+        if (!"quarkus".equals(runtime) && !"spring-boot".equals(runtime)) {
+            return null;
+        }
+        String artifact = "quarkus".equals(runtime) ? "quarkus-camel-bom" : "camel-spring-boot-bom";
+        Set<String> coordinates = new TreeSet<>();
+        for (GraphNode node : graph.findByType(NodeType.CONFIG_PROPERTY)) {
+            var p = node.properties();
+            if ("managed".equals(p.get("kind")) && "import".equals(p.get("scope"))
+                    && "pom".equals(p.get("type")) && artifact.equals(p.get("artifactId"))) {
+                String version = p.get("version");
+                String group = p.get("groupId");
+                if (version == null || version.isBlank() || version.contains("${") || "managed".equals(version)
+                        || "unknown".equals(version)
+                        || group == null || group.contains("${")) {
+                    return null;
+                }
+                coordinates.add(group + ":" + artifact + ":" + version);
+            }
+        }
+        return coordinates.size() == 1 ? coordinates.iterator().next() : null;
     }
 
     /**
@@ -284,15 +315,6 @@ public final class ProjectDiscovery {
             }
         }
         return versions;
-    }
-
-    private static String firstManaged(ProjectGraph graph, String... artifactIds) {
-        Map<String, Set<String>> versions = collectManagedVersions(graph, artifactIds);
-        if (versions.isEmpty()) {
-            return null;
-        }
-        // If modules agree, return the single version; if they conflict, return null
-        return versions.size() == 1 ? versions.keySet().iterator().next() : null;
     }
 
     private static Set<DslType> detectDslTypes(ProjectGraph graph) {
@@ -447,6 +469,9 @@ public final class ProjectDiscovery {
             if (detectedRuntimes.size() > 1) {
                 gaps.add("Conflicting runtimes found: " + describe(runtimeEvidence)
                          + ". The runtime is not locked. Resolve which runtime this project uses before planning.");
+            }
+            if (allCamelVersions.isEmpty() && ("spring-boot".equals(runtime) || "quarkus".equals(runtime))) {
+                gaps.add("Inspect the platform BOM dependency management to establish the Camel core version.");
             }
             if (allCamelVersions.size() > 1) {
                 gaps.add("Conflicting Camel versions found: " + describe(versionEvidence)

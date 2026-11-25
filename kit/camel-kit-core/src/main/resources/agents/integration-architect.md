@@ -55,8 +55,8 @@ Your design output follows the flow design section format:
 - Error handling strategy
 - Configuration properties with `{{PLACEHOLDER}}` syntax
 - DataMapper sections (if XSLT transformation needed)
-- Catalog binding: record the runtime, full platform BOM derived from `.camel-kit/config.properties`, and
-  `binding=MATCHED`.
+- Catalog binding: record the selected profile’s runtime, Camel version and full catalog GAV. Record
+  `binding=MATCHED` only after the required check in `shared/mcp-setup.md` passes.
 - Per artifact, use the catalog-researcher labels `Artifact identity:`, `Result:`, and `Verification provenance:`:
   record the exact type/name, verification result, tool name(s), requested identity, and catalog binding. Supply only
   validated fields for the `Catalog Verification Evidence` block in `camel-brainstorm/guides/design-assembly.md`.

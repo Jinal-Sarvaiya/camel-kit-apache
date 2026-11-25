@@ -68,7 +68,18 @@ Provides the domain knowledge guides needed to validate generated Apache Camel r
 
 ## Runtime Path Inventory (MANDATORY)
 
-Before loading validation stages, read `project.runtime` and every flow's `Target Module`. Build an exact inventory for
+For a migration, including project-scoped validation of a direct migration, use `{COMMAND_PREFIX} target --migration`.
+Use its profile recorded in the migration note or design to identify the destination. Ask which application is being
+validated if the scope is ambiguous. Compare its complete profile to the approved
+destination and pass it to every worker. In this workflow all runtime/version references below mean the
+destination. Existing-project version locks apply to in-place additions. Preserve source modules and scope
+migration edits to the approved destination. If the profile changes, refresh the design, POM and catalog evidence.
+
+For a Maven destination, run the wrapper's `help:effective-pom` for the destination module and pass the output to
+the same target command with `--check-effective-pom <file>`. Keep the output workspace-relative and temporary
+during report-only validation. Record a missing model or version mismatch as INCOMPLETE.
+
+Before loading validation stages, read the selected profile's `runtime` and every flow's `Target Module`. Build an exact inventory for
 each module using the same optional relative module prefix as `camel-implement/guides/orchestrator.md`:
 
 - Main: `ROUTE_FILES` is every `{MODULE_PREFIX}*.camel.yaml`; `PROPS_FILE` is
@@ -418,8 +429,9 @@ generated:
 
 **Date:** YYYY-MM-DD HH:mm
 **Project:** {project name from .camel-kit/config.properties}
-**Runtime:** {project.runtime from config.properties, or "not yet selected"}
-**Camel Version:** {project.camelVersion from config.properties, or "not yet selected"}
+**Runtime:** {selected profile runtime, or "not yet selected"}
+**Camel Version:** {selected profile camelVersion, or "not yet selected"}
+**Required catalog check:** {PASS or INCOMPLETE with the diagnostic from target --check-catalog}
 
 ## Summary
 

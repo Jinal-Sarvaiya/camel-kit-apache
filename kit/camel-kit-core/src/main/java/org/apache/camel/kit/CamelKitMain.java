@@ -9,6 +9,7 @@ import org.apache.camel.kit.command.HelpAwareCommand;
 import org.apache.camel.kit.command.HookCommand;
 import org.apache.camel.kit.command.InformationOptionParser;
 import org.apache.camel.kit.command.InitCommand;
+import org.apache.camel.kit.command.TargetCommand;
 import org.apache.camel.kit.command.doc.DocCommand;
 import org.apache.camel.kit.command.graph.GraphCommand;
 import org.apache.camel.kit.command.pipeline.NextIdCommand;
@@ -174,6 +175,7 @@ public class CamelKitMain extends HelpAwareCommand {
     public static CommandRunner commandLine(CamelKitMain main, String... args) {
         CommandRunner commandLine = new CommandRunner(main)
                 .addSubcommand("init", new InitCommand(main))
+                .addSubcommand("target", new TargetCommand())
                 .addSubcommand("doctor", new DoctorCommand(main))
                 .addSubcommand("doc", new DocCommand())
                 .addSubcommand("hook", new HookCommand())

@@ -1,13 +1,13 @@
 # Endpoint & Runtime Validation Guide
 
 > **Context variables provided by master SKILL.md:**
-> - `CAMEL_VERSION` — from `.camel-kit/config.properties`
-> - `RUNTIME` — project runtime from `.camel-kit/config.properties` (affects route file location)
-> - `PLATFORM_BOM` — resolved from `CAMEL_VERSION` + `RUNTIME` via the version mapping table in `skills/shared/mcp-setup.md`
+> - `CAMEL_VERSION` — the selected profile’s `camelVersion`
+> - `RUNTIME` — the selected profile’s `runtime`
+> - `PLATFORM_BOM` — the selected profile’s `catalog.platformBom` from `shared/mcp-setup.md`
 > - `ROUTE_FILES` — exact runtime/module-aware relative route paths from the validation inventory
 > - `PROPS_FILE` — exact properties path matching the current route's module
 >
-> **Version mapping:** When calling MCP catalog tools, translate `CAMEL_VERSION` + `RUNTIME` to the correct `camelVersion` and `platformBom` parameters using the version mapping table in `skills/shared/mcp-setup.md`.
+> Use the selected profile’s three `catalog` arguments on every version-sensitive call under `shared/mcp-setup.md`.
 
 ## Stage 2: Endpoint URI Validation (MCP Enhanced)
 
@@ -71,15 +71,15 @@ Endpoint 3: http://{{api.endpoint}}
   - Required fix: Use https:// (plain HTTP is allowed only for localhost)
 ```
 
-**If tool call fails (fallback):**
+**If the required catalog is unavailable or mismatched, report INCOMPLETE.** Manual observations may accompany the report:
 
 ```
 == ENDPOINT URI VALIDATION (Manual) ==
 
 Validating component existence...
 
-✅ kafka - component exists
-✅ sql - component exists
+INCOMPLETE kafka - target catalog unavailable
+INCOMPLETE sql - target catalog unavailable
 ❌ http://api.example.com - external non-local plain HTTP is FAIL; localhost HTTP is exempt
 ```
 

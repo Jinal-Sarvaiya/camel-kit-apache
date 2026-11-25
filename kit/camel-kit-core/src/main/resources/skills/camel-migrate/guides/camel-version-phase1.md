@@ -1,9 +1,7 @@
 # Camel 2.x/3.x → 4.x Version Migration
 
 > **Context variables provided by master SKILL.md:**
-> - `CAMEL_VERSION` — target Camel version from `.camel-kit/config.properties`
-> - `RUNTIME` — from `.camel-kit/config.properties` (`project.runtime`, default: `main`)
-> - `PLATFORM_BOM` — resolved from `CAMEL_VERSION` + `RUNTIME` via the version mapping table in `skills/shared/mcp-setup.md`
+> - `CAMEL_VERSION`, `RUNTIME`, `PLATFORM_BOM` — use the exact `catalog` fields from `{COMMAND_PREFIX} target --migration`
 > - Confirmed analysis summary (with ✓/~/? markers) from `camel-migrate`
 > - Full list of source artifact paths
 > - Detected Camel source version (2.x or 3.x) and platform type

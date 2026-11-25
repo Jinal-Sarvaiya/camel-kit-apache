@@ -286,7 +286,9 @@ public class InitService {
         }
         // Discovery must not retain constraints from an earlier scan when declarations disappear or conflict.
         for (String key : List.of("project.runtime", "project.camelVersion", "project.detectedCamelVersion",
-                "project.platformBomVersion", "project.detectedPlatformBomVersion", "project.springBootVersion",
+                "project.applicationBom", "project.catalogBom", "project.catalogVersion", "project.platformBomVersion",
+                "project.detectedPlatformBomVersion",
+                "project.springBootVersion",
                 "project.primaryDsl", "project.dslTypes", "project.hasTests", "project.baselineTestStatus",
                 "project.routeCount", "project.contractFilesCount", "project.discoveryGaps",
                 "project.unsupportedCombination", "project.modules", "project.moduleCount", "project.beansCount",
@@ -300,6 +302,7 @@ public class InitService {
         config.setProperty("agent.name", agentName);
         config.setProperty("agent.folder", agent.folder());
         config.setProperty("citrus.version", request.resolvedCitrusVersion());
+        config.setProperty("camel.catalog.repos", request.distribution().camelCatalogRepos());
         if (request.withCitrusMcp()) {
             config.setProperty("citrus.mcp.version", request.distribution().citrusMcpVersion());
             config.setProperty("citrus.mcp.enabled", "true");
@@ -568,7 +571,7 @@ public class InitService {
             if (discovery.camelVersion() != null) {
                 config.setProperty("project.camelVersion", discovery.camelVersion());
                 config.setProperty("project.detectedCamelVersion", discovery.camelVersion());
-            } else if (!discovery.hasConflict()) {
+            } else if (!discovery.hasConflict() && !"spring-boot".equals(runtime) && !"quarkus".equals(runtime)) {
                 // ERROR: Cannot proceed with undetectable version on existing project
                 throw new IllegalStateException(
                         "Cannot detect Camel version from existing project. "
@@ -579,6 +582,10 @@ public class InitService {
             // With conflicting evidence neither value is locked; the gap below tells the user what to resolve.
 
             if (discovery.platformBomVersion() != null) {
+                String applicationBom = org.apache.camel.kit.graph.ProjectDiscovery.applicationBom(graph, runtime);
+                if (applicationBom != null) {
+                    config.setProperty("project.applicationBom", applicationBom);
+                }
                 config.setProperty("project.platformBomVersion", discovery.platformBomVersion());
                 config.setProperty("project.detectedPlatformBomVersion", discovery.platformBomVersion());
             }

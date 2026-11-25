@@ -1859,6 +1859,33 @@ class InitServiceTest {
         assertFalse(refreshed.getProperty("project.discoveryGaps", "").contains("Project discovery failed"));
     }
 
+    @Test
+    void reinitRefreshesObservedPlatformAndPreservesTheMigrationDestination() throws Exception {
+        Path project = tempDir.resolve("migration-source");
+        Files.createDirectories(project.resolve(".camel-kit"));
+        Files.writeString(project.resolve(".camel-kit/config.properties"), """
+                target.runtime=main
+                target.camelVersion=4.22.1
+                """);
+        String source = minimalCamelPom("3.20.0").replace("<dependencies>", """
+                <dependencyManagement><dependencies><dependency>
+                  <groupId>com.vendor.platform</groupId><artifactId>camel-spring-boot-bom</artifactId>
+                  <version>3.20.2</version><type>pom</type><scope>import</scope>
+                </dependency></dependencies></dependencyManagement>
+                <dependencies>
+                """);
+        Files.writeString(project.resolve("pom.xml"), source);
+        new InitService()
+                .initialize(requestForExistingProject(project, "claude", InitProgress.noop(), InitReporter.noop()));
+        var config = loadConfig(project);
+        assertEquals("3.20.0", config.getProperty("project.detectedCamelVersion"));
+        assertEquals("com.vendor.platform:camel-spring-boot-bom:3.20.2", config.getProperty("project.applicationBom"));
+        assertEquals("spring-boot", config.getProperty("project.runtime"));
+        assertEquals("main", config.getProperty("target.runtime"));
+        assertEquals("4.22.1", config.getProperty("target.camelVersion"));
+        assertEquals(source, Files.readString(project.resolve("pom.xml")));
+    }
+
     private static String minimalCamelPom(String camelVersion) {
         return String.format(java.util.Locale.ROOT, """
                 <?xml version="1.0" encoding="UTF-8"?>

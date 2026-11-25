@@ -95,6 +95,24 @@ The current defaults are Camel {camel-version} for Camel Main and Spring Boot, w
 on the Quarkus platform {quarkus-platform-version}; the catalog server artifact follows the Camel Main stream.
 
 [[camel-tools]]
+With the shipped Camel MCP 4.22.1 runner, required catalog checks have the following results for the
+supported community targets. The runner can return the selected starter or extension alongside its bundled core.
+
+[cols="1,1,1,2",options="header"]
+|===
+|Runtime |Requested core |Returned core |Required catalog check
+|Main |4.22.1 or 4.18.4 |Matches requested core |Pass
+|Spring Boot |4.22.1 |4.22.1 |Pass
+|Spring Boot |4.18.4 |4.22.1 |Incomplete
+|Quarkus |4.18.3 |4.22.1 |Incomplete (default platform 3.33.3.2)
+|Quarkus |4.14.7 |4.22.1 |Incomplete (platform 3.27.3)
+|===
+
+The check applies to greenfield designs, existing applications and migrations. On an affected row the workflow
+cannot complete a design that requires verified catalog artifacts. The selected application version is preserved.
+For a different runner or platform, verify the actual responses. See the
+xref:existing-project.adoc#catalog-limitation[runtime catalog limitation].
+
 == The Camel catalog server
 
 The workflow allowlist covers the read-only and generation helpers the skills use; runtime mutation and control

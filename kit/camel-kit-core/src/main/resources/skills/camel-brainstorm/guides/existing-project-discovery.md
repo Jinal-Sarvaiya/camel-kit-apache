@@ -47,7 +47,9 @@ if project.unsupportedCombination is set:
 if project.discoveryGaps is set:
     INSPECT the source for each listed gap, then ask the user only about what is still unclear.
 
-if project.runtime or project.camelVersion is missing:
+if project.needsResolvedCore and the core version is missing:
+    Follow "Recover the core version from Maven" in guides/version-selection.md for every affected module.
+if project.runtime or project.camelVersion is still missing:
     STOP: discovery found conflicting evidence or could not read the project. Report the matching
           project.discoveryGaps entry and ask the user to resolve it. Do not pick one value and do not
           fall back to the shipped version tables.

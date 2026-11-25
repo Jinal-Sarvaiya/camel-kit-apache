@@ -150,4 +150,40 @@ class PomParserTest {
                 "BOM version should be resolved from module-a's bom.version property, not module-b's");
         assertEquals("module-a/pom.xml", bom.properties().get("file"));
     }
+
+    @Test
+    void inheritsBomPropertiesFromMatchingParentDespiteSiblingShadowing(@TempDir Path root) throws Exception {
+        String pom
+                = "<project><modelVersion>4.0.0</modelVersion><groupId>example</groupId><artifactId>%s</artifactId><version>1</version>%s</project>";
+        String parent
+                = "<parent><groupId>example</groupId><artifactId>platform</artifactId><version>1</version><relativePath>../parent</relativePath></parent>";
+        Path platform = Files.createDirectories(root.resolve("parent")).resolve("pom.xml");
+        Files.writeString(platform,
+                String.format(java.util.Locale.ROOT, pom, "platform",
+                        "<properties><starter>4.2</starter><core>4.1</core></properties>"));
+        Files.writeString(Files.createDirectories(root.resolve("sibling")).resolve("pom.xml"),
+                String.format(java.util.Locale.ROOT, pom, "other",
+                        "<properties><starter>3.0</starter><core>3.0</core></properties>"));
+        Path leaf = Files.createDirectories(root.resolve("app")).resolve("pom.xml");
+        String imports
+                = """
+                        <dependencyManagement><dependencies>
+                          <dependency><groupId>org.apache.camel.springboot</groupId><artifactId>camel-spring-boot-bom</artifactId>
+                            <type>pom</type><scope>import</scope><version>${starter}</version></dependency>
+                          <dependency><groupId>org.apache.camel</groupId><artifactId>camel-bom</artifactId>
+                            <type>pom</type><scope>import</scope><version>${core}</version></dependency>
+                        </dependencies></dependencyManagement>
+                        """;
+        Files.writeString(leaf, String.format(java.util.Locale.ROOT, pom, "app", parent + imports));
+        var graph = new ProjectGraph();
+        new PomParser().parse(root, graph);
+        var discovery = org.apache.camel.kit.graph.ProjectDiscovery.discover(graph);
+        assertEquals("4.1", discovery.camelVersion());
+        assertEquals("4.2", discovery.platformBomVersion());
+        Files.writeString(leaf,
+                String.format(java.util.Locale.ROOT, pom, "app", parent.replace("<version>1", "<version>2") + imports));
+        var mismatch = new ProjectGraph();
+        new PomParser().parse(root, mismatch);
+        assertNull(org.apache.camel.kit.graph.ProjectDiscovery.discover(mismatch).platformBomVersion());
+    }
 }

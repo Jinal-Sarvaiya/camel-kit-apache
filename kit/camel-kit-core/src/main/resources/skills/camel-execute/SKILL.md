@@ -44,10 +44,9 @@ AUTONOMOUS EXECUTION: Execute ALL validated tasks from the plan using wave analy
 
 ---
 
-For a migration, use `{COMMAND_PREFIX} target --migration`. Compare its complete profile to the approved
-destination and pass it to every worker. In this workflow all runtime/version references below mean the
-destination. Existing-project version locks apply to in-place additions. Preserve source modules and scope
-migration edits to the approved destination. If the profile changes, refresh the design, POM and catalog evidence.
+## Target runtime
+
+Use the selected profile as described in `shared/mcp-setup.md`, Rule 1, including its migration handoff.
 
 ## Invocation Modes
 
@@ -224,7 +223,8 @@ Read `.camel-kit/config.properties`:
    and do not execute. Treat `project.discoveryGaps` as items to inspect in the source before editing, not as proof
    that nothing exists.
 
-   **A missing `project.runtime` or `project.camelVersion` means discovery found conflicting or no evidence, not that
+   When `project.needsResolvedCore=true` and `project.camelVersion` is missing, first follow “Recover the core version from Maven” in
+   `camel-brainstorm/guides/version-selection.md`. **A still-missing `project.runtime` or `project.camelVersion` means discovery found conflicting or no evidence, not that
    the project has no constraint.** If either is absent, or `project.discoveryGaps` reports conflicting runtimes or
    Camel versions or a failed discovery, STOP and report it: the user must resolve it before any file is edited. Never
    fill the value in from the shipped version tables.

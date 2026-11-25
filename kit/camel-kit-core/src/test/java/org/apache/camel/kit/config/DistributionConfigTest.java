@@ -118,6 +118,14 @@ class DistributionConfigTest {
     }
 
     @Test
+    void catalogRepositoryWhitespaceIsNormalizedForMcpLaunchers() {
+        Properties properties = new Properties();
+        properties.setProperty("camel.catalog.repos", " https://repo.example/first, https://repo.example/second ");
+        assertEquals("https://repo.example/first,https://repo.example/second",
+                DistributionConfig.load(properties).camelCatalogRepos());
+    }
+
+    @Test
     void piVersionsCanBeOverriddenViaProperties() {
         Properties properties = new Properties();
         properties.setProperty("pi.version", "9.9.9-test");

@@ -68,15 +68,12 @@ Provides the domain knowledge guides needed to validate generated Apache Camel r
 
 ## Runtime Path Inventory (MANDATORY)
 
-For a migration, including project-scoped validation of a direct migration, use `{COMMAND_PREFIX} target --migration`.
-Use its profile recorded in the migration note or design to identify the destination. Ask which application is being
-validated if the scope is ambiguous. Compare its complete profile to the approved
-destination and pass it to every worker. In this workflow all runtime/version references below mean the
-destination. Existing-project version locks apply to in-place additions. Preserve source modules and scope
-migration edits to the approved destination. If the profile changes, refresh the design, POM and catalog evidence.
+Use the target profile and migration handoff in `shared/mcp-setup.md`, Rule 1. For a direct migration,
+identify the destination from its migration note and ask which application to validate if scope is ambiguous.
 
 For a Maven destination, run the wrapper's `help:effective-pom` for the destination module and pass the output to
-the same target command with `--check-effective-pom <file>`. Keep the output workspace-relative and temporary
+the same target command with `--check-effective-pom <file>`. For in-place validation also supply the fresh
+`--dependency-tree <json>` from that leaf under the same Maven settings (see the version-selection guide). Keep the output workspace-relative and temporary
 during report-only validation. Record a missing model or version mismatch as INCOMPLETE.
 
 Before loading validation stages, read the selected profile's `runtime` and every flow's `Target Module`. Build an exact inventory for

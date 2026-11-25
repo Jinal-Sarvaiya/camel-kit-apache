@@ -167,6 +167,30 @@ Two further keys appear only when needed:
 * `project.unsupportedCombination` - the detected runtime or DSL is outside the supported scope (for example a Karaf
   runtime, or no YAML routes). The workflow stops instead of guessing; Camel Kit never converts the DSL.
 
+[[resolved-maven-core]]
+=== Resolve a BOM-only project's Camel version
+
+A starter or platform BOM can have a different version from Camel core. If init finds the BOM but cannot
+determine the core, it sets `project.needsResolvedCore=true`. Use the application's Maven settings and
+profiles. From the workspace root, run the following for each Camel application module, replacing `app/pom.xml`
+with its POM. For a vendor Spring Boot BOM, first set `project.catalogBom` to the published catalog provider
+GAV from its starter release metadata. Use fresh output paths for each module. The dependency plugin supports JSON from version 3.7.0.
+
+[source,shell]
+----
+./mvnw -f app/pom.xml help:effective-pom -Doutput="$PWD/app/target/model.xml"
+./mvnw -f app/pom.xml org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -DoutputType=json -Dincludes=org.apache.camel:camel-core-engine -DoutputFile="$PWD/app/target/tree.json"
+camel-kit target --check-effective-pom app/target/model.xml --dependency-tree app/target/tree.json
+----
+
+The command checks that the dependency tree and effective model identify the same module. A successful check
+prints the profile without writing configuration. When the affected modules agree, copy `camelVersion` to
+`project.camelVersion` in `.camel-kit/config.properties`. For Quarkus copy `runtimeCatalogVersion` to
+`project.catalogVersion`; for Spring Boot copy `springBootVersion` to `project.springBootVersion`.
+Keep conflicting versions unresolved. Re-run the checks if the effective build settings or profiles change.
+Init preserves the recovered core across reinitialization with unchanged POMs and repositories. Changes to
+the selected platform invalidate its recorded catalog coordinates.
+
 === 3. Add a New Capability
 
 Start the workflow:

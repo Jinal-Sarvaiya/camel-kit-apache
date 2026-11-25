@@ -93,12 +93,16 @@ Print the active runtime profile as JSON. Add `--migration` for the destination 
 xref:migration.adoc#target-profile[the migration workflow]. An incomplete selection returns exit code 1.
 
 ----
-camel-kit target [--project-dir <path>] [--migration] [--pom-template | --check-effective-pom <xml> | --check-catalog <json>]
+camel-kit target [--project-dir <path>] [--migration] [--pom-template]
+camel-kit target [--project-dir <path>] [--migration] [--check-effective-pom <xml> [--dependency-tree <json>]] [--check-catalog <json>]
 ----
 
 `--pom-template` prints a runtime-specific Maven template ready for the four project identity fields.
 `--check-effective-pom` reads a leaf module's `help:effective-pom` XML and checks the managed core,
-framework, starter or extension versions and the build plugin. Both checks accept workspace-relative paths.
+framework, starter or extension versions and the build plugin. For an existing application, add a JSON
+`--dependency-tree` from the same module to check its resolved transitive Camel core. See
+xref:existing-project.adoc#resolved-maven-core[recovering a BOM-only project's versions].
+The two checks can run together. Evidence files must be inside the workspace.
 `--check-catalog` reads a JSON evidence file. It contains the captured profile under `profile`
 and the two MCP calls under `list` and `maven`. Each call contains its tool `name`, actual `arguments` and
 original `result`. A successful check prints the profile. Stale or mismatched evidence exits 1 with

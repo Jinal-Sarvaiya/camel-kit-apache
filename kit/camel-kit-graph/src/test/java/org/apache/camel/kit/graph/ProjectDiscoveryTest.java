@@ -536,7 +536,9 @@ class ProjectDiscoveryTest {
                 "maven-property:spring-boot.version", NodeType.CONFIG_PROPERTY,
                 Map.of("value", "3.3.5")));
         graph.addNode(springBootStarter("pom.xml"));
-        graph.addNode(managed("camel-spring-boot-bom", "4.8.1"));
+        graph.addNode(
+                new GraphNode("maven-property:starter.version", NodeType.CONFIG_PROPERTY, Map.of("value", "4.8.1")));
+        graph.addNode(managed("camel-spring-boot-bom", "${starter.version}"));
         graph.addNode(managed("spring-boot-dependencies", "${spring-boot.version}"));
 
         ProjectDiscovery.DiscoveryResult result = ProjectDiscovery.discover(graph);
@@ -753,7 +755,7 @@ class ProjectDiscoveryTest {
         assertEquals("spring-boot", result.runtime());
         assertNull(result.camelVersion());
         assertEquals("4.8.0", result.platformBomVersion());
-        assertTrue(result.coverageGaps().stream().anyMatch(gap -> gap.contains("Camel core version")));
+        assertTrue(result.coverageGaps().stream().anyMatch(gap -> gap.contains("camel-core-engine")));
     }
 
     @Test

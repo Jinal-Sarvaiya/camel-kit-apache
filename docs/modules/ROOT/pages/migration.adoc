@@ -62,6 +62,8 @@ target.springBootVersion=3.5.11
 For Quarkus, set `target.applicationBom` to the full Camel platform BOM and `target.catalogVersion` to its
 managed `org.apache.camel.quarkus:camel-quarkus-catalog` version. The MCP lookup takes the platform BOM GAV.
 Main needs only `target.runtime=main` and the core version.
+Check xref:mcp.adoc#binding[catalog availability] before selecting the destination. With the pinned runner,
+the default Quarkus platform 3.33.3.2 cannot complete a design that requires verified component coordinates.
 
 Run `camel-kit target --migration` to inspect the profile. For a new Maven application,
 `camel-kit target --migration --pom-template` prints the POM with the selected imports and plugin version.

@@ -73,7 +73,7 @@ public class DistributionConfig {
         this.camelMcpRepos = configured(props, bundled, "camel.mcp.repos");
         this.knowledgeMcpRepos = configured(props, bundled, "knowledge.mcp.repos");
         this.citrusMcpRepos = configured(props, bundled, "citrus.mcp.repos");
-        this.camelCatalogRepos = configured(props, bundled, "camel.catalog.repos");
+        this.camelCatalogRepos = configured(props, bundled, "camel.catalog.repos").strip().replaceAll("\\s*,\\s*", ",");
         this.piVersion = configured(props, bundled, "pi.version");
         requiredProperty(bundled, "pi.supported");
         this.piSupported = props.getProperty("pi.supported", this.piVersion);

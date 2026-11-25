@@ -4,8 +4,11 @@ import java.io.Reader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.model.*;
@@ -36,14 +39,53 @@ public class PomParser implements GraphParser {
     @Override
     public void parseFiles(Path projectRoot, List<Path> files, ProjectGraph graph) {
         GraphParser.requireSafeFiles(projectRoot, files);
-        files.forEach(file -> parsePom(file, projectRoot, graph));
+        Map<Path, Model> models = new LinkedHashMap<>();
+        for (Path file : files) {
+            try (Reader input = new StringReader(new String(GraphParser.readSource(file), StandardCharsets.UTF_8))) {
+                models.put(file.normalize(), new MavenXpp3Reader().read(input));
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Failed to parse POM: " + file, e);
+            }
+        }
+        models.forEach((file, model) -> parsePom(file, projectRoot, graph, model, inheritedProperties(file, models)));
     }
 
-    private void parsePom(Path pomFile, Path projectRoot, ProjectGraph graph) {
-        try (Reader reader = new StringReader(
-                new String(GraphParser.readSource(pomFile), StandardCharsets.UTF_8))) {
-            Model model = new MavenXpp3Reader().read(reader);
+    // Follow only matching parents already included in the workspace scan. Siblings do not share properties.
+    private static Properties inheritedProperties(Path file, Map<Path, Model> models) {
+        Properties properties = new Properties();
+        var visited = new HashSet<Path>();
+        Model model = models.get(file);
+        while (model != null && visited.add(file)) {
+            model.getProperties().forEach(properties::putIfAbsent);
+            var parent = model.getParent();
+            if (parent == null || parent.getRelativePath() == null || parent.getRelativePath().isBlank()) {
+                break;
+            }
+            Path relative = Path.of(parent.getRelativePath());
+            if (relative.isAbsolute()) {
+                break;
+            }
+            file = file.resolveSibling(relative).normalize();
+            if (!models.containsKey(file)) {
+                file = file.resolve("pom.xml").normalize();
+            }
+            model = models.get(file);
+            if (model != null) {
+                String group = model.getGroupId() == null && model.getParent() != null
+                        ? model.getParent().getGroupId() : model.getGroupId();
+                String version = model.getVersion() == null && model.getParent() != null
+                        ? model.getParent().getVersion() : model.getVersion();
+                if (!parent.getGroupId().equals(group) || !parent.getArtifactId().equals(model.getArtifactId())
+                        || !parent.getVersion().equals(version)) {
+                    break;
+                }
+            }
+        }
+        return properties;
+    }
 
+    private void parsePom(Path pomFile, Path projectRoot, ProjectGraph graph, Model model, Properties properties) {
+        try {
             String groupId = model.getGroupId() != null
                     ? model.getGroupId()
                     : (model.getParent() != null ? model.getParent().getGroupId() : "unknown");
@@ -78,7 +120,7 @@ public class PomParser implements GraphParser {
             // against the declaring POM's own properties to prevent cross-module property collision.
             String pomRelative = projectRoot.relativize(pomFile).toString();
             if (model.getParent() != null) {
-                String parentVersion = resolveProperty(model.getParent().getVersion(), model);
+                String parentVersion = resolveProperty(model.getParent().getVersion(), properties);
                 // Include module provenance in node ID to preserve per-module parent versions
                 graph.addNode(new GraphNode(
                         "maven-parent:" + pomRelative + ":" + model.getParent().getGroupId() + ":"
@@ -94,14 +136,14 @@ public class PomParser implements GraphParser {
             if (management != null) {
                 for (Dependency managed : management.getDependencies()) {
                     String rawVersion = managed.getVersion();
-                    String resolvedVersion = rawVersion != null ? resolveProperty(rawVersion, model) : "managed";
+                    String resolvedVersion = rawVersion != null ? resolveProperty(rawVersion, properties) : "managed";
                     // Include module provenance in node ID to preserve per-module managed versions
                     graph.addNode(new GraphNode(
                             "maven-managed:" + pomRelative + ":" + managed.getGroupId() + ":" + managed.getArtifactId(),
                             NodeType.CONFIG_PROPERTY,
                             Map.of("kind", "managed",
-                                    "groupId", resolveProperty(managed.getGroupId(), model),
-                                    "artifactId", resolveProperty(managed.getArtifactId(), model),
+                                    "groupId", resolveProperty(managed.getGroupId(), properties),
+                                    "artifactId", resolveProperty(managed.getArtifactId(), properties),
                                     "version", resolvedVersion,
                                     "scope", managed.getScope() != null ? managed.getScope() : "compile",
                                     "type", managed.getType() != null ? managed.getType() : "jar",
@@ -109,7 +151,7 @@ public class PomParser implements GraphParser {
                 }
             }
 
-            recordCamelVersionEvidence(model, pomRelative, graph);
+            recordCamelVersionEvidence(model, pomRelative, graph, properties);
 
             for (Dependency dep : model.getDependencies()) {
                 String depId = "maven:" + dep.getGroupId() + ":" + dep.getArtifactId();
@@ -138,22 +180,22 @@ public class PomParser implements GraphParser {
      * under {@code maven-camel-version:<pom>:<source>}, with the property references resolved against that POM's own
      * properties. Discovery uses them to notice modules that disagree.
      */
-    private void recordCamelVersionEvidence(Model model, String pomRelative, ProjectGraph graph) {
+    private void recordCamelVersionEvidence(
+            Model model, String pomRelative, ProjectGraph graph, Properties properties) {
         String camelVersionProperty
                 = model.getProperties() == null ? null : model.getProperties().getProperty("camel.version");
-        addCamelVersionEvidence(graph, pomRelative, "property camel.version", camelVersionProperty, model);
+        addCamelVersionEvidence(graph, pomRelative, "property camel.version", camelVersionProperty, properties);
         for (Dependency dep : model.getDependencies()) {
             if ("org.apache.camel".equals(dep.getGroupId())) {
                 addCamelVersionEvidence(graph, pomRelative, "dependency " + dep.getArtifactId(), dep.getVersion(),
-                        model);
+                        properties);
             }
         }
-
     }
 
     private void addCamelVersionEvidence(
-            ProjectGraph graph, String pomRelative, String source, String rawVersion, Model model) {
-        String version = resolveProperty(rawVersion, model);
+            ProjectGraph graph, String pomRelative, String source, String rawVersion, Properties properties) {
+        String version = resolveProperty(rawVersion, properties);
         if (version == null || version.isBlank() || version.contains("${")) {
             return;
         }
@@ -162,9 +204,9 @@ public class PomParser implements GraphParser {
                 Map.of("kind", "camel-version-evidence", "version", version, "source", source, "file", pomRelative)));
     }
 
-    private static String resolveProperty(String value, Model model) {
+    private static String resolveProperty(String value, Properties properties) {
         for (int depth = 0; depth < 16 && value != null && value.startsWith("${") && value.endsWith("}"); depth++) {
-            String resolved = model.getProperties().getProperty(value.substring(2, value.length() - 1));
+            String resolved = properties.getProperty(value.substring(2, value.length() - 1));
             if (resolved == null) {
                 break;
             }

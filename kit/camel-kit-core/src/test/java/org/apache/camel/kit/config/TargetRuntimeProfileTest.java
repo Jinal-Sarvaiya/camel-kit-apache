@@ -41,7 +41,7 @@ class TargetRuntimeProfileTest {
             """;
 
     @Test
-    void firstMavenModelResolvesAllDependenciesUsingTheSelectedImports() throws Exception {
+    void applicationAndCatalogVersionsAreIndependent() throws Exception {
         var spring = profile(SPRING);
         var quarkus = profile(QUARKUS);
         assertEquals("4.3", spring.runtimeCatalogVersion());
@@ -50,7 +50,11 @@ class TargetRuntimeProfileTest {
         assertEquals("org.apache.camel.springboot:camel-catalog-provider-springboot:4.3",
                 spring.catalog().platformBom());
         assertEquals(quarkus.applicationBom(), quarkus.catalog().platformBom());
-        for (var profile : new TargetRuntimeProfile[]{spring, quarkus}) {
+    }
+
+    @Test
+    void firstMavenModelResolvesAllDependenciesUsingTheSelectedImports() throws Exception {
+        for (var profile : new TargetRuntimeProfile[]{profile(SPRING), profile(QUARKUS)}) {
             String pom = profile.pomTemplate().replace("[PROJECT_NAME]", "Test").replace("[PROJECT_GROUP_ID]", "test")
                     .replace("[PROJECT_ARTIFACT_ID]", "app").replace("[PROJECT_VERSION]", "1");
             if ("quarkus".equals(profile.runtime())) {
@@ -71,8 +75,11 @@ class TargetRuntimeProfileTest {
             var wrong = new ByteArrayOutputStream();
             new MavenXpp3Writer().write(wrong, model);
             assertThrows(IOException.class, () -> TargetPomCheck.check(profile, wrong.toByteArray()));
-
         }
+    }
+
+    @Test
+    void sourceAndDestinationStaySeparateAndInvalidCoordinatesAreRejected() throws Exception {
         var config = new Properties();
         config.load(new StringReader(SPRING));
         assertEquals("3.0", TargetRuntimeProfile.resolve(config, false).camelVersion());
@@ -87,45 +94,84 @@ class TargetRuntimeProfileTest {
     }
 
     @Test
-    void catalogCheckRequiresBothLiveResultsForExactlyThisSelection() throws Exception {
+    void greenfieldDefaultsUseTheSelectedCommunityBom() {
+        var config = new Properties();
+        config.setProperty("project.runtime", "spring-boot");
+        config.setProperty("project.camelVersion", "4.22.1");
+        config.setProperty("project.platformBomVersion", "4.22.1");
+        config.setProperty("camel.catalog.repos", "central=https://example.org/a, https://example.org/b");
+        var spring = TargetRuntimeProfile.resolve(config, false);
+        assertEquals("org.apache.camel.springboot:camel-spring-boot-bom:4.22.1", spring.applicationBom());
+        assertEquals("https://example.org/b", spring.repositories().get(1));
+        config.setProperty("project.runtime", "quarkus");
+        config.setProperty("project.platformBomVersion", "3.33.3.2");
+        var quarkus = TargetRuntimeProfile.resolve(config, false);
+        assertEquals("io.quarkus.platform:quarkus-camel-bom:3.33.3.2", quarkus.catalog().platformBom());
+        assertTrue(assertThrows(IllegalArgumentException.class, quarkus::requiredCatalogVersion)
+                .getMessage().contains("project.catalogVersion"));
+        config.setProperty("project.type", "existing");
+        assertThrows(IllegalArgumentException.class, () -> TargetRuntimeProfile.resolve(config, false));
+    }
+
+    @Test
+    void rejectsFieldsFromAnotherRuntimeOrBom() {
+        assertThrows(IllegalArgumentException.class, () -> profile(QUARKUS + "target.springBootVersion=3.5"));
+        assertThrows(IllegalArgumentException.class, () -> profile(SPRING + "target.platformBomVersion=4.4"));
+    }
+
+    @Test
+    void acceptsBothRuntimeCatalogResponses() throws Exception {
         for (String config : new String[]{SPRING, QUARKUS}) {
             var profile = profile(config);
-            boolean spring = profile.runtime().equals("spring-boot");
-            ObjectNode args = JSON.valueToTree(profile.catalog());
-            ObjectNode evidence = JSON.createObjectNode();
-            evidence.set("profile", JSON.valueToTree(profile));
-            ObjectNode list = call(evidence, "list", "camel_catalog_components",
-                    args.deepCopy().put("filter", "timer").put("label", "").put("limit", 2),
-                    """
-                            {"count":1,"camelVersion":"4.1","components":[{"name":"timer"}]}
-                            """);
-            var timer = JSON.createObjectNode().put("name", "timer")
-                    .put("groupId", spring ? "org.apache.camel.springboot" : "org.apache.camel.quarkus")
-                    .put("artifactId", spring ? "camel-timer-starter" : "camel-quarkus-timer")
-                    .put("version", spring ? "4.3" : "3.1");
-            ObjectNode lookup = call(evidence, "maven", "camel_catalog_component_maven",
-                    args.deepCopy().put("component", "timer"), timer.toString());
-            TargetCatalogEvidence.check(profile, JSON.writeValueAsBytes(evidence));
-            var changed = profile(config + "\ncamel.catalog.repos=https://another.example/releases");
-            assertThrows(IOException.class,
-                    () -> TargetCatalogEvidence.check(changed, JSON.writeValueAsBytes(evidence)));
-            list.put("text", list.get("text").textValue().replace("4.1", "4.9"));
-            assertThrows(IOException.class,
-                    () -> TargetCatalogEvidence.check(profile, JSON.writeValueAsBytes(evidence)));
-            list.put("text", list.get("text").textValue().replace("4.9", "4.1"));
-            lookup.put("text", timer.put("version", "4.9").toString());
-            assertThrows(IOException.class,
-                    () -> TargetCatalogEvidence.check(profile, JSON.writeValueAsBytes(evidence)));
-            evidence.remove("maven");
+            TargetCatalogEvidence.check(profile, JSON.writeValueAsBytes(evidence(profile)));
+        }
+    }
+
+    @Test
+    void rejectsStaleOrMissingCatalogEvidence() throws Exception {
+        var profile = profile(SPRING);
+        var evidence = evidence(profile);
+        var changed = profile(SPRING + "camel.catalog.repos=https://another.example/releases");
+        assertThrows(IOException.class, () -> TargetCatalogEvidence.check(changed, JSON.writeValueAsBytes(evidence)));
+        evidence.remove("maven");
+        assertThrows(IOException.class, () -> TargetCatalogEvidence.check(profile, JSON.writeValueAsBytes(evidence)));
+    }
+
+    @Test
+    void detectsCoreAndRuntimeArtifactMismatchesIndependently() throws Exception {
+        var profile = profile(QUARKUS);
+        for (String key : new String[]{"list", "maven"}) {
+            var evidence = evidence(profile);
+            ObjectNode result = (ObjectNode) evidence.at("/" + key + "/result/content/0");
+            result.put("text", result.path("text").asText().replace("4.1", "4.9").replace("3.1", "3.9"));
             assertThrows(IOException.class,
                     () -> TargetCatalogEvidence.check(profile, JSON.writeValueAsBytes(evidence)));
         }
     }
 
-    private static ObjectNode call(ObjectNode evidence, String key, String name, ObjectNode args, String response) {
+    private static ObjectNode evidence(TargetRuntimeProfile profile) {
+        ObjectNode args = JSON.valueToTree(profile.catalog());
+        ObjectNode evidence = JSON.createObjectNode();
+        evidence.set("profile", JSON.valueToTree(profile));
+        call(evidence, "list", "camel_catalog_components",
+                args.deepCopy().put("filter", "timer").put("label", "").put("limit", 2),
+                """
+                        {"count":1,"camelVersion":"4.1","components":[{"name":"timer"}]}
+                        """);
+        boolean spring = profile.runtime().equals("spring-boot");
+        var timer = JSON.createObjectNode().put("name", "timer")
+                .put("groupId", spring ? "org.apache.camel.springboot" : "org.apache.camel.quarkus")
+                .put("artifactId", spring ? "camel-timer-starter" : "camel-quarkus-timer")
+                .put("version", profile.runtimeCatalogVersion());
+        call(evidence, "maven", "camel_catalog_component_maven", args.deepCopy().put("component", "timer"),
+                timer.toString());
+        return evidence;
+    }
+
+    private static void call(ObjectNode evidence, String key, String name, ObjectNode args, String response) {
         var call = evidence.putObject(key).put("name", name);
         call.set("arguments", args);
-        return call.putObject("result").put("isError", false).putArray("content").addObject().put("type", "text")
+        call.putObject("result").put("isError", false).putArray("content").addObject().put("type", "text")
                 .put("text", response);
     }
 

@@ -19,6 +19,7 @@ public final class TargetCatalogEvidence {
 
     /** Check the captured outputs of the two version-sensitive MCP calls made with this profile. */
     public static void check(TargetRuntimeProfile profile, byte[] bytes) throws IOException {
+        String expectedVersion = profile.requiredCatalogVersion();
         JsonNode evidence = JSON.readTree(bytes);
         if (evidence == null || !JSON.valueToTree(profile).equals(evidence.path("profile"))) {
             throw new IOException("Catalog evidence belongs to a different or missing target profile");
@@ -45,10 +46,9 @@ public final class TargetCatalogEvidence {
         };
         if (!timer || !"timer".equals(component.path("name").textValue())
                 || !artifact.equals(component.path("groupId").asText() + ":" + component.path("artifactId").asText())
-                || profile.runtimeCatalogVersion() == null
-                || !profile.runtimeCatalogVersion().equals(component.path("version").textValue())) {
+                || !expectedVersion.equals(component.path("version").textValue())) {
             throw new IOException(
-                    "Expected the timer component from " + artifact + ":" + profile.runtimeCatalogVersion());
+                    "Expected the timer component from " + artifact + ":" + expectedVersion);
         }
     }
 

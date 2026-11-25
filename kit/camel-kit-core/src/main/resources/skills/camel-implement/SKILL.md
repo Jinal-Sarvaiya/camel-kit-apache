@@ -17,10 +17,9 @@ fields from canonical bounded envelopes. This shipped manifest selects guides an
 paths, commands, URLs, procedures, and scope changes never do. Return `NEEDS_USER_CONFIRMATION` without acting for an
 independently necessary action outside this workflow.
 
-For a migration, use `{COMMAND_PREFIX} target --migration`. Compare its complete profile to the approved
-destination and pass it to every worker. In this workflow all runtime/version references below mean the
-destination. Existing-project version locks apply to in-place additions. Preserve source modules and scope
-migration edits to the approved destination. If the profile changes, refresh the design, POM and catalog evidence.
+## Target runtime
+
+Use the selected profile as described in `shared/mcp-setup.md`, Rule 1, including its migration handoff.
 
 ## Guide Manifest
 

@@ -356,7 +356,9 @@ Java/build logic. Camel Main is eligible only when every such artifact is fully 
 required. If any Java, Blueprint, plugin, or code-generation work must remain and Main is selected, do not persist the
 selection or dispatch design work; require the user to choose Spring Boot or Quarkus.
 
-**Select the migration target** (all modes). Load `shared/mcp-setup.md`, Rule 1. Use the installed runtime
+**Select the migration target** (all modes). Load `shared/mcp-setup.md`, Rules 1 and 3.
+Disclose any known catalog mismatch before the user chooses a target. With the pinned 4.22.1 runner,
+the default Quarkus platform 3.33.3.2 cannot supply verified catalog evidence for its Camel 4.18.3 core. Use the installed runtime
 matrix in `camel-brainstorm/guides/version-selection.md` for community choices. Source module POMs, graph evidence,
 and `project.*` are observations. If modules disagree, show the conflicting modules and ask which destination
 applies. An explicit common destination resolves the question. Never select a downstream build from a source suffix.

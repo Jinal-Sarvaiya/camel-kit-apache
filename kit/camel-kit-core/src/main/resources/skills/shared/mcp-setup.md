@@ -134,7 +134,9 @@ Fallback policy:
 
 Run `{COMMAND_PREFIX} target --migration` for a migration or `{COMMAND_PREFIX} target` for the current
 application. Pass the three fields in its `catalog` object (`runtime`, `camelVersion`, `platformBom`) unchanged
-on every version-sensitive call. The application BOM is for Maven. Spring Boot lookup takes the GAV of
+on every version-sensitive call. For a migration, compare the complete profile with the approved destination, pass
+it to each worker and scope edits to that destination. A change invalidates the design's POM and catalog evidence.
+In-place additions use the existing application's locks. The application BOM is for Maven. Spring Boot lookup takes the GAV of
 `camel-catalog-provider-springboot` at its own release. Quarkus lookup takes the complete `quarkus-camel-bom`
 GAV. Main takes `org.apache.camel:camel-catalog` at the selected core version.
 Check that the active Camel MCP launcher uses the profile's `repositories` for catalog resolution. Use only the
@@ -152,18 +154,47 @@ The runtime affects which components are returned (e.g., Quarkus extensions vs S
 
 ### Rule 3: Bind catalog results to the resolved Camel version
 
-The version binding comes from `.camel-kit/config.properties`. For required checks, capture the profile
-before dispatch. With its exact `catalog` arguments, call `camel_catalog_components` with `filter="timer"`,
-`label=""`, `limit=2`, and `camel_catalog_component_maven` with `component="timer"`. Save the profile
-under `profile`. Under `list` and `maven` respectively store each actual call as
-`{"name": <tool name>, "arguments": <sent arguments>, "result": <original MCP result including content>}`
-in a workspace-relative JSON file, using a fresh file under `.camel-kit/.cache/`. In report-only validation remove this temporary file after
-recording the profile and outcome in the report. Run the same target command with `--check-catalog <file>`. Quarkus requires the catalog version
-managed by the chosen platform (`target.catalogVersion` for migrations, `project.catalogVersion` otherwise).
-The check compares the returned core version and the runtime-specific timer artifact. A server can return a
-starter/extension even while serving its bundled core catalog. An error, missing result, different target, or
-version mismatch makes the required catalog check **INCOMPLETE**. Report the diagnostic, mark dependent
-lookups unverified, and never use a bundled or manual lookup to pass. Repeat after any profile change.
+The version binding comes from `.camel-kit/config.properties`. For a required check:
+
+1. Save the complete output of the appropriate target command under `profile` **before** dispatch.
+2. Copy its three `catalog` fields into both calls. For `camel_catalog_components` add `filter="timer"`, `label=""`, `limit=2`.
+   For `camel_catalog_component_maven` add `component="timer"`.
+3. Capture the actual sent arguments and returned MCP results in a fresh workspace-relative file under `.camel-kit/.cache/`.
+   The JSON below illustrates the wire shape for Main. Replace the entire profile, arguments and result content with
+   the observed values. Copy text verbatim using JSON string encoding. If the harness exposes only a confirmed successful
+   single text block, wrap that text in `content` as shown and omit `isError`. If success or the original text is
+   unavailable, report INCOMPLETE. Never substitute sample data or reconstruct a result from a summary.
+
+```json
+{
+  "profile": {
+    "runtime": "main", "camelVersion": "4.22.1", "applicationBom": null, "springBootVersion": null,
+    "repositories": ["https://repo.maven.apache.org/maven2/"], "runtimeCatalogVersion": "4.22.1",
+    "catalog": {"runtime":"main","camelVersion":"4.22.1","platformBom":"org.apache.camel:camel-catalog:4.22.1"}
+  },
+  "list": {
+    "name": "camel_catalog_components",
+    "arguments": {"runtime":"main","camelVersion":"4.22.1","platformBom":"org.apache.camel:camel-catalog:4.22.1","filter":"timer","label":"","limit":2},
+    "result": {"content":[{"type":"text","text":"<original list response text>"}]}
+  },
+  "maven": {
+    "name": "camel_catalog_component_maven",
+    "arguments": {"runtime":"main","camelVersion":"4.22.1","platformBom":"org.apache.camel:camel-catalog:4.22.1","component":"timer"},
+    "result": {"content":[{"type":"text","text":"<original Maven response text>"}]}
+  }
+}
+```
+
+4. Run the same target command with `--check-catalog <file>`. For Quarkus record the managed
+   `camel-quarkus-catalog` version in `target.catalogVersion` (migration) or `project.catalogVersion`.
+   Require both the returned core version and runtime-specific timer artifact to match.
+5. Record the profile and outcome. Remove the temporary file during report-only validation. An error, missing result,
+   changed profile or version mismatch makes the required check **INCOMPLETE**. Leave dependent lookups unverified.
+   Repeat after any profile change.
+
+With the shipped 4.22.1 runner the supported Spring Boot 4.18.4 and Quarkus 4.18.3/4.14.7 rows return
+core 4.22.1. This includes the default Quarkus platform 3.33.3.2. Inform the user before selecting these rows:
+design assembly requires verified artifacts and cannot complete while that mismatch persists.
 
 Detail tools do not all return `camelVersion`. Do not require or invent a field that is absent from a tool's schema.
 Validate each returned artifact identity and each consumed field against the requested type and name, bound to the

@@ -17,6 +17,9 @@ import org.apache.camel.kit.graph.model.NodeType;
  */
 public final class ProjectDiscovery {
 
+    public static final String UNRESOLVED_PLATFORM_CORE = "Read the selected module's Maven dependency tree "
+                                                          + "for org.apache.camel:camel-core-engine and record the resolved project.camelVersion before planning.";
+
     private ProjectDiscovery() {
     }
 
@@ -93,8 +96,7 @@ public final class ProjectDiscovery {
         }
         for (GraphNode managed : graph.findByType(NodeType.CONFIG_PROPERTY)) {
             var fields = managed.properties();
-            if ("managed".equals(fields.get("kind")) && "pom".equals(fields.get("type"))
-                    && "import".equals(fields.get("scope"))) {
+            if (isImportedBom(fields)) {
                 String artifact = fields.getOrDefault("artifactId", "");
                 String runtime = switch (artifact) {
                     case "quarkus-camel-bom" -> "quarkus";
@@ -131,10 +133,10 @@ public final class ProjectDiscovery {
         for (GraphNode node : graph.findByType(NodeType.CONFIG_PROPERTY)) {
             var fields = node.properties();
             String artifact = fields.getOrDefault("artifactId", "");
-            if ("managed".equals(fields.get("kind")) && "pom".equals(fields.get("type"))
-                    && "import".equals(fields.get("scope")) && "org.apache.camel".equals(fields.get("groupId"))
+            if (isImportedBom(fields) && "org.apache.camel".equals(fields.get("groupId"))
                     && artifact.startsWith("camel-") && artifact.endsWith("-bom")) {
-                addVersion(versions, fields.get("version"), "imported BOM " + artifact + " in " + fields.get("file"));
+                addVersion(versions, resolve(graph, fields.get("version"), fields.get("file")),
+                        "imported BOM " + artifact + " in " + fields.get("file"));
             }
             // Older graphs also recorded platform BOMs as core evidence. Read their actual imports above.
             if ("camel-version-evidence".equals(fields.get("kind"))
@@ -143,6 +145,11 @@ public final class ProjectDiscovery {
             }
         }
         return versions;
+    }
+
+    private static boolean isImportedBom(Map<String, String> fields) {
+        return "managed".equals(fields.get("kind")) && "pom".equals(fields.get("type"))
+                && "import".equals(fields.get("scope"));
     }
 
     private static void addVersion(Map<String, Set<String>> versions, String version, String source) {
@@ -156,12 +163,17 @@ public final class ProjectDiscovery {
      * Resolves a {@code ${property}} reference against the Maven properties the parser recorded; a value that is not a
      * reference, or whose property is unknown, is returned unchanged.
      */
-    private static String resolve(ProjectGraph graph, String value) {
+    private static String resolve(ProjectGraph graph, String value, String file) {
         if (value == null || !value.startsWith("${") || !value.endsWith("}")) {
             return value;
         }
         GraphNode property = graph.getNode("maven-property:" + value.substring(2, value.length() - 1));
-        return property == null ? value : property.properties().getOrDefault("value", value);
+        // A legacy graph may have kept only a sibling's declaration under this global property key.
+        if (property == null || (property.properties().containsKey("file")
+                && !property.properties().get("file").equals(file))) {
+            return value;
+        }
+        return property.properties().getOrDefault("value", value);
     }
 
     /**
@@ -199,9 +211,8 @@ public final class ProjectDiscovery {
         Set<String> coordinates = new TreeSet<>();
         for (GraphNode node : graph.findByType(NodeType.CONFIG_PROPERTY)) {
             var p = node.properties();
-            if ("managed".equals(p.get("kind")) && "import".equals(p.get("scope"))
-                    && "pom".equals(p.get("type")) && artifact.equals(p.get("artifactId"))) {
-                String version = p.get("version");
+            if (isImportedBom(p) && artifact.equals(p.get("artifactId"))) {
+                String version = resolve(graph, p.get("version"), p.get("file"));
                 String group = p.get("groupId");
                 if (version == null || version.isBlank() || version.contains("${") || "managed".equals(version)
                         || "unknown".equals(version)
@@ -288,7 +299,7 @@ public final class ProjectDiscovery {
         for (GraphNode managed : graph.findByType(NodeType.CONFIG_PROPERTY)) {
             if ("managed".equals(managed.properties().get("kind"))
                     && wanted.contains(managed.properties().get("artifactId"))) {
-                String version = resolve(graph, managed.properties().get("version"));
+                String version = resolve(graph, managed.properties().get("version"), managed.properties().get("file"));
                 String file = managed.properties().get("file");
                 if (version != null && !"managed".equals(version) && !version.contains("${") && file != null) {
                     versions.computeIfAbsent(version, k -> new TreeSet<>()).add(file);
@@ -307,7 +318,7 @@ public final class ProjectDiscovery {
         for (GraphNode parent : graph.findByType(NodeType.CONFIG_PROPERTY)) {
             if ("parent".equals(parent.properties().get("kind"))
                     && artifactId.equals(parent.properties().get("artifactId"))) {
-                String version = resolve(graph, parent.properties().get("version"));
+                String version = resolve(graph, parent.properties().get("version"), parent.properties().get("file"));
                 String file = parent.properties().get("file");
                 if (version != null && !version.contains("${") && !"null".equals(version) && file != null) {
                     versions.computeIfAbsent(version, k -> new TreeSet<>()).add(file);
@@ -471,7 +482,7 @@ public final class ProjectDiscovery {
                          + ". The runtime is not locked. Resolve which runtime this project uses before planning.");
             }
             if (allCamelVersions.isEmpty() && ("spring-boot".equals(runtime) || "quarkus".equals(runtime))) {
-                gaps.add("Inspect the platform BOM dependency management to establish the Camel core version.");
+                gaps.add(UNRESOLVED_PLATFORM_CORE);
             }
             if (allCamelVersions.size() > 1) {
                 gaps.add("Conflicting Camel versions found: " + describe(versionEvidence)

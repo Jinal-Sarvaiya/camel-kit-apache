@@ -24,7 +24,8 @@ For an approved in-place migration, apply the profile's imports and plugin versi
 
 Run the project wrapper's `help:effective-pom` on the destination leaf POM with `-Doutput=<absolute-workspace-output>`.
 Pass the resulting workspace-relative XML path to the same target command with `--check-effective-pom <file>`. Require success on the first generated
-model. Compare its managed `org.apache.camel:camel-core-engine` to the profile's core version and each required
+model. For an existing application supply the resolved dependency tree from the same leaf with `--dependency-tree <json>`.
+Use the transitive core version when the starter is the only Camel import. For a new application compare its managed `org.apache.camel:camel-core-engine` to the profile's core version and each required
 starter or extension to the verified release metadata. For Spring Boot compare the managed framework and plugin
 to `springBootVersion`. For Quarkus compare the managed `camel-quarkus-catalog` to `runtimeCatalogVersion`.
 Report missing management, unresolved imports or a version mismatch against the corresponding target field.

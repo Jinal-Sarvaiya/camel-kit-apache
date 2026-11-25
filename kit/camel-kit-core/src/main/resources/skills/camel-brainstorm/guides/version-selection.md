@@ -25,6 +25,7 @@ The project's own declarations are the constraint. Init recorded them from the p
 
 ```
 if project.type == "existing":
+    If project.needsResolvedCore=true and project.camelVersion is missing, recover it from Maven below.
     STOP and report, do not continue, when ANY of these hold:
       - project.runtime or project.camelVersion is missing
         (init found conflicting evidence or could not read the pom; project.discoveryGaps says which)
@@ -40,6 +41,21 @@ if project.type == "existing":
       DO NOT infer a missing value (for example a Spring Boot version) from the tables
 ```
 
+### Recover the core version from Maven
+
+When init found the runtime and application BOM but no declared core version, use the project's wrapper and
+usual Maven settings/profiles. For each affected Camel leaf module run `help:effective-pom -Doutput=<absolute-model-file>`
+and `org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -DoutputType=json -Dincludes=org.apache.camel:camel-core-engine -DoutputFile=<absolute-tree-file>`
+with `-f <leaf-pom>`. Use dependency plugin 3.7.0 or later for JSON. Write fresh, separate outputs inside the workspace.
+Run `{COMMAND_PREFIX} target --check-effective-pom <model> --dependency-tree <tree>` with the workspace-relative paths.
+For a vendor Spring Boot BOM, first record the published provider GAV in `project.catalogBom` from the selected
+release metadata. The read-only check prints the resolved profile. If all affected modules agree, record its `camelVersion` as
+`project.camelVersion` in `.camel-kit/config.properties`. Also record the verified `project.springBootVersion`
+or `project.catalogVersion` for that runtime. Leave `target.*` intact. A conflicting module, failed Maven run or incomplete target check
+leaves the selection unresolved. Stop and report which module needs attention. For Camel 3.x use the migration workflow.
+Recheck after a change to the POMs, effective profiles, repositories or settings. On reinitialization, Kit keeps the
+recovered core for unchanged POMs and catalog selections for an unchanged platform.
+
 For a required catalog check, use Rule 3 in `shared/mcp-setup.md`. When needed, record
 `project.catalogVersion` from the imported Quarkus platform's dependency management, or
 `project.catalogBom` from the selected Spring Boot release metadata. Keep the observed project versions intact.
@@ -53,6 +69,13 @@ version is Camel 3.x.
 ---
 
 ## Step 1: Select Runtime Platform (Greenfield Projects Only)
+
+Before selecting a runtime, explain the required catalog check for the installed runner. With the shipped
+4.22.1 runner, Spring Boot 4.18.4 and both listed Quarkus targets (including the default 4.18.3) return
+core 4.22.1. Designs requiring catalog verification on these rows remain incomplete. Preserve the user's
+selected target and show this limitation before requesting design approval.
+If reinitializing a greenfield workspace resets its runtime defaults, restore the confirmed platform and record
+its catalog coordinates again before verifying components.
 
 First inspect the analyzed requirements and recorded answers. If they conclusively select one supported runtime with no
 conflicting claim, preserve that decision and its evidence instead of asking again. If the runtime is absent, ambiguous,

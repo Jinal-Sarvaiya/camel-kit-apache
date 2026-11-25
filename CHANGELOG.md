@@ -11,7 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Migration retains the source versions and uses a separate target profile for Maven generation and catalog
-  verification. A missing or mismatched runtime catalog produces an incomplete check (#195).
+  verification. The new `target` command prints that profile, renders the application POM, and checks Maven and
+  catalog evidence. Spring Boot templates import the application starter, Camel core and framework BOMs. Existing
+  projects resolve inherited BOM properties per module and can recover a transitive core from Maven's dependency tree.
+  With the shipped MCP 4.22.1 runner, catalog-dependent design cannot complete for Spring Boot 4.18.4 or either
+  supported Quarkus row, including the default platform 3.33.3.2. These checks report INCOMPLETE (#195).
 
 - Graph files now use format 1.1. CLI output such as `graph stats` reports namespaced types
   (for example `mule:flow`). Existing 1.0 graphs and legacy filters remain readable.

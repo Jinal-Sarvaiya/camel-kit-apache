@@ -2,6 +2,7 @@ package org.apache.camel.kit.command;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.Properties;
 
@@ -38,6 +39,10 @@ public class TargetCommand extends HelpAwareCommand {
             description = "Check the destination module's Maven help:effective-pom output")
     Path effectivePom;
 
+    @Option(parser = KitOptionParser.class, name = "dependency-tree", converter = PathConverter.class,
+            description = "Maven dependency:tree JSON for the same module as --check-effective-pom")
+    Path dependencyTree;
+
     @Override
     public Integer call() {
         Path config = projectDir.resolve(".camel-kit/config.properties");
@@ -46,13 +51,33 @@ public class TargetCommand extends HelpAwareCommand {
             Properties properties = new Properties();
             try (var input = Files.newInputStream(config)) {
                 properties.load(input);
+            } catch (NoSuchFileException e) {
+                throw new IOException(
+                        "Missing " + config + ". Run init here or use --project-dir for an initialized workspace.");
             }
-            TargetRuntimeProfile profile = TargetRuntimeProfile.resolve(properties, migration);
+            if (dependencyTree != null && effectivePom == null) {
+                throw new IllegalArgumentException("--dependency-tree requires --check-effective-pom");
+            }
             if ((catalogEvidence != null || effectivePom != null) && pomTemplate) {
                 throw new IllegalArgumentException("Choose template output or target checks");
             }
+            boolean existing = !migration && "existing".equals(properties.getProperty("project.type"));
+            TargetPomCheck model = null;
             if (effectivePom != null) {
-                TargetPomCheck.check(profile, read(effectivePom, 16 * 1024 * 1024));
+                model = new TargetPomCheck(
+                        read(effectivePom, 16 * 1024 * 1024),
+                        dependencyTree == null ? null : read(dependencyTree, 16 * 1024 * 1024));
+                if (existing) {
+                    model.completeExistingProfile(properties);
+                }
+            } else if (existing && "true".equals(properties.getProperty("project.needsResolvedCore"))
+                    && !properties.containsKey("project.camelVersion")) {
+                throw new IOException(
+                        "Resolve project.camelVersion with --check-effective-pom and --dependency-tree for each Camel module");
+            }
+            TargetRuntimeProfile profile = TargetRuntimeProfile.resolve(properties, migration);
+            if (model != null) {
+                model.check(profile, existing);
             }
             if (catalogEvidence != null) {
                 TargetCatalogEvidence.check(profile, read(catalogEvidence, 65536));

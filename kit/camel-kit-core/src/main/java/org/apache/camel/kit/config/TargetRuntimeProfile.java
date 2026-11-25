@@ -3,6 +3,7 @@ package org.apache.camel.kit.config;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Properties;
 
@@ -57,8 +58,21 @@ public record TargetRuntimeProfile(
         } else {
             throw new IllegalArgumentException("Select " + prefix + "runtime (main, spring-boot or quarkus)");
         }
+        String catalogVersion = binding.substring(binding.lastIndexOf(':') + 1);
+        if ("quarkus".equals(runtime)) {
+            catalogVersion = config.getProperty(prefix + "catalogVersion");
+            if (migration || catalogVersion != null) {
+                catalogVersion = scalar(catalogVersion, prefix + "catalogVersion");
+            }
+        }
+        return new TargetRuntimeProfile(
+                runtime, core, bom, boot, repositories(config), catalogVersion,
+                new CatalogRequest(runtime, core, binding));
+    }
+
+    private static List<String> repositories(Properties config) {
         String repos = config.getProperty("camel.catalog.repos", DistributionConfig.loadBundled().camelCatalogRepos());
-        List<String> repositories = List.of(repos.split(",", -1));
+        List<String> repositories = Arrays.stream(repos.split(",", -1)).map(String::strip).toList();
         // Profiles are copied into design and verification reports. Credentials belong in Maven settings.
         for (String repository : repositories) {
             String url = repository.replaceFirst("^[A-Za-z0-9_.-]+=", "");
@@ -73,16 +87,16 @@ public record TargetRuntimeProfile(
             }
             throw new IllegalArgumentException("Use credential-free repository URLs in camel.catalog.repos");
         }
-        String catalogVersion = binding.substring(binding.lastIndexOf(':') + 1);
-        if ("quarkus".equals(runtime)) {
-            catalogVersion = config.getProperty(prefix + "catalogVersion");
-            if (migration || catalogVersion != null) {
-                catalogVersion = scalar(catalogVersion, prefix + "catalogVersion");
-            }
+        return repositories;
+    }
+
+    public String requiredCatalogVersion() {
+        if (runtimeCatalogVersion == null) {
+            throw new IllegalArgumentException(
+                    "Set project.catalogVersion to the camel-quarkus-catalog version managed by "
+                                               + applicationBom);
         }
-        return new TargetRuntimeProfile(
-                runtime, core, bom, boot, repositories, catalogVersion,
-                new CatalogRequest(runtime, core, binding));
+        return runtimeCatalogVersion;
     }
 
     private static String matchingBinding(String provided, String expected) {

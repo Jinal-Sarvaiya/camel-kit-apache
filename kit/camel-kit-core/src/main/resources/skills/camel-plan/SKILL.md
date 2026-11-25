@@ -40,10 +40,9 @@ Do NOT generate any implementation artifacts (YAML, properties, POM, Docker Comp
 
 ---
 
-For a migration, use `{COMMAND_PREFIX} target --migration`. Compare its complete profile to the approved
-destination and pass it to every worker. In this workflow all runtime/version references below mean the
-destination. Existing-project version locks apply to in-place additions. Preserve source modules and scope
-migration edits to the approved destination. If the profile changes, refresh the design, POM and catalog evidence.
+## Target runtime
+
+Use the selected profile as described in `shared/mcp-setup.md`, Rule 1, including its migration handoff.
 
 ## Invocation Modes
 
@@ -186,6 +185,7 @@ project.moduleCount=2              # Number of entries in project.modules
 project.beansCount=2               # Annotated classes plus YAML `beans:` entries; @Bean methods are not counted
 project.configFilesCount=1         # application*.properties / application*.yml files read by the graph
 project.contractFilesCount=1       # Interface contract files (OpenAPI, WSDL, XSD, proto, Avro) listed in .camel-kit/baseline-contracts.txt
+project.needsResolvedCore=true     # When core evidence is missing, recover it from the Maven model and tree
 project.discoveryGaps=...          # Only present when discovery could not cover something - inspect source, ask the user
 project.unsupportedCombination=... # Only present for an unsupported runtime/DSL - STOP, do not plan additions
 project.unsupportedVersion=true    # Only present for Camel 3.x - STOP, do not plan additions
@@ -197,8 +197,9 @@ them to upgrade to Camel 4.x before planning. Do not plan against a guessed or n
 **`project.unsupportedCombination` is a hard stop.** Report its value to the user. Do not plan additions, convert the
 DSL or switch the runtime to make the project fit.
 
-**A missing `project.runtime` or `project.camelVersion` is a hard stop.** It means discovery found conflicting
-evidence (two runtimes, or two Camel versions) or could not read the project. The matching `project.discoveryGaps` entry
+When `project.needsResolvedCore=true` and `project.camelVersion` is missing, first follow “Recover the core version from Maven” in
+`camel-brainstorm/guides/version-selection.md`. **A missing `project.runtime` or `project.camelVersion` after recovery is a hard stop.** Check the discovery report for conflicting
+evidence (two runtimes or two Camel versions) or an unreadable project. The matching `project.discoveryGaps` entry
 names the evidence. Report it and ask the user to resolve it; do not pick one, and do not fill the value in from the
 shipped version tables.
 

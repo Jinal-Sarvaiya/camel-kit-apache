@@ -1366,6 +1366,7 @@ class ResourceConsistencyTest {
 
         assertContainsAll(migrate, "`target.runtime`", "`target.camelVersion`", "target --migration",
                 "retaining `project.*`");
+        assertFalse(migrate.contains("project.runtime=quarkus"));
         assertFalse(migrate.contains("target.runtime=quarkus"));
         assertTrue(migrate.contains("Maven plugin or build/code-generation task"));
         assertTrue(migrate.contains("Recheck the completed design before approval"));
@@ -1455,7 +1456,7 @@ class ResourceConsistencyTest {
         // keys init writes only for greenfield or internal bookkeeping are not workflow constraints
         Set<String> notConstraints
                 = Set.of("project.type", "project.unsupportedReason",
-                        "project.detectedPlatformBomVersion", "project.sourcePlatform");
+                        "project.detectedPlatformBomVersion", "project.sourcePlatform", "project.mavenInputs");
         Set<String> documentedButNeverWritten = new LinkedHashSet<>(documented);
         documentedButNeverWritten.removeAll(written);
         assertTrue(documentedButNeverWritten.isEmpty(),

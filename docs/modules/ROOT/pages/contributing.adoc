@@ -387,8 +387,9 @@ tests read, and `docs/user-guide.md`; keep them in step with these pages when be
 
 The shared parent, Kit and Knowledge have independent versions and release schedules.
 A product release references a published, released shared parent. All release jobs use Java 21.
-Kit release validation also requires a released `camel.cli.version` and a synchronized Maven mirror;
-snapshot and prerelease host pins cannot be staged. Verify the released Aesh-based host with the CLI compatibility suite. Use the corresponding
+Kit release validation requires released versions for `camel.cli.version` and `camel.mcp.version`, plus a
+synchronized Maven mirror for the CLI host. Verify the released host with the CLI compatibility suite and
+the MCP runner with the shipped target profiles. Use the corresponding
 POM (`pom.xml` with `-N`, `kit/pom.xml`, or `knowledge/pom.xml`) when preparing or staging a
 release; never deploy the root reactor to release one product.
 

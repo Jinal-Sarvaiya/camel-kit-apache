@@ -177,7 +177,7 @@ installation again. From the project root, preview the upgrade with `camel-kit i
 then use `--force` to apply it. Review any preserved skills, guides or commands using the procedure in <<existing-project>>.
 
 From 0.4.0::
-Camel Main, Camel Spring Boot and Camel MCP default to Camel {camel-version}; the supported older LTS patch is
+In Kit 0.4.1, Camel Main, Camel Spring Boot and Camel MCP default to Camel 4.22.1; the supported older LTS patch is
 4.18.4. Spring Boot uses 4.1.1. Camel {camel-version} maps to Forage 1.6.1. Version {camel-kit-version} also updates
 the shared generation and review guidance to prefer verified declarative bean construction after Forage and component
 configuration (see xref:forage.adoc[]), and Knowledge MCP {camel-kit-knowledge-version} validates endpoints against

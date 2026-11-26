@@ -15,7 +15,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   catalog evidence. Spring Boot templates import the application starter, Camel core and framework BOMs. Existing
   projects resolve inherited BOM properties per module and can recover a transitive core from Maven's dependency tree.
   The workflow checks the configured runner before design approval. A core mismatch reports INCOMPLETE.
-  The MCP reference records the affected combinations for runner 4.22.1, including default Quarkus (#195).
+  The development distribution uses the Camel MCP 4.22.3-SNAPSHOT runner and maps Camel 4.14.7 to Quarkus
+  platform 3.27.4. The catalog check passes for all six shipped community targets (#195).
 
 - Graph files now use format 1.1. CLI output such as `graph stats` reports namespaced types
   (for example `mule:flow`). Existing 1.0 graphs and legacy filters remain readable.

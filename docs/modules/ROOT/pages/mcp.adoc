@@ -23,11 +23,11 @@ configured repositories.
 | The Citrus action and endpoint catalogs, the YAML DSL schema and the test-authoring guidance used by `camel-test`
 |===
 
-The JBang runner coordinates of this release:
+The development distribution configures these JBang runner coordinates.
 
 [subs="attributes+"]
 ----
-camel            org.apache.camel:camel-jbang-mcp:{camel-version}:runner
+camel            org.apache.camel:camel-jbang-mcp:{camel-mcp-version}:runner
 camel-knowledge  io.github.luigidemasi:camel-kit-knowledge-mcp:{camel-kit-knowledge-version}:runner
 citrus           org.citrusframework:citrus-mcp-server:{citrus-version}:runner
 ----
@@ -45,7 +45,7 @@ The generated configuration is, in the target's JSON or TOML shape:
         "-Dcamel.catalog.repos=<configured catalog repositories>",
         "-Dquarkus.log.level=WARN",
         "-Dquarkus.http.port=-1",
-        "org.apache.camel:camel-jbang-mcp:{camel-version}:runner"
+        "org.apache.camel:camel-jbang-mcp:{camel-mcp-version}:runner"
       ]
     }
   }
@@ -92,29 +92,33 @@ For behaviour questions — YAML shape, runtime configuration, version changes, 
 the catalog with documentation search; catalog tools (`camel_catalog_*`) remain on `camel`.
 
 The current defaults are Camel {camel-version} for Camel Main and Spring Boot, with Camel {camel-quarkus-version}
-on the Quarkus platform {quarkus-platform-version}; the catalog server artifact follows the Camel Main stream.
+on Quarkus platform {quarkus-platform-version}. The distribution sets the catalog runner independently with
+`camel.mcp.version`.
 
 [[catalog-compatibility]]
 === Catalog results for the tested runner
 
-These results were measured with Camel MCP 4.22.1 and the community targets listed below. The default
-Quarkus platform in that distribution was 3.33.3.2. The runner can return the selected starter or extension
-alongside its bundled core.
+The development distribution uses Apache's snapshot repository for the Camel MCP runner. The table records
+catalog checks against snapshot build `4.22.3-20261125.143528-32`. Each check verified both the returned
+Camel core and the version of the runtime's timer artifact.
 
-[cols="1,1,1,2",options="header"]
+[cols="1,2,1,1",options="header"]
 |===
-|Runtime |Requested core |Returned core |Required catalog check
-|Main |4.22.1 or 4.18.4 |Matches requested core |Pass
+|Runtime |Application BOM version |Requested and returned Camel core |Check
+|Main |None |4.22.1 |Pass
+|Main |None |4.18.4 |Pass
 |Spring Boot |4.22.1 |4.22.1 |Pass
-|Spring Boot |4.18.4 |4.22.1 |Incomplete
-|Quarkus |4.18.3 |4.22.1 |Incomplete (platform 3.33.3.2)
-|Quarkus |4.14.7 |4.22.1 |Incomplete (platform 3.27.3)
+|Spring Boot |4.18.4 |4.18.4 |Pass
+|Quarkus (default) |3.33.3.2 |4.18.3 |Pass
+|Quarkus |3.27.4 |4.14.7 |Pass
 |===
 
-The check applies to greenfield designs, existing applications and migrations. On an affected row the workflow
-cannot complete a design that requires verified catalog artifacts. The selected application version is preserved.
-For a different runner or platform, verify the actual responses. See the
-xref:existing-project.adoc#catalog-limitation[runtime catalog limitation].
+The Red Hat Spring Boot example with starter BOM `4.14.4.redhat-00010` resolved core `4.14.4.redhat-00008`
+in Maven. The tested runner returned its bundled `4.22.3-SNAPSHOT` core, so its catalog check was `INCOMPLETE`.
+
+The check applies to greenfield designs, existing applications and migrations. Snapshot contents can change.
+Verify the actual responses for the configured runner and target before using catalog evidence in a design.
+See the xref:existing-project.adoc#catalog-limitation[runtime catalog limitation].
 
 [[camel-tools]]
 == The Camel catalog server

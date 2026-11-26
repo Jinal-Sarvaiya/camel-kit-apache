@@ -220,7 +220,7 @@ configuration_variants:
     stance: ruled 2026-10-27 - the Claude wildcard pre-approval is NOT the accepted posture; accepted posture is explicit grants aligned with the manifest allowed_tools, verified in the generated behaviour (V3). Implemented by V3; old workspaces require regeneration; see security-verification.md.
   - knob: camel.mcp.repos, knowledge.mcp.repos, citrus.mcp.repos, camel.catalog.repos, JBang //REPOS
     default: Maven Central, ASF public, ASF snapshots, Central snapshots
-    effect: Snapshot repositories serve mutable artifacts.
+    effect: Snapshot repositories serve mutable artifacts, including the development Camel MCP runner. Kit release validation requires a release version for camel.mcp.version.
     security_relevant: true
     stance: ruled 2026-10-27 - snapshots retained for development with their mutability documented; release defaults pin released versions; snapshot mutability waives no other control
   - knob: knowledge.mcp.group-id / knowledge.mcp.version (Kit's pin of the Knowledge server)

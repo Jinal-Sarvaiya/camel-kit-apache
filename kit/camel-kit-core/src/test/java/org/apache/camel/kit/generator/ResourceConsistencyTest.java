@@ -179,6 +179,19 @@ class ResourceConsistencyTest {
     }
 
     @Test
+    void websiteUsesTheBundledCamelMcpRunnerInItsLauncherExamples() throws IOException {
+        Path docs = repositoryRoot().resolve("docs");
+        String version = DistributionConfig.loadBundled().camelMcpVersion();
+        assertTrue(Files.readAllLines(docs.resolve("antora.yml")).stream().map(String::strip)
+                .anyMatch(("camel-mcp-version: " + version)::equals));
+        String page = Files.readString(docs.resolve("modules/ROOT/pages/mcp.adoc"));
+        String coordinate = "org.apache.camel:camel-jbang-mcp:";
+        assertTrue(page.contains(coordinate));
+        assertTrue(page.lines().filter(line -> line.contains(coordinate))
+                .allMatch(line -> line.contains(coordinate + "{camel-mcp-version}:runner")));
+    }
+
+    @Test
     void catalogGuidesUseDistributionVersionsOrObservedResults() throws IOException {
         Path skills = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
         Pattern literalVersion = Pattern.compile("\\b\\d+\\.\\d+\\.\\d+\\b");

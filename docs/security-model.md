@@ -800,7 +800,8 @@ This is the most important section for a developer adopting Camel-Kit and for an
   `central_snap` entries in the default repository lists or for the development JBang alias *(documented — README
   "Release channels")*. Snapshots are retained for development with their mutability documented; release defaults
   pin released versions; "snapshot mutability does not waive any other security control" *(maintainer, 2026-10-27 —
-  Q4)*.
+  Q4)*. The development Camel MCP runner uses an Apache snapshot. Kit release validation requires
+  `camel.mcp.version` to have a release version before staging.
 - **Validation of generated routes is a quality gate, not a security audit.** The five security-checklist rules
   (no hardcoded credentials, TLS everywhere, no sensitive data in logs, input validation at every external ingress,
   authentication on external endpoints) all fail validation when violated *(documented —

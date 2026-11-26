@@ -33,6 +33,10 @@ jobs:
           server-username: MAVEN_USERNAME
           server-password: MAVEN_PASSWORD
 
+      - name: Verify the Camel MCP runner before deploying Kit
+        if: github.event_name == 'schedule' || inputs.target == 'all' || inputs.target == 'kit'
+        run: python3 tools/check_camel_mcp_runner.py
+
       - name: Deploy snapshot
         run: |
           set -euo pipefail

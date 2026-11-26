@@ -110,7 +110,7 @@ Camel core and the version of the runtime's timer artifact.
 |Spring Boot |4.22.1 |4.22.1 |Pass
 |Spring Boot |4.18.4 |4.18.4 |Pass
 |Quarkus (default) |3.33.3.2 |4.18.3 |Pass
-|Quarkus |3.27.4 |4.14.7 |Pass
+|Quarkus |3.27.4.1 |4.14.7 |Pass
 |===
 
 The Red Hat Spring Boot example with starter BOM `4.14.4.redhat-00010` resolved core `4.14.4.redhat-00008`

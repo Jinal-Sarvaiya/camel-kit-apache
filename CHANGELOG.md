@@ -16,7 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   projects resolve inherited BOM properties per module and can recover a transitive core from Maven's dependency tree.
   The workflow checks the configured runner before design approval. A core mismatch reports INCOMPLETE.
   The development distribution uses the Camel MCP 4.22.3-SNAPSHOT runner and maps Camel 4.14.7 to Quarkus
-  platform 3.27.4. The catalog check passes for all six shipped community targets (#195).
+  platform 3.27.4.1, which includes the Quarkus HTTP fix for CVE-2026-50559. All six shipped community targets
+  pass the catalog check (#195).
 
 - Graph files now use format 1.1. CLI output such as `graph stats` reports namespaced types
   (for example `mule:flow`). Existing 1.0 graphs and legacy filters remain readable.

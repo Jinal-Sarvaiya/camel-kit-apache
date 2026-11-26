@@ -27,13 +27,25 @@ Is this correct? (yes / no — specify the correct pair)
 
 ## Step 2: Source Schema
 
-**Check for existing artifact:** If `camel-brainstorm` Question 7b recorded a source contract with status "existing" or "designed", use that artifact reference. The contract includes:
-- Artifact location (file path, URL, or inline content)
-- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
+**Check for existing artifact:** If `camel-brainstorm` Question 7b recorded a source contract, check the status and artifact:
 
-If a source schema artifact is already available, extract the schema from the artifact and skip the request below. For OpenAPI/AsyncAPI, extract the message schema. For WSDL, extract the message XSD. For JSON Schema/XSD, use as-is.
+- **Status "existing" with artifact** - Extract schema from artifact and skip request below
+- **Status "designed" with artifact** - Extract schema from artifact and skip request below
+- **Status "designed" without artifact** - This mapping should have been deferred by Q7a. If reached here, note error: mapping depends on design approval for proposed contract
+- **Status "not-applicable"** - Proceed with schema-less path (option c below)
+- **Status "pending"** - This mapping should have been deferred by Q7a
 
-**If no source schema artifact is available from Q7b, ask:**
+For artifacts with schemas:
+- **JSON Schema / XSD files** - Use file path as-is
+- **OpenAPI / AsyncAPI with embedded schema** - Extract message schema, save to `{flow-name}-source.schema.json` in project root, record this path
+- **WSDL with embedded XSD** - Extract XSD, save to `{flow-name}-source.xsd` in project root, record this path
+- **Inline content** - Save to `{flow-name}-source.{xsd|schema.json}` in project root, record this path
+
+Preserve schema references: if the extracted schema references other components in the original document (e.g., OpenAPI Order references OrderItem), save the complete schema with all referenced components to maintain validity.
+
+Skip request below after extracting and saving schema.
+
+**If no source schema artifact is available and status allows schema-less mapping, ask:**
 
 ```
 Please provide the source schema.
@@ -56,13 +68,25 @@ c) No schema — I'll describe the fields manually
 
 ## Step 3: Target Schema
 
-**Check for existing artifact:** If `camel-brainstorm` Question 7c (single-destination) or Question 8b (conditional routing branch) recorded a destination contract with status "existing" or "designed", use that artifact reference. The contract includes:
-- Artifact location (file path, URL, or inline content)
-- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
+**Check for existing artifact:** If `camel-brainstorm` Question 7c (single-destination) or Question 8b (conditional routing branch) recorded a destination contract, check the status and artifact:
 
-If a target schema artifact is already available, extract the schema from the artifact and skip the request below. For OpenAPI/AsyncAPI, extract the message schema. For WSDL, extract the message XSD. For JSON Schema/XSD, use as-is.
+- **Status "existing" with artifact** - Extract schema from artifact and skip request below
+- **Status "designed" with artifact** - Extract schema from artifact and skip request below  
+- **Status "designed" without artifact** - This mapping should have been deferred by Q7a. If reached here, note error: mapping depends on design approval for proposed contract
+- **Status "not-applicable"** - Proceed with schema-less path (option c below)
+- **Status "pending"** - This mapping should have been deferred by Q7a
 
-**If no target schema artifact is available from Q7c/Q8b, ask:**
+For artifacts with schemas:
+- **JSON Schema / XSD files** - Use file path as-is
+- **OpenAPI / AsyncAPI with embedded schema** - Extract message schema, save to `{flow-name}-target.schema.json` in project root, record this path
+- **WSDL with embedded XSD** - Extract XSD, save to `{flow-name}-target.xsd` in project root, record this path
+- **Inline content** - Save to `{flow-name}-target.{xsd|schema.json}` in project root, record this path
+
+Preserve schema references: if the extracted schema references other components in the original document, save the complete schema with all referenced components to maintain validity.
+
+Skip request below after extracting and saving schema.
+
+**If no target schema artifact is available and status allows schema-less mapping, ask:**
 
 ```
 Please provide the target schema.
@@ -237,4 +261,4 @@ The shared guide will:
 
 **Schema-less path:** If source or target has no schema file (Step 2c or 3c selected), the type is still `JSON_SCHEMA` or `XML_SCHEMA` (based on the data format) — the schema path is `"none"`. Pass the manually described field names and types. The shared guide will compute XPaths from the field paths without needing schema files. Only use `Primitive` if the data is a truly scalar value (single string, number, or boolean).
 
-**When done:** return control to `camel-brainstorm` and continue at Question 8 (Sink System).
+**When done:** return control to `camel-brainstorm` and continue at Question 9 (Error Handling).

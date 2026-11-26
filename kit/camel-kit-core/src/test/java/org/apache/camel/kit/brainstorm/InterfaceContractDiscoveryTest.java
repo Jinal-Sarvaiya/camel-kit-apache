@@ -146,9 +146,9 @@ class InterfaceContractDiscoveryTest {
                 || q7aSection.contains("separately"),
                 "Question 7a must record each pending mapping dependency separately");
 
-        // Must defer all if source is pending
-        assertTrue(q7aSection.contains("If source contract is \"pending\", defer ALL"),
-                "Question 7a must defer all mappings if source contract is pending");
+        // Must defer all if source is pending or designed without artifact
+        assertTrue(q7aSection.contains("If source contract is \"pending\"") && q7aSection.contains("defer ALL"),
+                "Question 7a must defer all mappings if source contract is pending or designed without artifact");
     }
 
     @Test
@@ -474,6 +474,118 @@ class InterfaceContractDiscoveryTest {
                 && content.contains("WSDL") && content.contains("JSON Schema")
                 && content.contains("XSD"),
                 "Briefing must list all supported contract types");
+    }
+
+    @Test
+    @DisplayName("DataMapper must handle ready branch alongside pending branch")
+    void testDataMapperHandlesReadyAndPendingBranches() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
+
+        int q7aIndex = content.indexOf("### Question 7a: Data Transformation Detail");
+        int q9Index = content.indexOf("### Question 9: Error Handling");
+        String q7aSection = content.substring(q7aIndex, q9Index);
+
+        // Must describe per-branch mapping collection
+        assertTrue(q7aSection.contains("Collect mapping for each branch where"),
+                "Q7a must describe collecting mapping for ready branches");
+
+        // Must defer only specific branches with pending dependencies
+        assertTrue(q7aSection.contains("Defer mapping for branches where"),
+                "Q7a must defer only branches with pending dependencies");
+
+        // Must allow not-applicable (schema-less mapping)
+        assertTrue(q7aSection.contains("not-applicable") && q7aSection.contains("schema-less"),
+                "Q7a must support not-applicable status for schema-less Groovy mapping");
+
+        // Must handle designed without artifact (defer until approval)
+        assertTrue(q7aSection.contains("designed without artifact") && q7aSection.contains("defer"),
+                "Q7a must defer mapping for designed contracts without artifacts (awaiting design approval)");
+    }
+
+    @Test
+    @DisplayName("DataMapper final exit must return to Q9")
+    void testDataMapperFinalExitReturnsToQ9() throws Exception {
+        Path datamapperPath = Path.of("src/main/resources/skills/camel-design/guides/datamapper-interview.md");
+        String content = Files.readString(datamapperPath);
+
+        // Find the final "When done" instruction
+        int whenDoneIndex = content.lastIndexOf("When done");
+        assertTrue(whenDoneIndex > 0, "DataMapper interview must have 'When done' instruction");
+
+        String whenDoneSection = content.substring(whenDoneIndex, Math.min(content.length(), whenDoneIndex + 200));
+
+        // Must return to Q9, not Q8
+        assertTrue(whenDoneSection.contains("Question 9"),
+                "DataMapper 'When done' instruction must return to Question 9");
+        assertFalse(whenDoneSection.contains("Question 8"),
+                "DataMapper 'When done' instruction must NOT return to Question 8");
+    }
+
+    @Test
+    @DisplayName("DataMapper Steps 2-3 must handle designed contracts without artifacts")
+    void testDataMapperHandlesDesignedWithoutArtifact() throws Exception {
+        Path datamapperPath = Path.of("src/main/resources/skills/camel-design/guides/datamapper-interview.md");
+        String content = Files.readString(datamapperPath);
+
+        // Check Step 2
+        int step2Index = content.indexOf("## Step 2: Source Schema");
+        int step3Index = content.indexOf("## Step 3: Target Schema");
+        String step2Section = content.substring(step2Index, step3Index);
+
+        assertTrue(
+                step2Section.contains("\"designed\" without artifact")
+                        || step2Section.contains("designed without artifact"),
+                "Step 2 must check for designed status without artifact");
+        assertTrue(
+                step2Section.contains("should have been deferred")
+                        || step2Section.contains("depends on design approval"),
+                "Step 2 must note that designed-without-artifact should have been deferred by Q7a");
+
+        // Check Step 3
+        int step3bIndex = content.indexOf("## Step 3b:");
+        String step3Section = content.substring(step3Index, step3bIndex);
+
+        assertTrue(
+                step3Section.contains("\"designed\" without artifact")
+                        || step3Section.contains("designed without artifact"),
+                "Step 3 must check for designed status without artifact");
+        assertTrue(
+                step3Section.contains("should have been deferred")
+                        || step3Section.contains("depends on design approval"),
+                "Step 3 must note that designed-without-artifact should have been deferred by Q7a");
+    }
+
+    @Test
+    @DisplayName("DataMapper must save extracted schemas with paths and preserve references")
+    void testDataMapperSavesExtractedSchemas() throws Exception {
+        Path datamapperPath = Path.of("src/main/resources/skills/camel-design/guides/datamapper-interview.md");
+        String content = Files.readString(datamapperPath);
+
+        // Check Step 2 for extracted schema handling
+        int step2Index = content.indexOf("## Step 2: Source Schema");
+        int step3Index = content.indexOf("## Step 3: Target Schema");
+        String step2Section = content.substring(step2Index, step3Index);
+
+        assertTrue(step2Section.contains("Extract") && step2Section.contains("save to"),
+                "Step 2 must extract and save embedded schemas");
+        assertTrue(step2Section.contains("flow-name}-source") && step2Section.contains("record this path"),
+                "Step 2 must save extracted source schema with project-relative path");
+        assertTrue(
+                step2Section.contains("Preserve schema references") || step2Section.contains("referenced components"),
+                "Step 2 must preserve references in extracted schemas");
+
+        // Check Step 3
+        int step3bIndex = content.indexOf("## Step 3b:");
+        String step3Section = content.substring(step3Index, step3bIndex);
+
+        assertTrue(step3Section.contains("Extract") && step3Section.contains("save to"),
+                "Step 3 must extract and save embedded schemas");
+        assertTrue(step3Section.contains("flow-name}-target") && step3Section.contains("record this path"),
+                "Step 3 must save extracted target schema with project-relative path");
+        assertTrue(
+                step3Section.contains("Preserve schema references") || step3Section.contains("referenced components"),
+                "Step 3 must preserve references in extracted schemas");
     }
 
     @Test

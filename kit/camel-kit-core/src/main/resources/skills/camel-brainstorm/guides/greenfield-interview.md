@@ -211,7 +211,13 @@ I'll propose a [contract-type] definition based on your requirements.
 
 This will be included in the design specification for your approval before implementation.
 Since this is a source you control, we can design it to fit the integration needs.
+
+The contract proposal will be created during design assembly. No artifact exists yet.
 ```
+
+Record status as "designed" with no artifact reference yet. The proposal will be carried into the design specification for approval.
+
+If field mapping is needed (Question 7a), it will be deferred until the design specification is approved and the proposed contract becomes available.
 
 Note: Only propose designing contracts for systems under your control. External system interfaces cannot be redesigned.
 
@@ -269,7 +275,13 @@ I'll propose a [contract-type] definition based on your requirements.
 
 This will be included in the design specification for your approval before implementation.
 Since this is a destination you control, we can design it to fit the integration needs.
+
+The contract proposal will be created during design assembly. No artifact exists yet.
 ```
+
+Record status as "designed" with no artifact reference yet. The proposal will be carried into the design specification for approval.
+
+If field mapping is needed (Question 7a), it will be deferred until the design specification is approved and the proposed contract becomes available.
 
 Note: Only propose designing contracts for systems under your control. External system interfaces cannot be redesigned.
 
@@ -360,19 +372,28 @@ ONLY if field mapping needed AND format pair is XML/JSON combinations.
 
 Before proceeding, determine which mappings can be collected now:
 
+**Contract status mapping decisions:**
+- **Status "existing" with artifact** - Proceed with mapping, pass artifact to DataMapper
+- **Status "designed" with artifact** - Proceed with mapping, pass artifact to DataMapper
+- **Status "designed" without artifact yet** - Defer mapping. Note: "Field mapping depends on [source/destination] contract design approval. Kit will propose schema in design spec."
+- **Status "pending"** - Defer mapping. Note: "Field mapping depends on pending [source/destination] contract"
+- **Status "not-applicable"** - Proceed with schema-less mapping (Groovy with manually described fields)
+
 **For single-destination flows:**
 - Check source contract (`flow.contracts.source` from Q7b) and destination contract (`flow.contracts.destination` from Q7c)
-- If BOTH source and destination have status "existing" or "designed", proceed with mapping
-- If EITHER source or destination has status "pending", defer this mapping. Note in design spec: "Field mapping depends on pending [source/destination] contract and will be resolved when the artifact arrives"
+- Apply above mapping decisions for each contract status
+- Proceed if BOTH endpoints allow mapping (existing with artifact, designed with artifact, or not-applicable)
+- Defer if EITHER endpoint requires deferral (pending or designed without artifact)
 
 **For conditional routing flows:**
 - Check source contract (`flow.contracts.source` from Q7b)
 - For EACH routing branch, check that branch's destination contract (`flow.routing.conditions[].contract` from Q8b)
-- Collect mapping for each branch where BOTH source and that branch's destination have status "existing" or "designed"
-- Defer mapping for branches where source or that specific branch's destination has status "pending"
-- Record each pending mapping dependency separately: "Field mapping for [branch-name] depends on pending [source/destination] contract"
+- Apply mapping decisions per branch
+- Collect mapping for each branch where BOTH source and destination allow mapping
+- Defer mapping for branches where either endpoint requires deferral
+- Record each deferred mapping dependency separately: "Field mapping for [branch-name] depends on [pending contract / design approval for contract]"
 
-If source contract is "pending", defer ALL mappings for this flow.
+If source contract is "pending" or "designed without artifact", defer ALL mappings for this flow.
 
 ```
 For the data transformation in "[flow-name]":

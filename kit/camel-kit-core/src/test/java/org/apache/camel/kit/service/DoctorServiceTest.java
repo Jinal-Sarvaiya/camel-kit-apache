@@ -571,6 +571,56 @@ class DoctorServiceTest {
     }
 
     @Test
+    void doctorIdentifiesExplicitToolDenialCorrectly() throws Exception {
+        createHealthyWorkspace(tempDir, OPENCODE);
+        // Set only one camel tool to deny in otherwise fresh config
+        writeMcpConfig(tempDir, OPENCODE, """
+                {
+                  "permission": {
+                    "camel_*": "ask",
+                    "camel-knowledge_*": "ask",
+                    "camel_camel_catalog_components": "deny"
+                  },
+                  "mcp": {
+                    "camel": {"type": "local"},
+                    "camel-knowledge": {"type": "local"}
+                  }
+                }
+                """);
+
+        DoctorResult result = new DoctorService().inspect(new DoctorRequest(tempDir));
+
+        assertTrue(result.hasFailures(), result.findings().toString());
+        assertTrue(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "OpenCode tool 'camel_camel_catalog_components' is explicitly denied",
+                "Remove the denial"));
+        assertFalse(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "must end with a namespace-wide 'ask' rule", null),
+                "Should not suggest adding namespace-wide ask rule for explicit denial");
+    }
+
+    @Test
+    void doctorNamesASingleDeniedToolInACompleteGeneratedConfig() throws Exception {
+        createHealthyWorkspaceWithCitrus(tempDir, OPENCODE);
+        Path mcpFile = tempDir.resolve(AgentRegistry.get(OPENCODE).mcpConfigPath());
+        ObjectNode config = (ObjectNode) MAPPER.readTree(Files.readString(mcpFile));
+        ((ObjectNode) config.path("permission")).put("citrus_citrus_docs_index", "deny");
+        Files.writeString(mcpFile, MAPPER.writerWithDefaultPrettyPrinter().writeValueAsString(config));
+
+        DoctorResult result = new DoctorService().inspect(new DoctorRequest(tempDir));
+
+        assertTrue(result.hasFailures(), result.findings().toString());
+        assertTrue(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "OpenCode tool 'citrus_citrus_docs_index' is explicitly denied", "Remove the denial"),
+                result.findings().toString());
+        assertFalse(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "must end with a namespace-wide 'ask' rule", null), result.findings().toString());
+        assertEquals(1, result.findings().stream()
+                .filter(finding -> finding.status() == DoctorFinding.Status.FAIL).count(),
+                result.findings().toString());
+    }
+
+    @Test
     void futureOpenCodeToolOverrideCannotBypassPermissionPrompts() throws Exception {
         createHealthyWorkspace(tempDir, OPENCODE);
         writeMcpConfig(tempDir, OPENCODE, """

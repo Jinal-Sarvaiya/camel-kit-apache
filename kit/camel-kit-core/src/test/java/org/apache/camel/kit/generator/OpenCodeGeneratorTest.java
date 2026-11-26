@@ -20,6 +20,7 @@ import org.apache.camel.kit.output.Printer;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -1235,6 +1236,113 @@ class OpenCodeGeneratorTest {
         assertEquals("ask",
                 higher.path("permission").path("camel_camel_validate_route").path("*").asText(),
                 "Object-valued ask rule must round-trip correctly");
+    }
+
+    @Test
+    void regenerationPreservesExactExceptionsAfterWildcard() throws Exception {
+        // Generate initial Citrus-enabled config
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // User restricts 7 tools to "ask" but allows one (citrus_docs_index) by positioning it after wildcard
+        Path higherPrecedence = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherPrecedence, """
+                {
+                  "permission": {
+                    "citrus_citrus_catalog_actions": "ask",
+                    "citrus_citrus_catalog_action": "ask",
+                    "citrus_citrus_catalog_action_schema": "ask",
+                    "citrus_citrus_catalog_endpoints": "ask",
+                    "citrus_citrus_catalog_endpoint": "ask",
+                    "citrus_citrus_catalog_endpoint_schema": "ask",
+                    "citrus_citrus_docs_page": "ask",
+                    "citrus_*": "ask",
+                    "citrus_citrus_docs_index": "allow"
+                  }
+                }
+                """);
+
+        // Regenerate with --force
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // Verify 7 prompts + 1 allowed lookup survive regeneration
+        JsonNode higher = readOpenCodeConfig(higherPrecedence);
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        higher.path("permission").fieldNames().forEachRemaining(keys::add);
+
+        int wildcardPos = keys.indexOf("citrus_*");
+        int docsPos = keys.indexOf("citrus_citrus_docs_index");
+
+        assertTrue(wildcardPos >= 0, "citrus_* wildcard must be present");
+        assertTrue(docsPos > wildcardPos,
+                "citrus_citrus_docs_index must remain after wildcard as an exception");
+        assertEquals("allow", higher.path("permission").path("citrus_citrus_docs_index").asText(),
+                "citrus_citrus_docs_index must retain allow action");
+
+        // OpenCode applies the last matching rule: seven prompts and one allowed lookup
+        for (String tool : CITRUS_TOOLS) {
+            assertEquals("citrus_citrus_docs_index".equals(tool) ? "allow" : "ask",
+                    effectiveAction(higher.path("permission"), tool), tool);
+        }
+    }
+
+    @Test
+    void regenerationPreservesCustomDenialPrecedingStockRulesInEmptyHigherFile() throws Exception {
+        Path lowerFile = tempDir.resolve("opencode.json");
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // Put a custom exact denial of the documentation index before the stock rules
+        ObjectNode config = (ObjectNode) readOpenCodeConfig(lowerFile);
+        ObjectNode reordered = new ObjectMapper().createObjectNode();
+        reordered.put("citrus_citrus_docs_index", "deny");
+        config.path("permission").fields().forEachRemaining(entry -> {
+            if (!"citrus_citrus_docs_index".equals(entry.getKey())) {
+                reordered.set(entry.getKey(), entry.getValue());
+            }
+        });
+        config.set("permission", reordered);
+        Files.writeString(lowerFile, new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(config));
+        Files.writeString(tempDir.resolve("opencode.jsonc"), "{}");
+
+        JsonNode before = readOpenCodeConfig(lowerFile).path("permission");
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // Every Citrus tool keeps the effective action it had before regeneration
+        JsonNode after = effectivePermission();
+        for (String tool : CITRUS_TOOLS) {
+            assertEquals(effectiveAction(before, tool), effectiveAction(after, tool), tool);
+        }
+    }
+
+    private static final List<String> CITRUS_TOOLS = List.of(
+            "citrus_citrus_catalog_actions", "citrus_citrus_catalog_action", "citrus_citrus_catalog_action_schema",
+            "citrus_citrus_catalog_endpoints", "citrus_citrus_catalog_endpoint",
+            "citrus_citrus_catalog_endpoint_schema", "citrus_citrus_docs_index", "citrus_citrus_docs_page");
+
+    /** Resolves a tool the way OpenCode does: the last matching rule wins. */
+    private static String effectiveAction(JsonNode permission, String tool) {
+        String action = null;
+        for (var rules = permission.fields(); rules.hasNext();) {
+            var rule = rules.next();
+            if (tool.matches(rule.getKey().replace("*", ".*")) && rule.getValue().isTextual()) {
+                action = rule.getValue().asText();
+            }
+        }
+        return action;
+    }
+
+    /** Merges the permission rules of the project config layers in OpenCode load order. */
+    private JsonNode effectivePermission() throws Exception {
+        ObjectNode merged = new ObjectMapper().createObjectNode();
+        for (String name : List.of("opencode.json", "opencode.jsonc")) {
+            Path file = tempDir.resolve(name);
+            if (Files.exists(file)) {
+                readOpenCodeConfig(file).path("permission").fields().forEachRemaining(entry -> {
+                    merged.remove(entry.getKey());
+                    merged.set(entry.getKey(), entry.getValue());
+                });
+            }
+        }
+        return merged;
     }
 
     @Test

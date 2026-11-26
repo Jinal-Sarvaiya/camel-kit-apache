@@ -45,71 +45,7 @@ final class OpenCodeConfigMerger {
             configurations.add(readExisting(target));
         }
 
-        // Collect user restrictions from all files before removing managed entries
-        // Traverse from lowest to highest precedence, so the last (highest) restriction wins
-        // Use LinkedHashMap to preserve insertion order (which will be user's original order)
-        java.util.LinkedHashMap<String, JsonNode> userRestrictionsMap = new java.util.LinkedHashMap<>();
-        ObjectNode generatedPermission = (ObjectNode) generated.path("permission");
-
-        for (ExistingConfiguration config : configurations) {
-            JsonNode permissionNode = config.config().path("permission");
-            if (!permissionNode.isObject()) {
-                continue;
-            }
-            ObjectNode permission = (ObjectNode) permissionNode;
-
-            // Check if wildcards appear after exact grants (user override for all-tools approval)
-            java.util.List<String> existingKeys = new java.util.ArrayList<>();
-            permission.fieldNames().forEachRemaining(existingKeys::add);
-
-            // Iterate in user's original order to preserve it
-            for (String key : existingKeys) {
-                JsonNode generatedValue = generatedPermission.get(key);
-                if (generatedValue == null) {
-                    continue; // Not a managed key
-                }
-
-                JsonNode existingValue = permission.get(key);
-                if (existingValue != null) {
-                    if (existingValue.isTextual() && generatedValue.isTextual()) {
-                        String existingAction = existingValue.asText();
-                        String generatedAction = generatedValue.asText();
-
-                        boolean preserveWildcard = false;
-                        if (key.endsWith("_*") && existingAction.equals(generatedAction)) {
-                            // Check if wildcard appears AFTER any exact grants from same namespace
-                            // (user override for all-tools approval)
-                            String namespace = key.substring(0, key.length() - 1); // Remove '*'
-                            int wildcardPos = existingKeys.indexOf(key);
-                            // Look for exact grants BEFORE the wildcard position
-                            for (int i = 0; i < wildcardPos; i++) {
-                                if (existingKeys.get(i).startsWith(namespace)
-                                        && !existingKeys.get(i).endsWith("_*")) {
-                                    // Found an exact grant before the wildcard - this is a user override
-                                    preserveWildcard = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        // Preserve if stricter OR if wildcard placed after exact grants
-                        if (isStricterThan(existingAction, generatedAction) || preserveWildcard) {
-                            // Keep replacing to retain the highest-precedence restriction
-                            userRestrictionsMap.put(key, JSON.getNodeFactory().textNode(existingAction));
-                        }
-                    } else if (existingValue.isObject()) {
-                        // Preserve object-valued rules (e.g., {env: "ALLOW_CAMEL_ROUTES"})
-                        userRestrictionsMap.put(key, existingValue);
-                    }
-                }
-            }
-        }
-
-        // Convert map to ObjectNode preserving order
-        ObjectNode userRestrictions = JSON.createObjectNode();
-        for (Map.Entry<String, JsonNode> entry : userRestrictionsMap.entrySet()) {
-            userRestrictions.set(entry.getKey(), entry.getValue());
-        }
+        ObjectNode userRestrictions = collectUserRules((ObjectNode) generated.path("permission"), configurations);
 
         List<PendingWrite> writes = new ArrayList<>();
         for (int i = 0; i < configurations.size() - 1; i++) {
@@ -126,6 +62,62 @@ final class OpenCodeConfigMerger {
             writes.add(new PendingWrite(highest.path(), merged));
         }
         writeAll(writes);
+    }
+
+    /**
+     * Collects the managed permission rules that must survive regeneration, in their effective order.
+     *
+     * <p>
+     * OpenCode applies the last matching rule, so the order of the rules decides each tool's action. Rules from all
+     * layers are flattened (a later layer replaces an earlier rule for the same key) and compared with the generated
+     * order. Everything from the first deviation onward is kept in the user's order, so exact exceptions on both sides
+     * of a wildcard keep their relative position. Rules that match the generated layout need no special handling.
+     */
+    private ObjectNode collectUserRules(ObjectNode generatedPermission, List<ExistingConfiguration> configurations) {
+        Map<String, JsonNode> managedRules = new java.util.LinkedHashMap<>();
+        for (ExistingConfiguration configuration : configurations) {
+            JsonNode permission = configuration.config().path("permission");
+            if (!permission.isObject()) {
+                continue;
+            }
+            permission.fields().forEachRemaining(entry -> {
+                JsonNode generatedValue = generatedPermission.get(entry.getKey());
+                if (generatedValue != null) {
+                    managedRules.remove(entry.getKey());
+                    managedRules.put(entry.getKey(), normalizeManagedRule(entry.getValue(), generatedValue));
+                }
+            });
+        }
+
+        List<String> generatedKeys = new ArrayList<>();
+        generatedPermission.fieldNames().forEachRemaining(generatedKeys::add);
+        List<Map.Entry<String, JsonNode>> rules = new ArrayList<>(managedRules.entrySet());
+        int common = 0;
+        while (common < rules.size() && common < generatedKeys.size()) {
+            String key = generatedKeys.get(common);
+            Map.Entry<String, JsonNode> rule = rules.get(common);
+            if (!rule.getKey().equals(key) || !rule.getValue().equals(generatedPermission.get(key))) {
+                break;
+            }
+            common++;
+        }
+
+        ObjectNode userRules = JSON.createObjectNode();
+        for (int i = common; i < rules.size(); i++) {
+            userRules.set(rules.get(i).getKey(), rules.get(i).getValue());
+        }
+        return userRules;
+    }
+
+    /** Keeps object-valued rules and rules stricter than generated; anything looser reverts to the generated action. */
+    private JsonNode normalizeManagedRule(JsonNode existing, JsonNode generated) {
+        if (existing.isObject()) {
+            return existing;
+        }
+        if (existing.isTextual() && generated.isTextual() && isStricterThan(existing.asText(), generated.asText())) {
+            return existing;
+        }
+        return generated;
     }
 
     private String removeManagedEntries(

@@ -992,24 +992,45 @@ public class DoctorService {
                 continue;
             }
 
-            List<OpenCodePermissionResolution> resolutions = openCodeTools(pattern).stream()
+            List<String> toolNames = new ArrayList<>(openCodeTools(pattern));
+            List<OpenCodePermissionResolution> resolutions = toolNames.stream()
                     .map(tool -> openCodePermissionAction(permission, tool))
                     .toList();
+
+            // Separate explicit tool denials (exact rules) from namespace override issues (wildcard rules)
+            List<String> deniedTools = new ArrayList<>();
             Set<Path> wrongSources = new LinkedHashSet<>();
-            for (OpenCodePermissionResolution resolution : resolutions) {
-                // Skip manifest tools with 'allow' - these are intentional grants
-                if (resolution.matched() && !"ask".equals(resolution.action())
-                        && !"allow".equals(resolution.action())) {
-                    wrongSources.add(permissionSource(resolution.rule(), permissionSources, mcpFile));
+            for (int i = 0; i < resolutions.size(); i++) {
+                OpenCodePermissionResolution resolution = resolutions.get(i);
+                if (resolution.matched() && "deny".equals(resolution.action())) {
+                    // Only report as explicit denial if matched by an exact rule (not a wildcard)
+                    if (!resolution.rule().contains("*")) {
+                        deniedTools.add(toolNames.get(i));
+                    }
                 }
             }
+
             boolean missing = resolutions.stream().anyMatch(resolution -> !resolution.matched());
-            if (wrongSources.isEmpty() && !missing) {
+            if (deniedTools.isEmpty() && !missing) {
                 String overridingRule = unsafeOpenCodeNamespaceOverride(permission, pattern, openCodeTools(pattern));
                 if (overridingRule != null) {
                     wrongSources.add(permissionSource(overridingRule, permissionSources, mcpFile));
                 }
             }
+
+            // Report explicit tool denials first (only for exact rules, not wildcards)
+            if (!deniedTools.isEmpty()) {
+                for (String deniedTool : deniedTools) {
+                    OpenCodePermissionResolution resolution = openCodePermissionAction(permission, deniedTool);
+                    Path source = permissionSource(resolution.rule(), permissionSources, mcpFile);
+                    findings.add(DoctorFinding.fail("mcp", relativize(root, source),
+                            "OpenCode tool '" + deniedTool + "' is explicitly denied",
+                            "Remove the denial or change to 'ask' to retain MCP permission prompts for this tool."));
+                }
+                valid = false;
+            }
+
+            // Report namespace override issues
             if (!wrongSources.isEmpty()) {
                 for (Path source : wrongSources) {
                     findings.add(DoctorFinding.fail("mcp", relativize(root, source),

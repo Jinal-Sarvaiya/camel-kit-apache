@@ -738,30 +738,56 @@ public final class ShipCoordinator {
             }
         }
 
-        // For DISCOVERY stage, include interface contract discovery rules
+        // For DISCOVERY stage, include interface contract discovery rules directly in prompt
         if (attempt.stage().stage() == Stage.DISCOVERY) {
-            text.append("\n## Interface Contract Discovery\n\n");
-            try (InputStream resource = getClass().getResourceAsStream(
-                    "/skills/shared/interface-contract-briefing.md")) {
-                if (resource != null) {
-                    byte[] briefingContent = resource.readAllBytes();
-                    text.append(new String(briefingContent, StandardCharsets.UTF_8))
-                            .append('\n');
-                } else {
-                    // Fallback: minimal inline guidance if resource not found
-                    text.append("For each integration boundary (source and destination), ")
-                            .append("establish the interface contract status separately:\n\n")
-                            .append("- Ask one boundary at a time (source, then destination)\n")
-                            .append("- Analyze supplied material first (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD)\n")
-                            .append("- Four statuses: existing, pending, designed, not-applicable\n")
-                            .append("- Record pending contracts as dependencies (do NOT invent placeholders)\n")
-                            .append("- Propose new contracts only for user-controlled endpoints\n")
-                            .append("- Defer DataMapper if either contract is pending\n\n");
-                }
-            } catch (IOException e) {
-                // If we can't load the briefing, continue without it
-                // The shared discovery-completeness.md will still apply
-            }
+            text.append("\n## Interface Contract Discovery\n\n")
+                    .append("For each integration boundary (source and destination), establish the ")
+                    .append("interface contract status separately:\n\n")
+                    .append("### Ask One Boundary at a Time\n\n")
+                    .append("1. **For the source** (where data comes from): Do you have an interface ")
+                    .append("definition, will you provide one later, should we design it, or is it not applicable?\n")
+                    .append("2. **For the destination** (where data goes): Do you have an interface ")
+                    .append("definition, will you provide one later, should we design it, or is it not applicable?\n\n")
+                    .append("### Analyze Supplied Material First\n\n")
+                    .append("Before asking about a boundary's contract, check if the user already provided:\n")
+                    .append("- OpenAPI specification\n")
+                    .append("- AsyncAPI specification\n")
+                    .append("- WSDL document\n")
+                    .append("- JSON Schema\n")
+                    .append("- XSD schema\n")
+                    .append("- Documented message contract\n\n")
+                    .append("If found, read it, extract constraints, record status as \"existing\", ")
+                    .append("and skip the question for that boundary.\n\n")
+                    .append("### Four Possible Statuses\n\n")
+                    .append("**Status: existing** - Request artifact details (file path, URL, or inline content), ")
+                    .append("contract type (OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other), and compatibility constraints. ")
+                    .append("Read and establish: schema version, required vs. optional fields, data type constraints, ")
+                    .append("breaking vs. non-breaking policies. Record the artifact reference and all constraints.\n\n")
+                    .append("**Status: pending** - Record dependency: \"[source/destination] contract must be provided ")
+                    .append("before execution.\" Note: \"Detailed field-level design decisions remain open.\" ")
+                    .append("Do NOT invent a placeholder contract. Defer DataMapper or field-level transformations ")
+                    .append("that depend on this contract.\n\n")
+                    .append("**Status: designed** - Propose contract definition based on requirements. Include in ")
+                    .append("design specification for user approval before implementation. ONLY for user-controlled ")
+                    .append("endpoints (never redesign external system interfaces). Specify contract type and present ")
+                    .append("proposed schema.\n\n")
+                    .append("**Status: not-applicable** - Record rationale for why no formal contract is needed. ")
+                    .append("No further action required for this boundary.\n\n")
+                    .append("### Record Both Boundaries\n\n")
+                    .append("Capture separately:\n")
+                    .append("- `source`: status, artifact, type, constraints, dependencies\n")
+                    .append("- `destination`: status, artifact, type, constraints, dependencies\n\n")
+                    .append("For conditional routing with multiple destinations, record one contract decision ")
+                    .append("per distinct routing target.\n\n")
+                    .append("### Recording in Ship Result\n\n")
+                    .append("Record all interface contract findings in the `report` field of your result.\n")
+                    .append("For each unresolved contract question, record it in `unansweredQuestions`.\n\n")
+                    .append("Use the grouped `report` structure to capture:\n")
+                    .append("- Analyzed material (what contracts were found in supplied requirements)\n")
+                    .append("- Established contracts (status: existing, with artifact reference and constraints)\n")
+                    .append("- Pending contracts (status: pending, with explicit dependency statement)\n")
+                    .append("- Designed contracts (status: designed, with proposed schema for approval)\n")
+                    .append("- Not applicable contracts (status: not-applicable, with rationale)\n\n");
             requireBriefingSize(text);
         }
 

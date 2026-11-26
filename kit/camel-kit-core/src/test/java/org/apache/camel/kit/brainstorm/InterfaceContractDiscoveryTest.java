@@ -10,332 +10,503 @@ import org.junit.jupiter.api.io.TempDir;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Behavioral tests for interface contract discovery (Issues #111 and #160).
+ * Workflow regression tests for interface contract discovery (Issues #111 and #160).
  *
- * These tests verify that: 1. Supplied contracts are read first without re-asking 2. Missing contracts are asked about
- * 3. Pending contracts are recorded as dependencies (not invented) 4. User-controlled contracts are proposed for
- * approval 5. DataMapper is deferred when contracts are pending 6. Ship discovery includes contract rules
+ * These tests verify the actual greenfield interview behavior by checking that: 1. Questions appear in the correct
+ * order 2. Contract questions are split (source separate from destination) 3. DataMapper is deferred when contracts are
+ * pending 4. Routing targets trigger per-destination contract discovery 5. Ship DISCOVERY includes contract rules
+ * inline in the prompt
+ *
+ * Tests must FAIL if the interview structure regresses to the old combined Question 7b.
  */
-@DisplayName("Interface Contract Discovery")
+@DisplayName("Interface Contract Discovery Workflow")
 class InterfaceContractDiscoveryTest {
+
+    private static final String GREENFIELD_INTERVIEW_PATH
+            = "src/main/resources/skills/camel-brainstorm/guides/greenfield-interview.md";
+    private static final String SHIP_COORDINATOR_PATH
+            = "src/main/java/org/apache/camel/kit/ship/controller/ShipCoordinator.java";
+    private static final String CONTRACT_BRIEFING_PATH
+            = "src/main/resources/skills/shared/interface-contract-briefing.md";
 
     @TempDir
     Path tempDir;
 
     @Test
-    @DisplayName("Should read supplied OpenAPI contract without re-asking")
-    void testSuppliedContractNotAskedAgain() throws Exception {
-        // Given: User provides an OpenAPI file in requirements
-        Path openapiFile = tempDir.resolve("api-spec.yaml");
-        Files.writeString(openapiFile, """
-                openapi: 3.0.1
-                info:
-                  title: Order API
-                  version: 1.0.0
-                paths:
-                  /orders:
-                    post:
-                      summary: Create order
-                      requestBody:
-                        content:
-                          application/json:
-                            schema:
-                              type: object
-                              required:
-                                - orderId
-                                - amount
-                              properties:
-                                orderId:
-                                  type: string
-                                amount:
-                                  type: number
-                """);
+    @DisplayName("Interview must have separate source and destination contract questions")
+    void testSeparateSourceAndDestinationQuestions() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        assertTrue(Files.exists(interviewPath),
+                "Greenfield interview file must exist at: " + GREENFIELD_INTERVIEW_PATH);
 
-        // When: Interview analyzes supplied material
-        // Then: Contract status = "existing"
-        // Then: Question 7b for source is NOT asked
-        // Then: Artifact reference and constraints are extracted
+        String content = Files.readString(interviewPath);
 
-        // Expected behavior verification:
-        // - Contract should be detected during material analysis
-        // - Status recorded as "existing"
-        // - No question asked about source contract
-        // - Compatibility constraints extracted from OpenAPI version
+        // Must have Question 7b for source
+        assertTrue(content.contains("### Question 7b: Source Interface Contract"),
+                "Question 7b must ask about SOURCE interface contract specifically");
 
-        assertTrue(Files.exists(openapiFile), "OpenAPI file should exist");
-        String content = Files.readString(openapiFile);
-        assertTrue(content.contains("openapi: 3.0.1"), "Should contain OpenAPI version");
-        assertTrue(content.contains("required"), "Should contain required fields");
+        // Must have Question 7c for destination
+        assertTrue(content.contains("### Question 7c: Destination Interface Contract"),
+                "Question 7c must ask about DESTINATION interface contract specifically");
+
+        // Must NOT have the old combined question
+        assertFalse(
+                content.contains("For the **source** (where data comes from):\na) Existing definition available now")
+                        && content.contains(
+                                "For the **destination** (where data goes):\na) Existing definition available now")
+                        && content.indexOf("For the **source**") > content.indexOf("### Question 7b"),
+                "Must NOT contain old combined source+destination question after Question 7b");
     }
 
     @Test
-    @DisplayName("Should ask about missing source contract")
-    void testMissingContractAsked() {
-        // Given: No contract provided in requirements
+    @DisplayName("Interview must NOT have duplicate Question 7b")
+    void testNoDuplicateQuestion7b() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
 
-        // When: Interview reaches Question 7b for source
-        // Then: Question IS asked: "For the source, do you have an interface definition...?"
+        int firstOccurrence = content.indexOf("### Question 7b:");
+        int secondOccurrence = content.indexOf("### Question 7b:", firstOccurrence + 1);
 
-        // Expected behavior:
-        // - Material analysis finds no contract
-        // - Question 7b for source is asked
-        // - User can choose: existing / pending / designed / not-applicable
-
-        // This test verifies the question is asked when no material is supplied
-        assertTrue(true, "Question 7b should be asked when no contract is supplied");
+        assertEquals(-1, secondOccurrence,
+                "There must be exactly ONE Question 7b, not multiple instances");
     }
 
     @Test
-    @DisplayName("Should record pending contract as dependency without placeholder")
-    void testPendingContractRecordedAsDependency() {
-        // Given: User answers "definition will be supplied later"
+    @DisplayName("Question order must be: transformations → contracts → sink → routing → DataMapper")
+    void testQuestionOrder() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
 
-        // When: Response is "b) Definition will be supplied later"
-        // Then: Status = "pending"
-        // Then: Dependency recorded: "destination contract must be provided before execution"
-        // Then: NO placeholder contract is invented
-        // Then: Field-level design decisions remain open
+        int q7Index = content.indexOf("### Question 7: Transformations");
+        int q7bIndex = content.indexOf("### Question 7b: Source Interface Contract");
+        int q7cIndex = content.indexOf("### Question 7c: Destination Interface Contract");
+        int q8Index = content.indexOf("### Question 8: Sink System");
+        int q8aIndex = content.indexOf("### Question 8a: Multi-Path Routing");
+        int q8bIndex = content.indexOf("### Question 8b: Routing Target Contracts");
+        int q7aIndex = content.indexOf("### Question 7a: Data Transformation Detail");
+        int q9Index = content.indexOf("### Question 9: Error Handling");
 
-        // Expected in design spec:
-        // Interface Contract:
-        //   - Status: pending
-        //   - Dependency: Destination contract must be provided before execution.
-        //                 Field-level design decisions remain open.
+        assertTrue(q7Index > 0, "Question 7 (Transformations) must exist");
+        assertTrue(q7bIndex > 0, "Question 7b (Source Contract) must exist");
+        assertTrue(q7cIndex > 0, "Question 7c (Destination Contract) must exist");
+        assertTrue(q8Index > 0, "Question 8 (Sink) must exist");
+        assertTrue(q8aIndex > 0, "Question 8a (Routing) must exist");
+        assertTrue(q8bIndex > 0, "Question 8b (Routing Target Contracts) must exist");
+        assertTrue(q7aIndex > 0, "Question 7a (DataMapper) must exist");
+        assertTrue(q9Index > 0, "Question 9 (Error Handling) must exist");
 
-        // Verify NO placeholder like this appears:
-        // ❌ WRONG: "schema": { "type": "object", "properties": {} }
-
-        assertTrue(true, "Pending contract should be recorded as dependency");
+        assertTrue(q7Index < q7bIndex,
+                "Question 7 (Transformations) must come before 7b (Source Contract)");
+        assertTrue(q7bIndex < q7cIndex,
+                "Question 7b (Source Contract) must come before 7c (Destination Contract)");
+        assertTrue(q7cIndex < q8Index,
+                "Question 7c (Destination Contract) must come before 8 (Sink)");
+        assertTrue(q8Index < q8aIndex,
+                "Question 8 (Sink) must come before 8a (Routing)");
+        assertTrue(q8aIndex < q8bIndex,
+                "Question 8a (Routing) must come before 8b (Routing Target Contracts)");
+        assertTrue(q8bIndex < q7aIndex,
+                "Question 8b (Routing Target Contracts) must come before 7a (DataMapper) - routing targets must be known before field mapping");
+        assertTrue(q7aIndex < q9Index,
+                "Question 7a (DataMapper) must come before 9 (Error Handling)");
     }
 
     @Test
-    @DisplayName("Should propose user-controlled contract for approval")
-    void testUserControlledContractProposed() {
-        // Given: User answers "we should design it together"
-        // And: Endpoint is user-controlled (not external)
+    @DisplayName("DataMapper must defer only mappings that depend on pending contracts")
+    void testDataMapperDefersOnlyAffectedMappings() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
 
-        // When: Response is "c) We should design it together"
-        // Then: Status = "designed"
-        // Then: Proposed contract included in design spec
-        // Then: Awaits user approval before implementation
+        int q7aIndex = content.indexOf("### Question 7a: Data Transformation Detail");
+        int q9Index = content.indexOf("### Question 9: Error Handling");
 
-        // Expected in design spec:
-        // Interface Contract:
-        //   - Status: designed
-        //   - Proposed JSON Schema definition (see Appendix or inline below)
-        //   - [User must approve this schema in design approval]
+        String q7aSection = content.substring(q7aIndex, q9Index);
 
-        assertTrue(true, "New contract should be proposed for user approval");
+        // Must check per-mapping dependencies, not blanket defer
+        assertTrue(
+                q7aSection.contains("BOTH source and destination")
+                        || q7aSection.contains("BOTH source and that branch"),
+                "Question 7a must check if BOTH source and destination are available for each mapping");
+
+        // Must collect mappings where both schemas are available
+        assertTrue(q7aSection.contains("Collect mapping for each branch where")
+                || q7aSection.contains("proceed with mapping"),
+                "Question 7a must collect mappings where both schemas are available");
+
+        // Must defer only specific mappings with pending dependencies
+        assertTrue(q7aSection.contains("Defer mapping for branches where") || q7aSection.contains("defer this mapping"),
+                "Question 7a must defer only mappings that depend on pending contracts");
+
+        // Must handle conditional routing per-branch
+        assertTrue(q7aSection.contains("For EACH routing branch") || q7aSection.contains("each branch"),
+                "Question 7a must handle conditional routing per-branch");
+
+        // Must record pending dependencies separately per branch
+        assertTrue(q7aSection.contains("Record each pending mapping dependency separately")
+                || q7aSection.contains("separately"),
+                "Question 7a must record each pending mapping dependency separately");
+
+        // Must defer all if source is pending
+        assertTrue(q7aSection.contains("If source contract is \"pending\", defer ALL"),
+                "Question 7a must defer all mappings if source contract is pending");
     }
 
     @Test
-    @DisplayName("Should NOT propose to redesign external system interface")
-    void testExternalInterfaceNotRedesigned() {
-        // Given: Destination is external system (e.g., third-party API)
-        // And: User answers "we should design it together"
+    @DisplayName("DataMapper must consume artifact references and return to Q9")
+    void testDataMapperConsumesArtifactsAndReturnsToQ9() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
 
-        // When: System detects endpoint is NOT user-controlled
-        // Then: Warn or reject: "Cannot redesign external system interface"
-        // Then: Suggest: existing / pending / not-applicable instead
+        int q7aIndex = content.indexOf("### Question 7a: Data Transformation Detail");
+        int q9Index = content.indexOf("### Question 9: Error Handling");
+        String q7aSection = content.substring(q7aIndex, q9Index);
 
-        assertTrue(true, "External interfaces cannot be redesigned");
+        // Must pass artifact references to DataMapper
+        assertTrue(q7aSection.contains("Pass any existing contract artifacts")
+                || q7aSection.contains("Pass") && q7aSection.contains("artifact"),
+                "Question 7a must pass existing contract artifacts to DataMapper");
+
+        assertTrue(q7aSection.contains("Questions 7b, 7c, and 8b") || (q7aSection.contains("7b")
+                && q7aSection.contains("7c") && q7aSection.contains("8b")),
+                "Question 7a must reference artifacts from Questions 7b, 7c, and 8b");
+
+        // Must skip schema request steps when artifacts are provided
+        assertTrue(q7aSection.contains("skip the schema request steps")
+                || q7aSection.contains("use the provided schemas directly"),
+                "Question 7a must tell DataMapper to skip schema requests when artifacts are provided");
+
+        // Must ask only for missing information
+        assertTrue(q7aSection.contains("Ask only for information not already")
+                || q7aSection.contains("not already available"),
+                "Question 7a must ask only for information not already in contract artifacts");
+
+        // Must return to Question 9
+        assertTrue(q7aSection.contains("return to Question 9"),
+                "Question 7a must explicitly return to Question 9 after completion");
     }
 
     @Test
-    @DisplayName("Should defer DataMapper when source contract is pending")
-    void testDataMapperDeferredWhenSourcePending() {
-        // Given: Source contract status = "pending"
-        // And: Transformation includes field mapping
+    @DisplayName("DataMapper interview must consume artifact references from Q7a")
+    void testDataMapperInterviewConsumesReferences() throws Exception {
+        Path datamapperPath = Path.of("src/main/resources/skills/camel-design/guides/datamapper-interview.md");
+        assertTrue(Files.exists(datamapperPath), "DataMapper interview must exist");
 
-        // When: Interview reaches Question 7a (DataMapper)
-        // Then: Check source contract status
-        // Then: Status is "pending"
-        // Then: Skip Question 7a
-        // Then: Note in design spec: "Field mapping depends on pending source contract"
+        String content = Files.readString(datamapperPath);
 
-        // Expected flow:
-        // Question 7: Transformations → field mapping selected
-        // Question 7b: Source contract → pending
-        // Question 7c: Destination contract → existing
-        // Question 7a: DataMapper → SKIPPED (source pending)
-        // Question 8: Sink System
+        // Must mention contract artifact references from Q7a
+        assertTrue(content.contains("Contract artifact references") || content.contains("Question 7a passes"),
+                "DataMapper interview must acknowledge contract artifact references from Q7a");
 
-        assertTrue(true, "DataMapper should be deferred when source contract is pending");
+        // Must check for existing artifacts in Step 2 (Source Schema)
+        int step2Index = content.indexOf("## Step 2: Source Schema");
+        int step3Index = content.indexOf("## Step 3: Target Schema");
+        String step2Section = content.substring(step2Index, step3Index);
+
+        assertTrue(step2Section.contains("Check for existing artifact") || step2Section.contains("already available"),
+                "Step 2 must check for existing source artifact from Q7b");
+
+        assertTrue(step2Section.contains("Question 7b") || step2Section.contains("Q7b"),
+                "Step 2 must reference Question 7b for source artifact");
+
+        assertTrue(step2Section.contains("skip the request") || step2Section.contains("skip"),
+                "Step 2 must skip schema request if artifact is available");
+
+        // Must check for existing artifacts in Step 3 (Target Schema)
+        int step3bIndex = content.indexOf("## Step 3b:");
+        String step3Section = content.substring(step3Index, step3bIndex);
+
+        assertTrue(step3Section.contains("Check for existing artifact") || step3Section.contains("already available"),
+                "Step 3 must check for existing target artifact from Q7c/Q8b");
+
+        assertTrue((step3Section.contains("Question 7c") || step3Section.contains("Q7c"))
+                && (step3Section.contains("Question 8b") || step3Section.contains("Q8b")),
+                "Step 3 must reference Question 7c and Question 8b for target artifact");
+
+        assertTrue(step3Section.contains("skip the request") || step3Section.contains("skip"),
+                "Step 3 must skip schema request if artifact is available");
+
+        // Must return to Question 9
+        assertTrue(content.contains("return control to `camel-brainstorm` at Question 9"),
+                "DataMapper interview must return to Question 9");
     }
 
     @Test
-    @DisplayName("Should defer DataMapper when destination contract is pending")
-    void testDataMapperDeferredWhenDestinationPending() {
-        // Given: Destination contract status = "pending"
-        // And: Transformation includes field mapping
+    @DisplayName("DataMapper canonicalize must return to Question 9")
+    void testDataMapperCanonicalizeReturnsToQ9() throws Exception {
+        Path canonicalizePath = Path.of("src/main/resources/skills/shared/datamapper-canonicalize.md");
+        assertTrue(Files.exists(canonicalizePath), "DataMapper canonicalize must exist");
 
-        // When: Interview reaches Question 7a (DataMapper)
-        // Then: Check destination contract status
-        // Then: Status is "pending"
-        // Then: Skip Question 7a
-        // Then: Note in design spec: "Field mapping depends on pending destination contract"
+        String content = Files.readString(canonicalizePath);
 
-        assertTrue(true, "DataMapper should be deferred when destination contract is pending");
+        // Must return to Question 9, not Question 8
+        assertTrue(content.contains("return to `camel-brainstorm` at Question 9"),
+                "DataMapper canonicalize must return to Question 9");
+
+        assertFalse(content.contains("return to `camel-brainstorm` at Question 8"),
+                "DataMapper canonicalize must NOT return to Question 8");
     }
 
     @Test
-    @DisplayName("Should run DataMapper when both contracts are available")
-    void testDataMapperRunsWhenContractsAvailable() {
-        // Given: Source contract status = "existing"
-        // And: Destination contract status = "existing"
-        // And: Transformation includes field mapping
+    @DisplayName("Question 8b must reuse Q7c answers and analyze supplied material first")
+    void testRoutingTargetContractsReuseAnswers() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
 
-        // When: Interview reaches Question 7a (DataMapper)
-        // Then: Neither source nor destination is pending
-        // Then: Question 7a IS asked
-        // Then: DataMapper interview proceeds normally
+        int q8bIndex = content.indexOf("### Question 8b: Routing Target Contracts");
+        int q7aIndex = content.indexOf("### Question 7a: Data Transformation Detail");
+        String q8bSection = content.substring(q8bIndex, q7aIndex);
 
-        assertTrue(true, "DataMapper should run when both contracts are available");
+        // Must analyze supplied material first
+        assertTrue(q8bSection.contains("Analyze supplied material first"),
+                "Question 8b must analyze supplied material first");
+
+        // Must reuse Q7c answers
+        assertTrue(q8bSection.contains("Reuse any answers already given in Question 7c")
+                || q8bSection.contains("Reuse") && q8bSection.contains("7c"),
+                "Question 8b must reuse answers already given in Question 7c");
+
+        // Must skip asking if already recorded
+        assertTrue(q8bSection.contains("skip") || q8bSection.contains("Skip"),
+                "Question 8b must skip asking about destinations already recorded in Q7c");
     }
 
     @Test
-    @DisplayName("Should handle mixed scenario: existing source + designed destination")
-    void testMixedExistingAndDesigned() throws Exception {
-        // Given: Source has existing OpenAPI
-        Path sourceApi = tempDir.resolve("source-api.yaml");
-        Files.writeString(sourceApi, "openapi: 3.0.1\ninfo:\n  title: Source API");
+    @DisplayName("Interview must have routing target contract question after Question 8a")
+    void testRoutingTargetContractQuestion() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
 
-        // And: Destination is user-controlled, to be designed
+        int q8aIndex = content.indexOf("### Question 8a: Multi-Path Routing");
+        assertTrue(q8aIndex > 0, "Question 8a (Routing) must exist");
 
-        // When: Interview processes both
-        // Then: Source status = "existing", artifact extracted
-        // Then: Source question skipped (already supplied)
-        // Then: Destination question asked
-        // Then: User chooses "design together"
-        // Then: Destination status = "designed"
-        // Then: Proposed schema included in design spec
+        int q8bIndex = content.indexOf("### Question 8b: Routing Target Contracts");
+        assertTrue(q8bIndex > 0,
+                "Question 8b (Routing Target Contracts) must exist for conditional routing scenarios");
 
-        assertTrue(Files.exists(sourceApi), "Source API should be provided");
-        assertTrue(true, "Mixed existing + designed scenario should work");
+        assertTrue(q8aIndex < q8bIndex,
+                "Question 8b (Routing Target Contracts) must come after 8a (Multi-Path Routing)");
+
+        int q9Index = content.indexOf("### Question 9: Error Handling");
+        assertTrue(q8bIndex < q9Index,
+                "Question 8b must come before Question 9 (Error Handling)");
+
+        // Verify it handles per-destination contracts
+        String q8bSection = content.substring(q8bIndex, content.indexOf("### Question 7a"));
+        assertTrue(q8bSection.contains("distinct routing destination") || q8bSection.contains("each distinct"),
+                "Question 8b must ask about each distinct routing destination");
+        assertTrue(q8bSection.contains("flow.routing.conditions[].contract"),
+                "Question 8b must record contract per routing branch");
     }
 
     @Test
-    @DisplayName("Should handle mixed scenario: existing source + pending destination")
-    void testMixedExistingAndPending() throws Exception {
-        // Given: Source has existing OpenAPI
-        Path sourceApi = tempDir.resolve("source-api.yaml");
-        Files.writeString(sourceApi, "openapi: 3.0.1\ninfo:\n  title: Source API");
+    @DisplayName("Ship DISCOVERY must include contract rules directly in controller-issued prompt")
+    void testShipDiscoveryPromptIncludesInlineRules() throws Exception {
+        Path shipCoordinatorPath = Path.of(SHIP_COORDINATOR_PATH);
+        assertTrue(Files.exists(shipCoordinatorPath),
+                "ShipCoordinator.java must exist at: " + SHIP_COORDINATOR_PATH);
 
-        // And: Destination contract will be supplied later
+        String content = Files.readString(shipCoordinatorPath);
 
-        // When: Interview processes both
-        // Then: Source status = "existing"
-        // Then: Destination status = "pending"
-        // Then: Destination dependency recorded
-        // Then: NO DataMapper (destination pending)
+        assertTrue(content.contains("Stage.DISCOVERY"),
+                "ShipCoordinator must have DISCOVERY stage handling");
 
-        assertTrue(Files.exists(sourceApi), "Source API should be provided");
-        assertTrue(true, "Mixed existing + pending scenario should work");
+        // Rules must be inline in text.append() calls
+        assertTrue(content.contains("Interface Contract Discovery"),
+                "DISCOVERY prompt must contain Interface Contract Discovery heading");
+
+        assertTrue(content.contains("Ask One Boundary") && content.contains("text.append"),
+                "DISCOVERY prompt must contain inline 'Ask One Boundary at a Time' rule");
+
+        assertTrue(content.contains("Analyze Supplied Material") && content.contains("text.append"),
+                "DISCOVERY prompt must contain inline 'Analyze Supplied Material First' rule");
+
+        assertTrue(content.contains("Four Possible Statuses") && content.contains("text.append"),
+                "DISCOVERY prompt must contain inline 'Four Possible Statuses' rule");
+
+        assertTrue(content.contains("Status: existing") && content.contains("Status: pending"),
+                "DISCOVERY prompt must define status values inline");
     }
 
     @Test
-    @DisplayName("Should include contract rules in Ship DISCOVERY prompt")
-    void testShipDiscoveryIncludesContractRules() {
-        // Given: Ship controller generates DISCOVERY task
+    @DisplayName("Ship DISCOVERY prompt must tell worker to record in report and unansweredQuestions")
+    void testShipDiscoveryRecordingInstructions() throws Exception {
+        Path shipCoordinatorPath = Path.of(SHIP_COORDINATOR_PATH);
+        String content = Files.readString(shipCoordinatorPath);
 
-        // When: DISCOVERY prompt is created
-        // Then: Include interface-contract-briefing.md
-        // Then: Include per-boundary rules (source and destination separately)
-        // Then: Preserve Ship's grouped question format
-        // Then: Maintain controller-owned oversight
+        assertTrue(content.contains("Stage.DISCOVERY"), "DISCOVERY stage handling must exist");
 
-        // Expected in Ship DISCOVERY prompt:
-        // - Reference to shared/interface-contract-briefing.md
-        // - Per-boundary contract discovery instructions
-        // - Structured result schema for contract status
-        // - Ship-specific grouped question approach
+        // Must tell worker to record in report and unansweredQuestions
+        assertTrue(content.contains("report") && content.contains("unansweredQuestions"),
+                "DISCOVERY prompt must mention 'report' and 'unansweredQuestions' fields");
 
-        assertTrue(true, "Ship DISCOVERY should include contract discovery rules");
+        assertTrue(content.contains("Record all interface contract findings"),
+                "DISCOVERY prompt must instruct to record contract findings");
+
+        assertTrue(content.contains("Recording in Ship Result") || content.contains("Recording"),
+                "DISCOVERY prompt must have recording instructions section");
     }
 
     @Test
-    @DisplayName("Should extract compatibility constraints from existing contract")
-    void testCompatibilityConstraintsExtracted() throws Exception {
-        // Given: OpenAPI with specific version and constraints
-        Path openapiFile = tempDir.resolve("api-with-constraints.yaml");
-        Files.writeString(openapiFile, """
-                openapi: 3.0.1
-                info:
-                  title: Order API
-                  version: 2.1.0
-                  x-breaking-changes: false
-                servers:
-                  - url: https://api.example.com/v2
-                paths:
-                  /orders:
-                    post:
-                      requestBody:
-                        required: true
-                """);
+    @DisplayName("Contract briefing must define four statuses")
+    void testContractBriefingDefinesFourStatuses() throws Exception {
+        Path briefingPath = Path.of(CONTRACT_BRIEFING_PATH);
+        assertTrue(Files.exists(briefingPath),
+                "Contract briefing must exist at: " + CONTRACT_BRIEFING_PATH);
 
-        // When: Contract is analyzed
-        // Then: Extract version: 2.1.0
-        // Then: Extract breaking changes policy: false
-        // Then: Extract required fields
-        // Then: Record in design spec constraints section
+        String content = Files.readString(briefingPath);
 
-        String content = Files.readString(openapiFile);
-        assertTrue(content.contains("version: 2.1.0"), "Should extract version");
-        assertTrue(content.contains("required: true"), "Should extract required constraints");
-        assertTrue(true, "Compatibility constraints should be extracted and recorded");
+        assertTrue(content.contains("Status: existing") || content.contains("**Status: existing**"),
+                "Briefing must define 'existing' status");
+        assertTrue(content.contains("Status: pending") || content.contains("**Status: pending**"),
+                "Briefing must define 'pending' status");
+        assertTrue(content.contains("Status: designed") || content.contains("**Status: designed**"),
+                "Briefing must define 'designed' status");
+        assertTrue(content.contains("Status: not-applicable") || content.contains("**Status: not-applicable**"),
+                "Briefing must define 'not-applicable' status");
     }
 
     @Test
-    @DisplayName("Should preserve question order: transformations → source contract → dest contract → DataMapper → sink")
-    void testQuestionOrderPreserved() {
-        // Expected order for per-flow questions:
-        // Question 5: Flow Intent and Data
-        // Question 6: Source System
-        // Question 7: Transformations
-        // Question 7b: Source Interface Contract
-        // Question 7c: Destination Interface Contract
-        // Question 7a: Data Transformation Detail (DataMapper) - CONDITIONAL
-        // Question 8: Sink System
-        // Question 8a: Multi-Path Routing - CONDITIONAL
-        // Question 9: Error Handling
+    @DisplayName("Contract briefing must prohibit inventing placeholder contracts")
+    void testContractBriefingProhibitsPlaceholders() throws Exception {
+        Path briefingPath = Path.of(CONTRACT_BRIEFING_PATH);
+        String content = Files.readString(briefingPath);
 
-        // This order ensures:
-        // 1. Contracts are established BEFORE DataMapper
-        // 2. DataMapper can check if contracts are pending
-        // 3. DataMapper return goes to Question 8 (sink) as expected
-
-        assertTrue(true, "Question order should be: transformations → contracts → DataMapper → sink");
+        assertTrue(content.contains("Do NOT invent") || content.contains("do not invent")
+                || content.contains("NOT invent a placeholder"),
+                "Briefing must explicitly prohibit inventing placeholder contracts");
     }
 
     @Test
-    @DisplayName("Should record contract information in design spec flow section")
-    void testContractInDesignSpec() {
-        // Given: Flow with contracts discovered
+    @DisplayName("Contract briefing must require asking source and destination separately")
+    void testContractBriefingRequiresSeparateQuestions() throws Exception {
+        Path briefingPath = Path.of(CONTRACT_BRIEFING_PATH);
+        String content = Files.readString(briefingPath);
 
-        // When: design-assembly.md generates design spec
-        // Then: Source section includes Interface Contract
-        // Then: Sink section includes Interface Contract
-        // Then: Each shows: status, artifact (if existing), dependency (if pending), proposed def (if designed)
+        assertTrue(content.contains("one boundary at a time") || content.contains("separately"),
+                "Briefing must require asking about source and destination separately");
+        assertTrue(content.contains("source") && content.contains("destination"),
+                "Briefing must mention both source and destination");
+    }
 
-        // Expected format in design spec Section 3 (Flow Designs):
-        //
-        // **Source:**
-        // - System: Shopify
-        // - Component: `camel-http`
-        // - Interface Contract:
-        //   - Status: existing
-        //   - Artifact: api/shopify-orders.yaml
-        //   - Type: OpenAPI 3.0.1
-        //   - Constraints: Breaking changes not allowed, all requests require authentication
-        //
-        // **Sink:**
-        // - System: Internal Event Bus
-        // - Component: `camel-kafka`
-        // - Interface Contract:
-        //   - Status: designed
-        //   - Proposed JSON Schema definition (see below)
-        //   - [Awaiting user approval in design review]
+    @Test
+    @DisplayName("Design template must support inline contract excerpts")
+    void testDesignTemplateSupportsInlineExcerpts() throws Exception {
+        Path designTemplatePath = Path.of(
+                "src/main/resources/skills/camel-brainstorm/guides/design-assembly.md");
+        assertTrue(Files.exists(designTemplatePath),
+                "Design assembly template must exist");
 
-        assertTrue(true, "Contract information should appear in design spec flow sections");
+        String content = Files.readString(designTemplatePath);
+
+        // Check both Source and Sink Interface Contract sections
+        assertTrue(content.contains("inline excerpt") || content.contains("inline content"),
+                "Design template must allow inline contract excerpts, not just file paths or URLs");
+    }
+
+    @Test
+    @DisplayName("Design template must preserve per-branch contract statuses for conditional routing")
+    void testDesignTemplatePreservesPerBranchContracts() throws Exception {
+        Path designTemplatePath = Path.of(
+                "src/main/resources/skills/camel-brainstorm/guides/design-assembly.md");
+        String content = Files.readString(designTemplatePath);
+
+        // Must have Conditional Routing section
+        assertTrue(content.contains("**Conditional Routing:**"),
+                "Design template must have Conditional Routing section for multi-destination flows");
+
+        // Must show per-branch structure
+        assertTrue(content.contains("Branch 1:") && content.contains("Branch 2:"),
+                "Conditional Routing section must show per-branch structure");
+
+        // Each branch must have its own Interface Contract field
+        int conditionalRoutingIndex = content.indexOf("**Conditional Routing:**");
+        int sinkIndex = content.indexOf("**Sink:**", conditionalRoutingIndex);
+        String conditionalSection = content.substring(conditionalRoutingIndex, sinkIndex);
+
+        // Count Interface Contract occurrences in conditional routing section
+        int contractCount = 0;
+        int index = 0;
+        while ((index = conditionalSection.indexOf("**Interface Contract:**", index)) != -1) {
+            contractCount++;
+            index += "**Interface Contract:**".length();
+        }
+
+        assertTrue(contractCount >= 2,
+                "Conditional Routing section must have Interface Contract for each branch (found " + contractCount
+                                       + ", expected >= 2)");
+
+        // Must reference flow.routing.conditions[].contract
+        assertTrue(content.contains("flow.routing.conditions[0].contract")
+                || content.contains("flow.routing.conditions[1].contract"),
+                "Design template must reference flow.routing.conditions[].contract for per-branch contracts");
+
+        // Must explain that each branch's contract is recorded separately
+        assertTrue(content.contains("separately") || content.contains("Branch 1 may have")
+                || content.contains("preserves both"),
+                "Design template must explain that per-branch contracts are preserved separately");
+    }
+
+    @Test
+    @DisplayName("Interview must record contract status for both source and destination")
+    void testInterviewRecordsBothContracts() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
+
+        assertTrue(content.contains("flow.contracts.source"),
+                "Interview must record flow.contracts.source");
+        assertTrue(content.contains("flow.contracts.destination"),
+                "Interview must record flow.contracts.destination");
+    }
+
+    @Test
+    @DisplayName("Contract briefing must require analyzing supplied material first")
+    void testContractBriefingRequiresAnalysisFirst() throws Exception {
+        Path briefingPath = Path.of(CONTRACT_BRIEFING_PATH);
+        String content = Files.readString(briefingPath);
+
+        assertTrue(content.contains("Analyze") || content.contains("analyze"),
+                "Briefing must require analyzing supplied material");
+        assertTrue(content.contains("First") || content.contains("first") || content.contains("Before asking"),
+                "Briefing must require analysis BEFORE asking questions");
+
+        // Must list supported contract types
+        assertTrue(content.contains("OpenAPI") && content.contains("AsyncAPI")
+                && content.contains("WSDL") && content.contains("JSON Schema")
+                && content.contains("XSD"),
+                "Briefing must list all supported contract types");
+    }
+
+    @Test
+    @DisplayName("Interview contract questions must support all four answer options")
+    void testContractQuestionsSupportAllOptions() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
+
+        int q7bIndex = content.indexOf("### Question 7b:");
+        int q7cIndex = content.indexOf("### Question 7c:");
+
+        assertTrue(q7bIndex > 0 && q7cIndex > 0, "Both contract questions must exist");
+
+        // Check Question 7b section
+        String q7bSection = content.substring(q7bIndex, q7cIndex);
+        assertTrue(q7bSection.contains("Existing definition available now"),
+                "Question 7b must have 'existing' option");
+        assertTrue(q7bSection.contains("Definition will be supplied later"),
+                "Question 7b must have 'pending' option");
+        assertTrue(q7bSection.contains("We should design it together"),
+                "Question 7b must have 'designed' option");
+        assertTrue(q7bSection.contains("Not applicable"),
+                "Question 7b must have 'not-applicable' option");
+
+        // Check Question 7c section
+        String q7cSection = content.substring(q7cIndex, content.indexOf("### Question 8"));
+        assertTrue(q7cSection.contains("Existing definition available now"),
+                "Question 7c must have 'existing' option");
+        assertTrue(q7cSection.contains("Definition will be supplied later"),
+                "Question 7c must have 'pending' option");
+        assertTrue(q7cSection.contains("We should design it together"),
+                "Question 7c must have 'designed' option");
+        assertTrue(q7cSection.contains("Not applicable"),
+                "Question 7c must have 'not-applicable' option");
     }
 }

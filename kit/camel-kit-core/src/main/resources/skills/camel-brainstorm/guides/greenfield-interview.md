@@ -280,92 +280,6 @@ Understood — no formal contract needed for this destination.
 
 Record: `flow.contracts.destination` with status (existing/pending/designed/na), artifact reference, constraints, and dependencies
 
-### Question 7a: Data Transformation Detail (conditional)
-
-ONLY if field mapping needed AND format pair is XML/JSON combinations AND neither source nor destination contract is pending.
-
-If either contract status is "pending", defer this question. Note in the design spec that field mapping depends on the pending contract and will be resolved when the artifact arrives.
-
-```
-For the data transformation in "[flow-name]":
-
-I'll need to understand the field mappings. Can you describe:
-- Source fields and their paths
-- Target fields and their paths
-- Any transformation logic (concatenation, formatting, default values)
-
-Or if you have example source and target messages, share those.
-```
-
-Load `camel-design/guides/datamapper-interview.md` and `shared/datamapper-canonicalize.md` for detailed field mapping.
-
-Record: `flow.datamapper.mappings[]`
-
-### Question 7b: Interface Contracts (per flow)
-
-```
-For flow "[flow-name]":
-
-Do you have an interface definition for the source or destination, or should we design one?
-
-Interface definitions include OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, or documented message contracts.
-
-For the **source** (where data comes from):
-a) Existing definition available now — I'll provide it
-b) Definition will be supplied later
-c) We should design it together
-d) Not applicable (no formal contract needed)
-
-For the **destination** (where data goes):
-a) Existing definition available now — I'll provide it
-b) Definition will be supplied later
-c) We should design it together
-d) Not applicable (no formal contract needed)
-```
-
-**For each "existing definition available now" answer:**
-```
-Please provide:
-- The contract artifact (file path, URL, or inline content)
-- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
-- Any compatibility constraints or version requirements
-```
-
-Read the supplied contract and establish:
-- Schema version and compatibility requirements
-- Required vs. optional fields
-- Data type constraints
-- Any breaking vs. non-breaking change policies
-
-**For each "definition will be supplied later" answer:**
-```
-Noted. The [source/destination] contract is pending.
-
-This means:
-- Detailed field-level design decisions will remain open
-- The implementation plan will record this dependency
-- You'll need to provide the contract before execution begins
-```
-
-Record the dependency without inventing a placeholder contract.
-
-**For each "we should design it together" answer:**
-```
-I'll propose a [contract-type] definition based on your requirements.
-
-This will be included in the design specification for your approval before implementation.
-Since this is a [source/destination] you control, we can design it to fit the integration needs.
-```
-
-Note: Only propose designing contracts for systems under the user's control. External system interfaces cannot be redesigned.
-
-**For "not applicable" answer:**
-```
-Understood — no formal contract needed for this [source/destination].
-```
-
-Record: `flow.contracts.source`, `flow.contracts.destination` with status (existing/pending/designed/na), artifact references, constraints, and dependencies
-
 ### Question 8: Sink System (per flow)
 
 ```
@@ -395,6 +309,91 @@ What are the routing conditions?
 ```
 
 Record: `flow.routing.conditions[]`
+
+### Question 8b: Routing Target Contracts (conditional)
+
+ONLY if Question 8a revealed multiple routing targets. For each distinct routing destination that was NOT already covered by Question 7c:
+
+Analyze supplied material first. If a contract artifact for this routing destination was already provided, read it, record status as "existing", extract constraints, and skip this question for that destination.
+
+Reuse any answers already given in Question 7c. If Question 7c recorded a destination contract, apply it to the matching routing branch and skip asking about that branch.
+
+```
+For the [destination-name] branch:
+
+Do you have an interface definition for this destination, or should we design one?
+
+Interface definitions include OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, or documented message contracts.
+
+a) Existing definition available now — I'll provide it
+b) Definition will be supplied later
+c) We should design it together
+d) Not applicable (no formal contract needed)
+```
+
+**For each "existing definition available now" answer:**
+```
+Please provide:
+- The contract artifact (file path, URL, or inline content)
+- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
+- Any compatibility constraints or version requirements
+```
+
+Read and establish: schema version, required vs. optional fields, data type constraints, breaking vs. non-breaking policies.
+
+**For "definition will be supplied later":**
+Record dependency: "Destination contract for [branch-name] must be provided before execution. Field-level design decisions remain open."
+
+**For "we should design it together":**
+Only for user-controlled endpoints. Propose contract definition in design spec for approval.
+
+**For "not applicable":**
+Record rationale for why no formal contract is needed.
+
+Record: `flow.routing.conditions[].contract` for each branch with status (existing/pending/designed/na), artifact references, constraints, and dependencies.
+
+The design specification must carry each routing branch's contract status separately so pending schemas on one branch and existing contracts on another are both preserved in the approved design.
+
+### Question 7a: Data Transformation Detail (conditional)
+
+ONLY if field mapping needed AND format pair is XML/JSON combinations.
+
+Before proceeding, determine which mappings can be collected now:
+
+**For single-destination flows:**
+- Check source contract (`flow.contracts.source` from Q7b) and destination contract (`flow.contracts.destination` from Q7c)
+- If BOTH source and destination have status "existing" or "designed", proceed with mapping
+- If EITHER source or destination has status "pending", defer this mapping. Note in design spec: "Field mapping depends on pending [source/destination] contract and will be resolved when the artifact arrives"
+
+**For conditional routing flows:**
+- Check source contract (`flow.contracts.source` from Q7b)
+- For EACH routing branch, check that branch's destination contract (`flow.routing.conditions[].contract` from Q8b)
+- Collect mapping for each branch where BOTH source and that branch's destination have status "existing" or "designed"
+- Defer mapping for branches where source or that specific branch's destination has status "pending"
+- Record each pending mapping dependency separately: "Field mapping for [branch-name] depends on pending [source/destination] contract"
+
+If source contract is "pending", defer ALL mappings for this flow.
+
+```
+For the data transformation in "[flow-name]":
+
+I'll need to understand the field mappings. Can you describe:
+- Source fields and their paths
+- Target fields and their paths
+- Any transformation logic (concatenation, formatting, default values)
+
+Or if you have example source and target messages, share those.
+```
+
+Pass any existing contract artifacts from Questions 7b, 7c, and 8b into DataMapper. The artifacts contain:
+- Source schema (from Q7b if status is "existing" or "designed")
+- Destination schema (from Q7c for single-destination, or from Q8b for each routing branch if status is "existing" or "designed")
+
+Load `camel-design/guides/datamapper-interview.md` and `shared/datamapper-canonicalize.md` for detailed field mapping. When schema artifacts are provided, skip the schema request steps and use the provided schemas directly. Ask only for information not already available in the contract artifacts.
+
+Record: `flow.datamapper.mappings[]`
+
+After completing DataMapper (or noting deferred mappings), return to Question 9.
 
 ### Question 9: Error Handling (per flow)
 

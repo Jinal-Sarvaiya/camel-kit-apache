@@ -49,8 +49,8 @@ should be designed together. Supplied contracts are inspected for compatibility 
 question; pending contracts are recorded as explicit dependencies without placeholder definitions; new contracts for
 user-controlled endpoints are proposed in the design specification for approval before implementation.
 
-NOTE: Interface contract discovery is available in development snapshots only (0.5.0-SNAPSHOT and later). Released
-versions (0.4.x) do not include this feature.
+NOTE: Interface contract discovery is available in development snapshots (channel: {camel-kit-snapshot-version}) only. Released
+versions ({camel-kit-version}) do not include this feature.
 
 .Example exchanges from the interview
 [%collapsible]

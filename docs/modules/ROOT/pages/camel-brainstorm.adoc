@@ -58,8 +58,8 @@ clarification at all. Open points are asked one at a time, never in batches, in 
 . *Cross-cutting questions*: performance, security and monitoring when relevant, then remaining constraints and the
   deliberate scope exclusions. A category that does not apply is recorded as not applicable with the reason.
 
-NOTE: Interface contract discovery is available in development snapshots only (0.5.0-SNAPSHOT and later). Released
-versions (0.4.x) do not include this feature.
+NOTE: Interface contract discovery is available in development snapshots (channel: {camel-kit-snapshot-version}) only. Released
+versions ({camel-kit-version}) do not include this feature.
 
 .Topics the interview can cover, with example exchanges
 [%collapsible]

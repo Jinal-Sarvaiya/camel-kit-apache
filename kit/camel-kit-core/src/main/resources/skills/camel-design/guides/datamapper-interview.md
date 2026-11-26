@@ -7,7 +7,9 @@
 
 You are now acting as a **Data Mapping Specialist**. This guide is loaded by `camel-brainstorm` when the user mentions data transformation or field mapping and the format pair is XML→XML, JSON→JSON, JSON→XML, or XML→JSON.
 
-Follow the steps below, then return control to `camel-brainstorm` at Question 8.
+**Contract artifact references:** `camel-brainstorm` Question 7a passes any existing contract artifacts from Questions 7b, 7c, and 8b. Check for these references before asking for schemas in Steps 2-3.
+
+Follow the steps below, then return control to `camel-brainstorm` at Question 9.
 
 ---
 
@@ -24,6 +26,14 @@ Is this correct? (yes / no — specify the correct pair)
 ---
 
 ## Step 2: Source Schema
+
+**Check for existing artifact:** If `camel-brainstorm` Question 7b recorded a source contract with status "existing" or "designed", use that artifact reference. The contract includes:
+- Artifact location (file path, URL, or inline content)
+- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
+
+If a source schema artifact is already available, extract the schema from the artifact and skip the request below. For OpenAPI/AsyncAPI, extract the message schema. For WSDL, extract the message XSD. For JSON Schema/XSD, use as-is.
+
+**If no source schema artifact is available from Q7b, ask:**
 
 ```
 Please provide the source schema.
@@ -45,6 +55,14 @@ c) No schema — I'll describe the fields manually
 ---
 
 ## Step 3: Target Schema
+
+**Check for existing artifact:** If `camel-brainstorm` Question 7c (single-destination) or Question 8b (conditional routing branch) recorded a destination contract with status "existing" or "designed", use that artifact reference. The contract includes:
+- Artifact location (file path, URL, or inline content)
+- Contract type (OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, other)
+
+If a target schema artifact is already available, extract the schema from the artifact and skip the request below. For OpenAPI/AsyncAPI, extract the message schema. For WSDL, extract the message XSD. For JSON Schema/XSD, use as-is.
+
+**If no target schema artifact is available from Q7c/Q8b, ask:**
 
 ```
 Please provide the target schema.

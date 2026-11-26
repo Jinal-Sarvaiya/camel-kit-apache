@@ -218,7 +218,7 @@ it. If the user identified no exclusions, write
 - Endpoint options: [key options from MCP catalog]
 - **Interface Contract:** [from flow.contracts.source]
   - Status: [existing / pending / designed / not-applicable]
-  - [If existing] Artifact: [file path or URL]; Type: [OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other]; Constraints: [compatibility requirements]
+  - [If existing] Artifact: [file path, URL, or inline excerpt/reference]; Type: [OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other]; Constraints: [compatibility requirements]
   - [If pending] **Dependency:** Source contract must be provided before execution. Field-level design decisions remain open.
   - [If designed] Proposed [contract-type] definition (see Appendix or inline below for the proposed schema awaiting approval)
   - [If not-applicable] No formal contract required
@@ -246,7 +246,37 @@ it. If the user identified no exclusions, write
 - Groovy sections include `Transformation Engine: Groovy (inline)` and `Format Pair`; XSLT sections include the
   selected XSLT pattern/approach and structural mapping columns.
 
-**Sink:**
+**Conditional Routing:** (if applicable — use this instead of single Sink when Question 8a identified multiple routing targets)
+- **Routing Logic:** [from flow.routing]
+  - Branch 1: [condition] → [destination-name]
+    - System: [name]
+    - Component: `[camel-component]` (MCP-verified)
+    - Action: [description]
+    - Endpoint options: [key options]
+    - **Interface Contract:** [from flow.routing.conditions[0].contract]
+      - Status: [existing / pending / designed / not-applicable]
+      - [If existing] Artifact: [file path, URL, or inline excerpt/reference]; Type: [OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other]; Constraints: [compatibility requirements]
+      - [If pending] **Dependency:** Destination contract must be provided before execution. Field-level design decisions remain open.
+      - [If designed] Proposed [contract-type] definition (see Appendix or inline below for the proposed schema awaiting approval)
+      - [If not-applicable] No formal contract required
+  - Branch 2: [condition] → [destination-name]
+    - System: [name]
+    - Component: `[camel-component]` (MCP-verified)
+    - Action: [description]
+    - Endpoint options: [key options]
+    - **Interface Contract:** [from flow.routing.conditions[1].contract]
+      - Status: [existing / pending / designed / not-applicable]
+      - [If existing] Artifact: [file path, URL, or inline excerpt/reference]; Type: [OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other]; Constraints: [compatibility requirements]
+      - [If pending] **Dependency:** Destination contract must be provided before execution. Field-level design decisions remain open.
+      - [If designed] Proposed [contract-type] definition (see Appendix or inline below for the proposed schema awaiting approval)
+      - [If not-applicable] No formal contract required
+  - [Repeat for each routing branch]
+  - Default: [destination-name or "none"]
+    - [Same structure as branches above, if applicable]
+
+Each branch's contract status is recorded separately. For example, Branch 1 may have an existing OpenAPI reference while Branch 2 has a pending schema dependency. The approved design preserves both statuses.
+
+**Sink:** (use only for single-destination flows — omit when Conditional Routing is present)
 - System: [name]
 - Component: `[camel-component]` (MCP-verified)
 - **Rationale:** [Why this component was chosen over alternatives]
@@ -255,7 +285,7 @@ it. If the user identified no exclusions, write
 - Endpoint options: [key options from MCP catalog]
 - **Interface Contract:** [from flow.contracts.destination]
   - Status: [existing / pending / designed / not-applicable]
-  - [If existing] Artifact: [file path or URL]; Type: [OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other]; Constraints: [compatibility requirements]
+  - [If existing] Artifact: [file path, URL, or inline excerpt/reference]; Type: [OpenAPI/AsyncAPI/WSDL/JSON Schema/XSD/other]; Constraints: [compatibility requirements]
   - [If pending] **Dependency:** Destination contract must be provided before execution. Field-level design decisions remain open.
   - [If designed] Proposed [contract-type] definition (see Appendix or inline below for the proposed schema awaiting approval)
   - [If not-applicable] No formal contract required

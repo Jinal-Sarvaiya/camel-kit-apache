@@ -13,7 +13,7 @@ For each integration boundary (source and destination), establish the interface 
 
 1. **For the source** (where data comes from):
    - Do you have an interface definition, will you provide one later, should we design it, or is it not applicable?
-   
+
 2. **For the destination** (where data goes):
    - Do you have an interface definition, will you provide one later, should we design it, or is it not applicable?
 
@@ -21,7 +21,7 @@ For each integration boundary (source and destination), establish the interface 
 
 Before asking about a boundary's contract, check if the user already provided:
 - OpenAPI specification
-- AsyncAPI specification  
+- AsyncAPI specification
 - WSDL document
 - JSON Schema
 - XSD schema

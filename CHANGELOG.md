@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   catalog evidence. Spring Boot templates import the application starter, Camel core and framework BOMs. Existing
   projects resolve inherited BOM properties per module and can recover a transitive core from Maven's dependency tree.
   The workflow checks the configured runner before design approval. A core mismatch reports INCOMPLETE.
-  The development distribution uses the Camel MCP 4.22.3-SNAPSHOT runner and maps Camel 4.14.7 to Quarkus
+  The distribution uses the released Camel MCP 4.22.3 runner and maps Camel 4.14.7 to Quarkus
   platform 3.27.4.1, which includes the Quarkus HTTP fix for CVE-2026-50559. All six shipped community targets
   pass the catalog check (#195).
 

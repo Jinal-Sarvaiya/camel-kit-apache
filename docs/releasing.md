@@ -61,8 +61,8 @@ Generated integration pins are independent.
    installation of the released CLI/plugin or standalone Knowledge runner.
 
 Before the nightly and manual Kit snapshot deployments, `python3 tools/check_camel_mcp_runner.py` resolves the
-pinned runner with an empty Maven repository. If the corresponding release is available on Maven Central,
-the check stops deployment and identifies the version to verify and select.
+pinned runner with an empty Maven repository. When the pin is a snapshot and its release JAR appears on Maven
+Central, the check stops deployment and identifies the version to verify and select.
 
 The nightly snapshot workflow builds the root reactor. Manual snapshot dispatch can
 select just the parent, Kit, or Knowledge. Independent product builds require their

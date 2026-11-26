@@ -10,7 +10,6 @@ import java.util.List;
 
 import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.output.SystemPrinter;
-import org.apache.camel.kit.util.TemplateUtils;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
@@ -28,7 +27,10 @@ class TargetCommandTest {
     private String run(int status, String... options) {
         var args = new ArrayList<>(List.of("target", "--project-dir", dir.toString()));
         args.addAll(List.of(options));
-        String[] argv = args.toArray(String[]::new);
+        return execute(status, args.toArray(String[]::new));
+    }
+
+    private String execute(int status, String... argv) {
         var output = new StringWriter();
         var main = new CamelKitMain(new SystemPrinter());
         try {
@@ -48,19 +50,26 @@ class TargetCommandTest {
 
     @Test
     void mainAcceptsEvidenceInTheDocumentedShape() throws Exception {
-        config("project.runtime=main\nproject.camelVersion=4.22.1\ncamel.catalog.repos=https://repo.maven.apache.org/maven2/\n");
-        String guide = TemplateUtils.readTemplate("skills/shared/mcp-setup.md");
+        execute(0, "init", dir.toString(), "--ai", "claude", "--no-fetch",
+                "-p", "camel.main.version=4.99.1", "-p", "camel.mcp.version=4.99.2",
+                "-p", "maven.dependency.plugin.version=3.99.1",
+                "-p", "camel.catalog.repos=https://repo.maven.apache.org/maven2/");
+        assertTrue(Files.readString(dir.resolve(".mcp.json")).contains("camel-jbang-mcp:4.99.2"));
+        Path skills = dir.resolve(".claude/skills");
+        assertTrue(Files.readString(skills.resolve("camel-brainstorm/guides/version-selection.md"))
+                .contains("maven-dependency-plugin:3.99.1:tree"));
+        String guide = Files.readString(skills.resolve("shared/mcp-setup.md"));
         String example = guide.substring(guide.indexOf("### Rule 3:"));
         int start = example.indexOf("```json") + 7;
         ObjectNode wire = (ObjectNode) JSON.readTree(example.substring(start, example.indexOf("```", start)));
         assertEquals(JSON.readTree(run(0)), wire.get("profile"));
         ((ObjectNode) wire.at("/list/result/content/0")).put("text",
                 """
-                        {"camelVersion":"4.22.1","components":[{"name":"timer"}],"count":1}
+                        {"camelVersion":"4.99.1","components":[{"name":"timer"}],"count":1}
                         """);
         ((ObjectNode) wire.at("/maven/result/content/0")).put("text",
                 """
-                        {"name":"timer","groupId":"org.apache.camel","artifactId":"camel-timer","version":"4.22.1"}
+                        {"name":"timer","groupId":"org.apache.camel","artifactId":"camel-timer","version":"4.99.1"}
                         """);
         Path file = dir.resolve("evidence.json");
         JSON.writeValue(file.toFile(), wire);
@@ -73,9 +82,11 @@ class TargetCommandTest {
     @Test
     void reportsMissingWorkspaceAndRejectsConflictingOrOversizedInputs() throws Exception {
         assertTrue(run(1).contains("Run init"));
+        String conflict = run(2, "--pom-template", "--check-catalog", "data");
+        assertTrue(conflict.contains("Choose template"));
+        assertFalse(conflict.contains("INCOMPLETE"));
+        assertTrue(run(2, "--dependency-tree", "tree").contains("requires --check-effective-pom"));
         config("project.runtime=main\nproject.camelVersion=4.22.1\n");
-        assertTrue(run(1, "--pom-template", "--check-catalog", "data").contains("Choose template"));
-        assertTrue(run(1, "--dependency-tree", "tree").contains("requires --check-effective-pom"));
         try (var data = new RandomAccessFile(dir.resolve("data").toFile(), "rw")) {
             data.setLength(65537);
             assertTrue(run(1, "--check-catalog", "data").contains("65536"));

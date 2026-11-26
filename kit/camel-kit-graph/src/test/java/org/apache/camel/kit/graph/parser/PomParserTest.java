@@ -25,6 +25,20 @@ class PomParserTest {
     }
 
     @Test
+    void malformedParentReportsTheDeclaringPom(@TempDir Path root) throws Exception {
+        Files.writeString(root.resolve("pom.xml"),
+                "<project><modelVersion>4.0.0</modelVersion><groupId>example</groupId>"
+                                                   + "<artifactId>root</artifactId><version>1</version></project>");
+        Path child = Files.createDirectory(root.resolve("child")).resolve("pom.xml");
+        Files.writeString(child,
+                "<project><modelVersion>4.0.0</modelVersion><parent><groupId>example</groupId>"
+                                 + "<artifactId>root</artifactId></parent><artifactId>child</artifactId></project>");
+        var failure = assertThrows(IllegalArgumentException.class, () -> new PomParser().parse(root, graph));
+        assertTrue(failure.getMessage().contains(child.toString()));
+        assertTrue(failure.getMessage().contains("parent requires groupId, artifactId and version"));
+    }
+
+    @Test
     void parsesProjectArtifact() {
         assertTrue(graph.hasNode("maven:com.example:order-service"));
         assertEquals("1.0.0",

@@ -18,6 +18,16 @@ import org.codehaus.plexus.util.xml.pull.XmlPullParserException;
 
 /** Checks Maven's effective dependency management without executing the generated project. */
 public final class TargetPomCheck {
+    public enum Application {
+        GENERATED,
+        EXISTING;
+
+        // A generated POM must supply every declaration. Existing projects may obtain them elsewhere.
+        private boolean requires(Object declaration) {
+            return this == GENERATED || declaration != null;
+        }
+    }
+
     private final Model model;
     private final Map<String, String> managed = new HashMap<>();
     private final String treeCore;
@@ -62,16 +72,16 @@ public final class TargetPomCheck {
         }
     }
 
-    public void check(TargetRuntimeProfile target, boolean existing) throws IOException {
+    public void check(TargetRuntimeProfile target, Application application) throws IOException {
         if (target.applicationBom() == null) {
             throw new IOException("Expected a Maven destination with an application BOM");
         }
         if (treeCore != null) {
             requireVersion("resolved org.apache.camel:camel-core-engine", target.camelVersion(), treeCore);
         }
-        if (!existing || treeCore == null) {
+        if (application == Application.GENERATED || treeCore == null) {
             String core = managed.get("org.apache.camel:camel-core-engine:jar");
-            if (existing && core == null) {
+            if (application == Application.EXISTING && core == null) {
                 throw new IOException("Camel core is transitive. Supply --dependency-tree from the same Maven module");
             }
             requireVersion("org.apache.camel:camel-core-engine", target.camelVersion(), core);
@@ -93,7 +103,7 @@ public final class TargetPomCheck {
                     managed.get("org.apache.camel.quarkus:camel-quarkus-catalog:jar"));
         }
         var configured = model.getBuild() == null ? null : model.getBuild().getPluginsAsMap().get(plugin);
-        if (!existing || configured != null) {
+        if (application.requires(configured)) {
             requireVersion(plugin, pluginVersion, configured == null ? null : configured.getVersion());
         }
         for (Dependency dep : model.getDependencies()) {
@@ -101,15 +111,11 @@ public final class TargetPomCheck {
                     || "org.apache.camel.quarkus".equals(dep.getGroupId())
                     || "org.springframework.boot".equals(dep.getGroupId())) {
                 String version = managed.get(dep.getManagementKey());
-                if (!existing || version != null) {
+                if (application.requires(version)) {
                     requireVersion(dep.getManagementKey(), version, dep.getVersion());
                 }
             }
         }
-    }
-
-    public static void check(TargetRuntimeProfile target, byte[] effectivePom) throws IOException {
-        new TargetPomCheck(effectivePom, null).check(target, false);
     }
 
     private static String resolvedCore(Model model, byte[] tree) throws IOException {

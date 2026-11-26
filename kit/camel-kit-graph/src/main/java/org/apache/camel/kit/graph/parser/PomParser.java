@@ -41,13 +41,22 @@ public class PomParser implements GraphParser {
         GraphParser.requireSafeFiles(projectRoot, files);
         Map<Path, Model> models = new LinkedHashMap<>();
         for (Path file : files) {
+            Model model;
             try (Reader input = new StringReader(new String(GraphParser.readSource(file), StandardCharsets.UTF_8))) {
-                models.put(file.normalize(), new MavenXpp3Reader().read(input));
+                model = new MavenXpp3Reader().read(input);
             } catch (Exception e) {
                 throw new IllegalArgumentException("Failed to parse POM: " + file, e);
             }
+            var parent = model.getParent();
+            if (parent != null && (parent.getGroupId() == null || parent.getArtifactId() == null
+                    || parent.getVersion() == null)) {
+                throw new IllegalArgumentException(
+                        "Failed to parse POM: " + file
+                                                   + " (Maven parent requires groupId, artifactId and version)");
+            }
+            models.put(file.normalize(), model);
         }
-        models.forEach((file, model) -> parsePom(file, projectRoot, graph, model, inheritedProperties(file, models)));
+        models.forEach((file, model) -> parsePom(file, projectRoot, graph, model, models));
     }
 
     // Follow only matching parents already included in the workspace scan. Siblings do not share properties.
@@ -84,8 +93,9 @@ public class PomParser implements GraphParser {
         return properties;
     }
 
-    private void parsePom(Path pomFile, Path projectRoot, ProjectGraph graph, Model model, Properties properties) {
+    private void parsePom(Path pomFile, Path projectRoot, ProjectGraph graph, Model model, Map<Path, Model> models) {
         try {
+            Properties properties = inheritedProperties(pomFile, models);
             String groupId = model.getGroupId() != null
                     ? model.getGroupId()
                     : (model.getParent() != null ? model.getParent().getGroupId() : "unknown");

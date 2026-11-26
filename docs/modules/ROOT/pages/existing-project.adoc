@@ -174,12 +174,15 @@ A starter or platform BOM can have a different version from Camel core. If init 
 determine the core, it sets `project.needsResolvedCore=true`. Use the application's Maven settings and
 profiles. From the workspace root, run the following for each Camel application module, replacing `app/pom.xml`
 with its POM. For a vendor Spring Boot BOM, first set `project.catalogBom` to the published catalog provider
-GAV from its starter release metadata. Use fresh output paths for each module. The dependency plugin supports JSON from version 3.7.0.
+GAV from its starter release metadata. Use fresh output paths for each module. The tree goal requires a Maven
+Dependency Plugin with JSON support. If the project uses an older plugin, use the fully qualified goal in the
+installed `camel-brainstorm/guides/version-selection.md`. Init renders that goal from the distribution’s
+`maven.dependency.plugin.version` setting.
 
 [source,shell]
 ----
 ./mvnw -f app/pom.xml help:effective-pom -Doutput="$PWD/app/target/model.xml"
-./mvnw -f app/pom.xml org.apache.maven.plugins:maven-dependency-plugin:3.8.1:tree -DoutputType=json -Dincludes=org.apache.camel:camel-core-engine -DoutputFile="$PWD/app/target/tree.json"
+./mvnw -f app/pom.xml dependency:tree -DoutputType=json -Dincludes=org.apache.camel:camel-core-engine -DoutputFile="$PWD/app/target/tree.json"
 camel-kit target --check-effective-pom app/target/model.xml --dependency-tree app/target/tree.json
 ----
 
@@ -483,12 +486,9 @@ local run of one example. It is not a production certification, and its limits a
 [#catalog-limitation]
 === Runtime Catalog Version
 
-Camel Kit starts the Camel MCP server at the version pinned by `camel.mcp.version` in `distribution.properties`, which
-was 4.22.1 when this page was last checked (2026-11-17). With that runner, a Spring Boot or Quarkus catalog request for
-a Camel version other than the server's own can be answered with the server's version, combining component metadata of
-the requested target with newer EIP and model metadata
-(link:https://issues.apache.org/jira/browse/CAMEL-26926[CAMEL-26926]). The recorded live run was not exposed to this,
-because the application and the MCP server were both on 4.22.1.
+The configured runner can return the requested starter or extension alongside its own Camel core catalog.
+The xref:mcp.adoc#catalog-compatibility[compatibility table] identifies the runner and combinations tested.
+In this recorded run the application and the runner used the same core version.
 
 When a catalog response reports a Camel version that differs from the one requested, or from the version recorded in
 `project.camelVersion`:
@@ -498,10 +498,8 @@ When a catalog response reports a Camel version that differs from the one reques
 * Do not upgrade the application to match the MCP server. Camel Kit never changes the versions of an existing project,
   and a version upgrade belongs to `/camel-migrate`.
 
-CAMEL-26926 is fixed in the Camel source, with the fix assigned to Camel 4.18.6, 4.22.3 and 4.24.0. That does not change
-the runner Camel Kit installs, and it does not establish end-to-end acceptance for older-target Spring Boot or Quarkus
-applications. Before relying on a fixed combination, confirm that the MCP artifact is published, that Camel Kit pins it,
-and that a catalog request for your target version returns that version.
+For background see link:https://issues.apache.org/jira/browse/CAMEL-26926[CAMEL-26926].
+Repeat the required catalog check after changing the runner or target.
 
 === Version 1 Scope
 

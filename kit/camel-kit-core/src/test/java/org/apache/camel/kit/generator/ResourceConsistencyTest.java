@@ -169,6 +169,17 @@ class ResourceConsistencyTest {
     Path tempDir;
 
     @Test
+    void catalogGuidesUseDistributionVersionsOrObservedResults() throws IOException {
+        Path skills = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        Pattern literalVersion = Pattern.compile("\\b\\d+\\.\\d+\\.\\d+\\b");
+        for (String file : List.of("shared/mcp-setup.md", "camel-migrate/SKILL.md",
+                "camel-brainstorm/guides/version-selection.md")) {
+            String instructions = Files.readString(skills.resolve(file)).replaceFirst("(?s)\\A---\\R.*?\\R---\\R", "");
+            assertFalse(literalVersion.matcher(instructions).find(), file);
+        }
+    }
+
+    @Test
     void retiredCommandScanAllowsGuidePaths() {
         Pattern retiredCommand = STALE_PATTERNS.stream()
                 .filter(stale -> stale.description().equals("retired internal command exposed as slash command"))

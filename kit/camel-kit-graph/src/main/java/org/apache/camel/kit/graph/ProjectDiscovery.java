@@ -436,11 +436,12 @@ public final class ProjectDiscovery {
             Map<String, Set<String>> versionEvidence) {
 
         public boolean isUnsupportedVersion() {
-            if (camelVersion == null) {
-                return false;
-            }
-            // Camel 3.x is unsupported
-            return camelVersion.startsWith("3.");
+            return isUnsupportedVersion(camelVersion);
+        }
+
+        /** Applies the same support policy to source-discovered and Maven-resolved versions. */
+        public static boolean isUnsupportedVersion(String version) {
+            return version != null && version.startsWith("3.");
         }
 
         /** True when more than one runtime or more than one Camel version was found: nothing may be locked. */

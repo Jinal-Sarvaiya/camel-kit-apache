@@ -75,6 +75,10 @@ public record TargetRuntimeProfile(
         List<String> repositories = Arrays.stream(repos.split(",", -1)).map(String::strip).toList();
         // Profiles are copied into design and verification reports. Credentials belong in Maven settings.
         for (String repository : repositories) {
+            if (repository.isEmpty()) {
+                throw new IllegalArgumentException(
+                        "Empty repository in camel.catalog.repos. Supply a URL for each comma-separated entry");
+            }
             String url = repository.replaceFirst("^[A-Za-z0-9_.-]+=", "");
             try {
                 URI uri = new URI(url);

@@ -38,6 +38,8 @@ import org.apache.camel.kit.generator.QuteTemplateEngine;
 import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ParserDiagnostic;
+import org.apache.camel.kit.graph.ProjectDiscovery;
+import org.apache.camel.kit.graph.ProjectDiscovery.DiscoveryResult;
 import org.apache.camel.kit.graph.ProjectGraph;
 import org.apache.camel.kit.graph.RuntimeDetector;
 import org.apache.camel.kit.graph.model.NodeType;
@@ -561,9 +563,7 @@ public class InitService {
 
         ProjectGraph graph = result.graph();
         DistributionConfig distribution = request.distribution();
-        // Use ProjectDiscovery for comprehensive metadata
-        org.apache.camel.kit.graph.ProjectDiscovery.DiscoveryResult discovery
-                = org.apache.camel.kit.graph.ProjectDiscovery.discover(graph);
+        DiscoveryResult discovery = ProjectDiscovery.discover(graph);
 
         boolean isExistingProject = "existing".equals(config.getProperty("project.type"));
         String runtime = discovery.runtime();
@@ -590,7 +590,7 @@ public class InitService {
             // With conflicting evidence neither value is locked; the gap below tells the user what to resolve.
 
             if (discovery.platformBomVersion() != null) {
-                String applicationBom = org.apache.camel.kit.graph.ProjectDiscovery.applicationBom(graph, runtime);
+                String applicationBom = ProjectDiscovery.applicationBom(graph, runtime);
                 if (applicationBom != null) {
                     config.setProperty("project.applicationBom", applicationBom);
                 }
@@ -601,6 +601,7 @@ public class InitService {
                 config.setProperty("project.springBootVersion", discovery.springBootVersion());
             }
 
+            // A POM edit can change the resolved dependency tree even when the imported platform stays the same.
             String inputs = mavenInputs(projectRoot, result);
             config.setProperty("project.mavenInputs", inputs);
             boolean sameModel = inputs.equals(previous.getProperty("project.mavenInputs"))
@@ -663,7 +664,7 @@ public class InitService {
             // Gaps the graph could not fill (e.g. routes defined in unsupported layouts): workflow must inspect source
             List<String> gaps = new ArrayList<>(discovery.coverageGaps());
             if (discovery.camelVersion() == null && config.containsKey("project.camelVersion")) {
-                gaps.remove(org.apache.camel.kit.graph.ProjectDiscovery.UNRESOLVED_PLATFORM_CORE);
+                gaps.remove(ProjectDiscovery.UNRESOLVED_PLATFORM_CORE);
             }
             if (!gaps.isEmpty()) {
                 config.setProperty("project.discoveryGaps", String.join(" | ", gaps));
@@ -693,19 +694,18 @@ public class InitService {
                 config.setProperty("project.configFilesCount", String.valueOf(discovery.configFilesCount()));
             }
 
-            // Flag unsupported versions
-            if (config.getProperty("project.camelVersion", "").startsWith("3.")) {
+            String camelVersion = config.getProperty("project.camelVersion");
+            if (DiscoveryResult.isUnsupportedVersion(camelVersion)) {
                 config.setProperty("project.unsupportedVersion", "true");
                 config.setProperty("project.unsupportedReason",
                         "Camel 3.x is not supported. Please upgrade to Camel 4.x.");
                 reportWarning(request, warnings,
-                        "Camel " + config.getProperty("project.camelVersion")
+                        "Camel " + camelVersion
                                                  + " is not supported. Please upgrade to Camel 4.x "
                                                  + "before adding features.");
             }
 
             // forage.version must track project.camelVersion
-            String camelVersion = config.getProperty("project.camelVersion");
             if (camelVersion != null) {
                 String forageVersion = distribution.forageVersionForCamel(camelVersion);
                 if (forageVersion != null) {
@@ -719,6 +719,7 @@ public class InitService {
             writeVersionConfig(config, distribution, runtime);
         }
 
+        // Catalog coordinates belong to the selected platform and repositories, independently of other POM edits.
         if (runtime != null && config.getProperty("project.camelVersion") != null
                 && config.getProperty("project.platformBomVersion") != null
                 && List.of("project.type", "project.runtime", "project.camelVersion", "project.applicationBom",

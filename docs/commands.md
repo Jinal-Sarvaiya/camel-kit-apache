@@ -268,7 +268,7 @@ For Pi, Camel-Kit generates `AGENTS.md`, project skills under `.pi/skills/`, pro
 selected in `target.*` in the workspace configuration. Use `--project-dir` to select the workspace.
 `--pom-template` prints the Maven template with runtime coordinates filled in. To check a generated
 application, supply `--check-effective-pom <xml>`, `--check-catalog <json>`, or both. For a transitive core
-dependency, add `--dependency-tree <json>` from the same Maven module to the effective-POM check. Keep all evidence inside the workspace. Incomplete checks exit with status 1. The Camel JBang plugin exposes the same options under
+dependency, add `--dependency-tree <json>` from the same Maven module to the effective-POM check. Keep all evidence inside the workspace. Incomplete checks exit with status 1. Invalid option combinations exit with status 2. The Camel JBang plugin exposes the same options under
 `camel kit target`. See [target selection](modules/ROOT/pages/migration.adoc#target-profile).
 
 ### camel-kit doctor

@@ -73,7 +73,7 @@ See xref:getting-started.adoc#existing-project[reinitializing existing projects]
 Configuration is read in three layers, the later overriding the earlier: the built-in `distribution.properties`,
 the user file given with `-c` or at its default path, and the `-p` flags. Any distribution property can be
 overridden; the common ones are `camel.main.version`, `camel.springboot.version`, `springboot.bom.version`,
-`camel.quarkus.version`, `quarkus.platform.version`, `camel.mcp.version`, `knowledge.mcp.group-id`, `knowledge.mcp.version`,
+`camel.quarkus.version`, `quarkus.platform.version`, `maven.dependency.plugin.version`, `camel.mcp.version`, `knowledge.mcp.group-id`, `knowledge.mcp.version`,
 `citrus.version` and `citrus.mcp.version`. The selected runtime and versions are persisted in
 `.camel-kit/config.properties`.
 
@@ -90,7 +90,7 @@ coloured text elsewhere.
 === target
 
 Print the active runtime profile as JSON. Add `--migration` for the destination saved by
-xref:migration.adoc#target-profile[the migration workflow]. An incomplete selection returns exit code 1.
+xref:migration.adoc#target-profile[the migration workflow]. Incomplete selections or evidence return exit code 1. Incompatible options return usage error 2.
 
 ----
 camel-kit target [--project-dir <path>] [--migration] [--pom-template]

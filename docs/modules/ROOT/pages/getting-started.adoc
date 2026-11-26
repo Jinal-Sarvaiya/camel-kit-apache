@@ -365,8 +365,8 @@ in Camel Kit. Three layers override them, the later winning:
 The workspace records the effective `camel.catalog.repos` used by the Camel MCP launcher.
 Configure any vendor repository in the Maven settings used for the destination build and in the
 catalog repository list at init. Keep repository credentials in Maven settings.
-Before choosing a runtime, check the xref:mcp.adoc#binding[catalog compatibility table]. With the shipped
-4.22.1 runner the default Quarkus target cannot complete a design requiring verified catalog artifacts.
+Before choosing a runtime, consult the xref:mcp.adoc#catalog-compatibility[observed catalog results].
+Verify the selected target with your configured runner before approving a design that needs catalog artifacts.
 
 `camel-kit target` shows the selected application BOM, core version, repositories and catalog arguments.
 For a migration, `camel-kit target --migration` reads the separate destination selection.

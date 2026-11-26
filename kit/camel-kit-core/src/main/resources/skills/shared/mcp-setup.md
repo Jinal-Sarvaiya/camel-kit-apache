@@ -168,18 +168,18 @@ The version binding comes from `.camel-kit/config.properties`. For a required ch
 ```json
 {
   "profile": {
-    "runtime": "main", "camelVersion": "4.22.1", "applicationBom": null, "springBootVersion": null,
-    "repositories": ["https://repo.maven.apache.org/maven2/"], "runtimeCatalogVersion": "4.22.1",
-    "catalog": {"runtime":"main","camelVersion":"4.22.1","platformBom":"org.apache.camel:camel-catalog:4.22.1"}
+    "runtime": "main", "camelVersion": "{CAMEL_MAIN_VERSION}", "applicationBom": null, "springBootVersion": null,
+    "repositories": ["https://repo.maven.apache.org/maven2/"], "runtimeCatalogVersion": "{CAMEL_MAIN_VERSION}",
+    "catalog": {"runtime":"main","camelVersion":"{CAMEL_MAIN_VERSION}","platformBom":"org.apache.camel:camel-catalog:{CAMEL_MAIN_VERSION}"}
   },
   "list": {
     "name": "camel_catalog_components",
-    "arguments": {"runtime":"main","camelVersion":"4.22.1","platformBom":"org.apache.camel:camel-catalog:4.22.1","filter":"timer","label":"","limit":2},
+    "arguments": {"runtime":"main","camelVersion":"{CAMEL_MAIN_VERSION}","platformBom":"org.apache.camel:camel-catalog:{CAMEL_MAIN_VERSION}","filter":"timer","label":"","limit":2},
     "result": {"content":[{"type":"text","text":"<original list response text>"}]}
   },
   "maven": {
     "name": "camel_catalog_component_maven",
-    "arguments": {"runtime":"main","camelVersion":"4.22.1","platformBom":"org.apache.camel:camel-catalog:4.22.1","component":"timer"},
+    "arguments": {"runtime":"main","camelVersion":"{CAMEL_MAIN_VERSION}","platformBom":"org.apache.camel:camel-catalog:{CAMEL_MAIN_VERSION}","component":"timer"},
     "result": {"content":[{"type":"text","text":"<original Maven response text>"}]}
   }
 }
@@ -192,9 +192,9 @@ The version binding comes from `.camel-kit/config.properties`. For a required ch
    changed profile or version mismatch makes the required check **INCOMPLETE**. Leave dependent lookups unverified.
    Repeat after any profile change.
 
-With the shipped 4.22.1 runner the supported Spring Boot 4.18.4 and Quarkus 4.18.3/4.14.7 rows return
-core 4.22.1. This includes the default Quarkus platform 3.33.3.2. Inform the user before selecting these rows:
-design assembly requires verified artifacts and cannot complete while that mismatch persists.
+A runner can return its bundled Camel core for a different requested target. Before design approval,
+report the actual Rule 3 result for the configured runner. If the returned catalog core differs from the
+requested core, report both versions and mark the check INCOMPLETE. Design assembly requires verified catalog artifacts.
 
 Detail tools do not all return `camelVersion`. Do not require or invent a field that is absent from a tool's schema.
 Validate each returned artifact identity and each consumed field against the requested type and name, bound to the

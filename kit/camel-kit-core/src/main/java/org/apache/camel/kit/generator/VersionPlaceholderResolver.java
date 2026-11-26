@@ -51,6 +51,7 @@ class VersionPlaceholderResolver {
     static Map<String, String> buildVersionTemplateData(DistributionConfig dist) {
         Map<String, String> data = new java.util.LinkedHashMap<>();
         data.put("CAMEL_VERSION", dist.camelMainVersion());
+        data.put("MAVEN_DEPENDENCY_PLUGIN_VERSION", dist.mavenDependencyPluginVersion());
         data.put("CAMEL_MAIN_VERSION", dist.camelMainVersion());
         data.put("CAMEL_SPRINGBOOT_VERSION", dist.camelSpringbootVersion());
         data.put("CAMEL_QUARKUS_VERSION", dist.camelQuarkusVersion());

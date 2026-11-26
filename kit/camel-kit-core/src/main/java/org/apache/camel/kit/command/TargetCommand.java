@@ -45,6 +45,12 @@ public class TargetCommand extends HelpAwareCommand {
 
     @Override
     public Integer call() {
+        if (dependencyTree != null && effectivePom == null) {
+            throw new UsageException("--dependency-tree requires --check-effective-pom");
+        }
+        if ((catalogEvidence != null || effectivePom != null) && pomTemplate) {
+            throw new UsageException("Choose template output or target checks");
+        }
         Path config = projectDir.resolve(".camel-kit/config.properties");
         try {
             ConfinedPaths.requirePath(projectDir, config);
@@ -55,29 +61,25 @@ public class TargetCommand extends HelpAwareCommand {
                 throw new IOException(
                         "Missing " + config + ". Run init here or use --project-dir for an initialized workspace.");
             }
-            if (dependencyTree != null && effectivePom == null) {
-                throw new IllegalArgumentException("--dependency-tree requires --check-effective-pom");
-            }
-            if ((catalogEvidence != null || effectivePom != null) && pomTemplate) {
-                throw new IllegalArgumentException("Choose template output or target checks");
-            }
-            boolean existing = !migration && "existing".equals(properties.getProperty("project.type"));
+            var application = !migration && "existing".equals(properties.getProperty("project.type"))
+                    ? TargetPomCheck.Application.EXISTING : TargetPomCheck.Application.GENERATED;
             TargetPomCheck model = null;
             if (effectivePom != null) {
                 model = new TargetPomCheck(
                         read(effectivePom, 16 * 1024 * 1024),
                         dependencyTree == null ? null : read(dependencyTree, 16 * 1024 * 1024));
-                if (existing) {
+                if (application == TargetPomCheck.Application.EXISTING) {
                     model.completeExistingProfile(properties);
                 }
-            } else if (existing && "true".equals(properties.getProperty("project.needsResolvedCore"))
+            } else if (application == TargetPomCheck.Application.EXISTING
+                    && "true".equals(properties.getProperty("project.needsResolvedCore"))
                     && !properties.containsKey("project.camelVersion")) {
                 throw new IOException(
                         "Resolve project.camelVersion with --check-effective-pom and --dependency-tree for each Camel module");
             }
             TargetRuntimeProfile profile = TargetRuntimeProfile.resolve(properties, migration);
             if (model != null) {
-                model.check(profile, existing);
+                model.check(profile, application);
             }
             if (catalogEvidence != null) {
                 TargetCatalogEvidence.check(profile, read(catalogEvidence, 65536));

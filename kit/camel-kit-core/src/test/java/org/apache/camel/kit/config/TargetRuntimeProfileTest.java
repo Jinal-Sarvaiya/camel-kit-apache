@@ -66,7 +66,7 @@ class TargetRuntimeProfileTest {
             var model = new DefaultModelBuilderFactory().newInstance().build(request).getEffectiveModel();
             var bytes = new ByteArrayOutputStream();
             new MavenXpp3Writer().write(bytes, model);
-            TargetPomCheck.check(profile, bytes.toByteArray());
+            new TargetPomCheck(bytes.toByteArray(), null).check(profile, TargetPomCheck.Application.GENERATED);
             for (Dependency dep : model.getDependencies()) {
                 assertEquals(FixtureBoms.MANAGED.get(dep.getGroupId() + ":" + dep.getArtifactId()), dep.getVersion(),
                         dep::getManagementKey);
@@ -74,7 +74,8 @@ class TargetRuntimeProfileTest {
             model.getDependencies().get(0).setVersion("0.1");
             var wrong = new ByteArrayOutputStream();
             new MavenXpp3Writer().write(wrong, model);
-            assertThrows(IOException.class, () -> TargetPomCheck.check(profile, wrong.toByteArray()));
+            assertThrows(IOException.class, () -> new TargetPomCheck(wrong.toByteArray(), null).check(profile,
+                    TargetPomCheck.Application.GENERATED));
         }
     }
 
@@ -86,6 +87,9 @@ class TargetRuntimeProfileTest {
         config.setProperty("camel.catalog.repos", "https://user:secret@example.org/releases");
         var invalid = assertThrows(IllegalArgumentException.class, () -> TargetRuntimeProfile.resolve(config, true));
         assertFalse(invalid.getMessage().contains("secret"));
+        config.setProperty("camel.catalog.repos", "https://example.org/releases, ");
+        assertTrue(assertThrows(IllegalArgumentException.class, () -> TargetRuntimeProfile.resolve(config, true))
+                .getMessage().contains("Empty repository"));
         config.remove("camel.catalog.repos");
         config.remove("target.catalogBom");
         assertThrows(IllegalArgumentException.class, () -> TargetRuntimeProfile.resolve(config, true));

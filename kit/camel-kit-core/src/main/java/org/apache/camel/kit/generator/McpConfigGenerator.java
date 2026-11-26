@@ -7,7 +7,6 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.camel.kit.config.DistributionConfig;
 import org.apache.camel.kit.util.AnsiColors;
 import org.apache.camel.kit.util.TemplateUtils;
 import org.apache.camel.kit.workflow.WorkflowManifest;
@@ -99,7 +98,7 @@ class McpConfigGenerator {
     private static String render(InitContext ctx, WorkflowManifest workflow) throws IOException {
         String template = TemplateUtils.readTemplate(ctx.agent().mcpConfigTemplatePath());
         return new QuteTemplateEngine()
-                .renderString(template, templateData(ctx.distribution(), workflow, ctx.withCitrusMcp()));
+                .renderString(template, templateData(ctx, workflow));
     }
 
     static ObjectNode readJsonConfig(Path configFile, String agent, String key)
@@ -127,11 +126,10 @@ class McpConfigGenerator {
         }
     }
 
-    private static Map<String, Object> templateData(
-            DistributionConfig dist, WorkflowManifest workflow, boolean withCitrusMcp)
+    private static Map<String, Object> templateData(InitContext ctx, WorkflowManifest workflow)
             throws IOException {
         Map<String, Object> data = new java.util.HashMap<>(
-                VersionPlaceholderResolver.buildVersionTemplateData(dist));
+                VersionPlaceholderResolver.buildVersionTemplateData(ctx.distribution()));
 
         WorkflowManifest.WorkflowMcpServer camelServer = workflow.mcpServer("camel");
         data.put("CAMEL_TOOLS_JSON", toJsonArray(camelServer.allowedTools()));
@@ -140,11 +138,49 @@ class McpConfigGenerator {
         data.put("KNOWLEDGE_TOOLS_JSON", toJsonArray(knowledgeServer.allowedTools()));
         data.put("KNOWLEDGE_DESCRIPTION", knowledgeServer.description());
 
-        data.put("CITRUS_ENABLED", withCitrusMcp);
+        data.put("CITRUS_ENABLED", ctx.withCitrusMcp());
         WorkflowManifest.WorkflowMcpServer citrusServer = workflow.mcpServer("citrus");
         data.put("CITRUS_TOOLS_JSON", toJsonArray(citrusServer.allowedTools()));
         data.put("CITRUS_DESCRIPTION", citrusServer.description());
+
+        // OpenCode-specific: generate exact MCP tool permissions from workflow manifest
+        if ("opencode".equals(ctx.agentName())) {
+            data.put("OPENCODE_MCP_PERMISSIONS", buildOpenCodePermissions(workflow, ctx.withCitrusMcp()));
+        }
+
         return data;
+    }
+
+    private static String buildOpenCodePermissions(WorkflowManifest workflow, boolean withCitrusMcp)
+            throws IOException {
+        java.util.LinkedHashMap<String, String> permissions = new java.util.LinkedHashMap<>();
+
+        // Add wildcard fallbacks first (OpenCode matches rules in order)
+        permissions.put("camel_*", "ask");
+        permissions.put("camel-knowledge_*", "ask");
+        if (withCitrusMcp) {
+            permissions.put("citrus_*", "ask");
+        }
+
+        // Add exact permissions for each tool from workflow manifest (after wildcards for precedence)
+        WorkflowManifest.WorkflowMcpServer camelServer = workflow.mcpServer("camel");
+        for (String tool : camelServer.allowedTools()) {
+            permissions.put("camel_" + tool, "allow");
+        }
+
+        WorkflowManifest.WorkflowMcpServer knowledgeServer = workflow.mcpServer("camel-knowledge");
+        for (String tool : knowledgeServer.allowedTools()) {
+            permissions.put("camel-knowledge_" + tool, "allow");
+        }
+
+        if (withCitrusMcp) {
+            WorkflowManifest.WorkflowMcpServer citrusServer = workflow.mcpServer("citrus");
+            for (String tool : citrusServer.allowedTools()) {
+                permissions.put("citrus_" + tool, "allow");
+            }
+        }
+
+        return JSON_MAPPER.writeValueAsString(permissions);
     }
 
     private static String toJsonArray(List<String> values) throws IOException {

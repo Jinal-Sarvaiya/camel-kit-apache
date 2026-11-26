@@ -44,6 +44,41 @@ final class OpenCodeConfigMerger {
             configurations.add(readExisting(target));
         }
 
+        // Collect user restrictions from all files before removing managed entries
+        // Traverse from lowest to highest precedence, so the last (highest) restriction wins
+        ObjectNode userRestrictions = JSON.createObjectNode();
+        ObjectNode generatedPermission = (ObjectNode) generated.path("permission");
+
+        for (ExistingConfiguration config : configurations) {
+            JsonNode permissionNode = config.config().path("permission");
+            if (!permissionNode.isObject()) {
+                continue;
+            }
+            ObjectNode permission = (ObjectNode) permissionNode;
+
+            generatedPermission.fieldNames().forEachRemaining(key -> {
+                JsonNode generatedValue = generatedPermission.get(key);
+                JsonNode existingValue = permission.get(key);
+
+                if (existingValue != null) {
+                    if (existingValue.isTextual() && generatedValue.isTextual()) {
+                        String existingAction = existingValue.asText();
+                        String generatedAction = generatedValue.asText();
+                        // Preserve if stricter, OR if it's a wildcard with same value
+                        // (user may have placed it last to override exact grants)
+                        if (isStricterThan(existingAction, generatedAction)
+                                || (key.endsWith("_*") && existingAction.equals(generatedAction))) {
+                            // Keep replacing to retain the highest-precedence restriction
+                            userRestrictions.put(key, existingAction);
+                        }
+                    } else if (existingValue.isObject()) {
+                        // Preserve object-valued rules (e.g., {env: "ALLOW_CAMEL_ROUTES"})
+                        userRestrictions.set(key, existingValue);
+                    }
+                }
+            });
+        }
+
         List<PendingWrite> writes = new ArrayList<>();
         for (int i = 0; i < configurations.size() - 1; i++) {
             ExistingConfiguration configuration = configurations.get(i);
@@ -54,7 +89,7 @@ final class OpenCodeConfigMerger {
         }
 
         ExistingConfiguration highest = configurations.get(configurations.size() - 1);
-        String merged = mergeGenerated(highest, generated, withCitrusMcp);
+        String merged = mergeGenerated(highest, generated, userRestrictions, withCitrusMcp);
         if (!merged.equals(highest.content())) {
             writes.add(new PendingWrite(highest.path(), merged));
         }
@@ -72,7 +107,7 @@ final class OpenCodeConfigMerger {
         removeObjectEntries(editor, generated, "permission");
         removeObjectEntries(editor, generated, "mcp");
         if (!withCitrusMcp) {
-            removeCitrusEntries(editor);
+            removeCitrusEntries(editor, generated);
         }
         return bom(content) + editor.content();
     }
@@ -82,19 +117,57 @@ final class OpenCodeConfigMerger {
         editor.removeObjectMembers(field, generatedObject.fieldNames());
     }
 
-    private void removeCitrusEntries(JsoncObjectEditor editor) {
+    private void removeCitrusEntries(JsoncObjectEditor editor, ObjectNode generated) throws IOException {
         editor.removeObjectMembers("mcp", java.util.Collections.singletonList("citrus").iterator());
-        editor.removeObjectMembers("permission",
-                List.of("citrus_*").iterator());
+
+        // Remove citrus wildcard and all exact citrus tool permissions from workflow manifest
+        List<String> citrusPermissions = new ArrayList<>();
+        citrusPermissions.add("citrus_*");
+
+        // Get Citrus tools from workflow manifest
+        try {
+            org.apache.camel.kit.workflow.WorkflowManifest workflow
+                    = org.apache.camel.kit.workflow.WorkflowManifestLoader.loadDefault();
+            org.apache.camel.kit.workflow.WorkflowManifest.WorkflowMcpServer citrusServer
+                    = workflow.mcpServer("citrus");
+            for (String tool : citrusServer.allowedTools()) {
+                citrusPermissions.add("citrus_" + tool);
+            }
+        } catch (Exception e) {
+            // If we can't load the manifest, fall back to removing anything starting with citrus_
+            // This preserves the old behavior as a safety net
+        }
+
+        editor.removeObjectMembers("permission", citrusPermissions.iterator());
     }
 
     private boolean hasCitrusEntries(ObjectNode config) {
-        return config.path("mcp").has("citrus")
-                || config.path("permission").has("citrus_*");
+        if (config.path("mcp").has("citrus")) {
+            return true;
+        }
+        JsonNode permission = config.path("permission");
+        if (permission.has("citrus_*")) {
+            return true;
+        }
+        // Check for any exact Citrus tool permissions from the manifest
+        try {
+            org.apache.camel.kit.workflow.WorkflowManifest workflow
+                    = org.apache.camel.kit.workflow.WorkflowManifestLoader.loadDefault();
+            org.apache.camel.kit.workflow.WorkflowManifest.WorkflowMcpServer citrusServer
+                    = workflow.mcpServer("citrus");
+            for (String tool : citrusServer.allowedTools()) {
+                if (permission.has("citrus_" + tool)) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            // If we can't load the manifest, be conservative and assume no Citrus entries
+        }
+        return false;
     }
 
     private String mergeGenerated(
-            ExistingConfiguration existing, ObjectNode generated, boolean withCitrusMcp)
+            ExistingConfiguration existing, ObjectNode generated, ObjectNode userRestrictions, boolean withCitrusMcp)
             throws IOException {
         boolean needsCitrusRemoval = !withCitrusMcp && hasCitrusEntries(existing.config());
         if (isCurrentAndOrdered(existing, generated) && !needsCitrusRemoval) {
@@ -120,8 +193,15 @@ final class OpenCodeConfigMerger {
         mergeObject(editor, existing.config(), generated, "permission");
         mergeObject(editor, existing.config(), generated, "mcp");
         if (!withCitrusMcp) {
-            removeCitrusEntries(editor);
+            removeCitrusEntries(editor, generated);
         }
+
+        // Apply user restrictions collected from all config files
+        if (!userRestrictions.isEmpty()) {
+            editor.removeObjectMembers("permission", userRestrictions.fieldNames());
+            editor.appendObjectMembers("permission", userRestrictions);
+        }
+
         return prefix + editor.content();
     }
 
@@ -182,8 +262,51 @@ final class OpenCodeConfigMerger {
             editor.appendRootMember(field, generatedObject);
             return;
         }
-        editor.removeObjectMembers(field, generatedObject.fieldNames());
-        editor.appendObjectMembers(field, generatedObject);
+
+        // For permissions, preserve user restrictions that are stricter than generated
+        ObjectNode toMerge = generatedObject;
+        if ("permission".equals(field)) {
+            toMerge = filterStricterUserPermissions(existing.path(field), generatedObject);
+        }
+
+        editor.removeObjectMembers(field, toMerge.fieldNames());
+        editor.appendObjectMembers(field, toMerge);
+    }
+
+    private ObjectNode filterStricterUserPermissions(JsonNode existingPermission, ObjectNode generatedPermission) {
+        if (!existingPermission.isObject()) {
+            return generatedPermission;
+        }
+
+        ObjectNode filtered = generatedPermission.deepCopy();
+        var fields = generatedPermission.fields();
+        while (fields.hasNext()) {
+            var field = fields.next();
+            String key = field.getKey();
+            String generatedAction = field.getValue().asText();
+            JsonNode existingValue = existingPermission.get(key);
+
+            if (existingValue != null && existingValue.isTextual()) {
+                String existingAction = existingValue.asText();
+                // If user set a stricter permission, preserve it by not including it in the merge
+                if (isStricterThan(existingAction, generatedAction)) {
+                    filtered.remove(key);
+                }
+            }
+        }
+        return filtered;
+    }
+
+    private boolean isStricterThan(String existing, String generated) {
+        // deny is strictest, ask is medium, allow is most permissive
+        // If existing is stricter than generated, return true
+        if ("deny".equals(existing)) {
+            return "ask".equals(generated) || "allow".equals(generated);
+        }
+        if ("ask".equals(existing)) {
+            return "allow".equals(generated);
+        }
+        return false;
     }
 
     private ExistingConfiguration readExisting(Path configFile) throws IOException {

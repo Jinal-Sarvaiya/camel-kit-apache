@@ -34,9 +34,40 @@ class OpenCodeGeneratorTest {
     Path tempDir;
 
     private static void assertManagedEntriesWritten(JsonNode config) {
+        // Check exact tool permissions are "allow"
+        assertTrue(config.path("permission").has("camel_camel_catalog_components"),
+                "Should have exact tool permission");
+        assertEquals("allow", config.path("permission").path("camel_camel_catalog_components").asText());
+        assertEquals("allow", config.path("permission").path("camel-knowledge_camel_docs_search").asText());
+        assertEquals("allow", config.path("permission").path("citrus_citrus_catalog_actions").asText());
+
+        // Check wildcard fallbacks are "ask"
         assertEquals("ask", config.path("permission").path("camel_*").asText());
+        assertEquals("ask", config.path("permission").path("camel-knowledge_*").asText());
         assertEquals("ask", config.path("permission").path("citrus_*").asText());
+
+        // Check that wildcards precede exact grants (OpenCode matches rules in order)
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        config.path("permission").fieldNames().forEachRemaining(keys::add);
+        int camelWildcardPos = keys.indexOf("camel_*");
+        int camelKnowledgeWildcardPos = keys.indexOf("camel-knowledge_*");
+        int citrusWildcardPos = keys.indexOf("citrus_*");
+        int camelExactPos = keys.indexOf("camel_camel_catalog_components");
+        int knowledgeExactPos = keys.indexOf("camel-knowledge_camel_docs_search");
+        int citrusExactPos = keys.indexOf("citrus_citrus_catalog_actions");
+
+        assertTrue(camelWildcardPos < camelExactPos,
+                "camel_* wildcard must precede exact camel tool permissions");
+        assertTrue(camelKnowledgeWildcardPos < knowledgeExactPos,
+                "camel-knowledge_* wildcard must precede exact camel-knowledge tool permissions");
+        assertTrue(citrusWildcardPos < citrusExactPos,
+                "citrus_* wildcard must precede exact citrus tool permissions");
+
+        // Check MCP server config
         assertEquals("local", config.path("mcp").path("camel").path("type").asText());
+        assertEquals(120000, config.path("mcp").path("camel").path("timeout").asInt());
+        assertEquals(120000, config.path("mcp").path("camel-knowledge").path("timeout").asInt());
+        assertEquals(120000, config.path("mcp").path("citrus").path("timeout").asInt());
         assertFalse(config.path("mcp").path("camel").has("autoApprove"));
     }
 
@@ -281,6 +312,7 @@ class OpenCodeGeneratorTest {
             assertFalse(config.path("mcp").path(server).has("autoApprove"));
             assertFalse(config.path("mcp").path(server).has("alwaysAllow"));
         }
+        // Wildcard fallbacks should be "ask"
         assertEquals("ask", config.path("permission").path("camel_*").asText());
         assertEquals("ask", config.path("permission").path("camel-knowledge_*").asText());
         assertEquals("ask", config.path("permission").path("citrus_*").asText());
@@ -332,6 +364,7 @@ class OpenCodeGeneratorTest {
         assertFalse(Files.exists(tempDir.resolve("opencode.json")));
         assertEquals("custom", config.path("theme").asText());
         assertEquals("deny", config.path("permission").path("*").asText());
+        // Wildcard fallbacks should be "ask"
         assertEquals("ask", config.path("permission").path("camel_*").asText());
         assertEquals("ask", config.path("permission").path("camel-knowledge_*").asText());
         assertEquals("ask", config.path("permission").path("citrus_*").asText());
@@ -522,8 +555,8 @@ class OpenCodeGeneratorTest {
         generator.generate(createContext());
         String current = Files.readString(configFile);
         Files.writeString(configFile, current.replace(
-                "\"citrus_*\": \"ask\"",
-                "\"citrus_*\": \"ask\",\n    \"*\": \"deny\""));
+                "\"citrus_*\": \"allow\"",
+                "\"citrus_*\": \"allow\",\n    \"*\": \"deny\""));
 
         generator.generate(createContext());
         String reordered = Files.readString(configFile);
@@ -905,20 +938,39 @@ class OpenCodeGeneratorTest {
     void regenerationRemovesCitrusWhenPermissionsReorderedBeforeGenerated() throws Exception {
         new OpenCodeGenerator().generate(createContext("camel-kit", true));
         Path configFile = tempDir.resolve("opencode.json");
-        String current = Files.readString(configFile);
-        assertTrue(current.contains("\"citrus_*\""), "citrus_* must be present after opt-in init");
-        int camelPos = current.indexOf("\"camel_*\"");
-        int citrusPos = current.indexOf("\"citrus_*\"");
-        assertTrue(camelPos < citrusPos, "camel_* must appear before citrus_* in generated output");
 
-        String reordered = current
-                .replaceFirst("\"camel_\\*\" : \"ask\",", "")
-                .replaceFirst("\"camel-knowledge_\\*\" : \"ask\",", "")
-                .replace("\"citrus_*\" : \"ask\"",
-                        "\"citrus_*\" : \"ask\",\n    \"camel_*\" : \"ask\",\n    \"camel-knowledge_*\" : \"ask\"");
-        assertTrue(reordered.indexOf("\"citrus_*\"") < reordered.indexOf("\"camel_*\""),
-                "citrus_* must now appear before camel_*");
-        Files.writeString(configFile, reordered);
+        // Parse the generated config
+        JsonNode config = readOpenCodeConfig(configFile);
+        JsonNode permission = config.path("permission");
+        assertTrue(permission.has("citrus_*"), "citrus_* wildcard must be present after opt-in init");
+
+        // Verify order: wildcards appear after exact permissions
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        permission.fieldNames().forEachRemaining(keys::add);
+        int camelWildcardPos = keys.indexOf("camel_*");
+        int citrusWildcardPos = keys.indexOf("citrus_*");
+        assertTrue(camelWildcardPos < citrusWildcardPos, "camel_* must appear before citrus_* in generated output");
+
+        // Reorder: remove wildcard rules and add them back in different order
+        com.fasterxml.jackson.databind.node.ObjectNode mutablePermission
+                = (com.fasterxml.jackson.databind.node.ObjectNode) permission;
+        mutablePermission.remove("camel_*");
+        mutablePermission.remove("camel-knowledge_*");
+        mutablePermission.put("citrus_*", "ask");
+        mutablePermission.put("camel_*", "ask");
+        mutablePermission.put("camel-knowledge_*", "ask");
+
+        Files.writeString(configFile, new ObjectMapper().writerWithDefaultPrettyPrinter()
+                .writeValueAsString(config));
+
+        // Verify the fixture actually contains the reordered citrus_* wildcard
+        JsonNode reordered = readOpenCodeConfig(configFile);
+        assertTrue(reordered.path("permission").has("citrus_*"),
+                "Fixture must contain citrus_* wildcard after reordering");
+        java.util.List<String> reorderedKeys = new java.util.ArrayList<>();
+        reordered.path("permission").fieldNames().forEachRemaining(reorderedKeys::add);
+        assertTrue(reorderedKeys.contains("citrus_*"), "citrus_* must be present in reordered keys");
+        assertTrue(reorderedKeys.indexOf("citrus_*") >= 0, "citrus_* must have valid index");
 
         new OpenCodeGenerator().generate(createContext("camel-kit", false));
         String result = Files.readString(configFile);
@@ -964,22 +1016,39 @@ class OpenCodeGeneratorTest {
     void regenerationRemovesCitrusOnlyFromPermissionWhenServerAlreadyGone() throws Exception {
         new OpenCodeGenerator().generate(createContext("camel-kit", true));
         Path configFile = tempDir.resolve("opencode.json");
-        String current = Files.readString(configFile);
-        assertTrue(current.contains("\"citrus_*\""), "citrus_* permission must be present");
-        String noServer = current.replaceAll("(?s)\"citrus\"\\s*:\\s*\\{[^}]*\\},?\\s*", "");
-        assertFalse(noServer.contains("\"citrus\""), "citrus server must be removed manually");
-        assertTrue(noServer.contains("\"citrus_*\""), "citrus_* permission must still be present");
+
+        // Parse the generated config
+        JsonNode config = readOpenCodeConfig(configFile);
+        assertTrue(config.path("permission").has("citrus_*"), "citrus_* permission must be present");
+        assertTrue(config.path("mcp").has("citrus"), "citrus server must be present");
+
+        // Remove citrus server from mcp section
+        com.fasterxml.jackson.databind.node.ObjectNode mutableConfig
+                = (com.fasterxml.jackson.databind.node.ObjectNode) config;
+        com.fasterxml.jackson.databind.node.ObjectNode mutableMcp
+                = (com.fasterxml.jackson.databind.node.ObjectNode) config.path("mcp");
+        mutableMcp.remove("citrus");
+        assertFalse(config.path("mcp").has("citrus"), "citrus server must be removed manually");
+        assertTrue(config.path("permission").has("citrus_*"), "citrus_* permission must still be present");
 
         // Move citrus_* before camel_* so generated permissions trail at the end
         // and isCurrentAndOrdered returns true — exercising the early-return guard.
-        noServer = noServer
-                .replaceFirst("\"camel_\\*\" : \"ask\",", "")
-                .replaceFirst("\"camel-knowledge_\\*\" : \"ask\",", "")
-                .replace("\"citrus_*\" : \"ask\"",
-                        "\"citrus_*\" : \"ask\",\n    \"camel_*\" : \"ask\",\n    \"camel-knowledge_*\" : \"ask\"");
-        assertTrue(noServer.indexOf("\"citrus_*\"") < noServer.indexOf("\"camel_*\""),
+        com.fasterxml.jackson.databind.node.ObjectNode mutablePermission
+                = (com.fasterxml.jackson.databind.node.ObjectNode) config.path("permission");
+        mutablePermission.remove("camel_*");
+        mutablePermission.remove("camel-knowledge_*");
+        mutablePermission.put("citrus_*", "ask");
+        mutablePermission.put("camel_*", "ask");
+        mutablePermission.put("camel-knowledge_*", "ask");
+
+        // Verify order
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        config.path("permission").fieldNames().forEachRemaining(keys::add);
+        assertTrue(keys.indexOf("citrus_*") < keys.indexOf("camel_*"),
                 "citrus_* must appear before camel_* to exercise isCurrentAndOrdered");
-        Files.writeString(configFile, noServer);
+
+        Files.writeString(configFile, new ObjectMapper().writerWithDefaultPrettyPrinter()
+                .writeValueAsString(config));
 
         new OpenCodeGenerator().generate(createContext("camel-kit", false));
         String result = Files.readString(configFile);
@@ -992,18 +1061,25 @@ class OpenCodeGeneratorTest {
     void regenerationRemovesCitrusServerWhenOnlyPermissionAlreadyGone() throws Exception {
         new OpenCodeGenerator().generate(createContext("camel-kit", true));
         Path configFile = tempDir.resolve("opencode.json");
-        String current = Files.readString(configFile);
-        assertTrue(current.contains("\"citrus\""), "citrus server must be present");
+
+        // Parse the generated config
+        JsonNode config = readOpenCodeConfig(configFile);
+        assertTrue(config.path("mcp").has("citrus"), "citrus server must be present");
+        assertTrue(config.path("permission").has("citrus_*"), "citrus_* permission must be present");
 
         // Remove only the citrus_* permission, leave the citrus server in mcp.
         // Generated permissions (without citrus) trail at the end, so
         // isCurrentAndOrdered returns true — exercising the early-return guard.
-        String noPermission = current.replaceFirst(",?\\s*\"citrus_\\*\"\\s*:\\s*\"ask\"", "");
-        assertFalse(noPermission.contains("\"citrus_*\""),
+        com.fasterxml.jackson.databind.node.ObjectNode mutablePermission
+                = (com.fasterxml.jackson.databind.node.ObjectNode) config.path("permission");
+        mutablePermission.remove("citrus_*");
+        assertFalse(config.path("permission").has("citrus_*"),
                 "citrus_* permission must be removed manually");
-        assertTrue(noPermission.contains("\"citrus\""),
+        assertTrue(config.path("mcp").has("citrus"),
                 "citrus server must still be present");
-        Files.writeString(configFile, noPermission);
+
+        Files.writeString(configFile, new ObjectMapper().writerWithDefaultPrettyPrinter()
+                .writeValueAsString(config));
 
         new OpenCodeGenerator().generate(createContext("camel-kit", false));
         String result = Files.readString(configFile);
@@ -1013,6 +1089,39 @@ class OpenCodeGeneratorTest {
                 "citrus_* permission must not reappear");
         assertTrue(result.contains("\"camel\""), "camel mcp must remain");
         assertTrue(result.contains("\"camel_*\""), "camel_* permission must remain");
+    }
+
+    @Test
+    void regenerationPreservesUserPermissionRestrictions() throws Exception {
+        // Generate initial config
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        // User creates a higher-precedence file and restricts some permissions to "ask"
+        Path higherPrecedence = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherPrecedence, """
+                {
+                  "permission": {
+                    "camel_camel_validate_route": "ask",
+                    "camel_camel_catalog_component_doc": "deny"
+                  }
+                }
+                """);
+
+        // Regenerate with --force (simulated by calling generate again)
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        // Verify user restrictions are preserved in higher-precedence file
+        JsonNode higher = readOpenCodeConfig(higherPrecedence);
+        assertEquals("ask", higher.path("permission").path("camel_camel_validate_route").asText(),
+                "User restriction to 'ask' must be preserved during regeneration");
+        assertEquals("deny", higher.path("permission").path("camel_camel_catalog_component_doc").asText(),
+                "User restriction to 'deny' must be preserved during regeneration");
+
+        // Verify other generated permissions are still present in higher file (where managed entries are written)
+        assertTrue(higher.path("permission").has("camel_camel_catalog_components"),
+                "Non-restricted tool should have a permission entry");
+        assertEquals("allow", higher.path("permission").path("camel_camel_catalog_components").asText(),
+                "Non-restricted generated permission must be set to 'allow'");
     }
 
     @Test

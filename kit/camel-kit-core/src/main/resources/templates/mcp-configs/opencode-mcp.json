@@ -1,10 +1,6 @@
 {
   "$schema": "https://opencode.ai/config.json",
-  "permission": {
-    "camel_*": "ask",
-    "camel-knowledge_*": "ask"{#if CITRUS_ENABLED},
-    "citrus_*": "ask"{/if}
-  },
+  "permission": {OPENCODE_MCP_PERMISSIONS},
   "mcp": {
     "camel": {
       "type": "local",
@@ -16,7 +12,8 @@
         "-Dquarkus.http.port=-1",
         "org.apache.camel:camel-jbang-mcp:{CAMEL_MCP_VERSION}:runner"
       ],
-      "enabled": true
+      "enabled": true,
+      "timeout": 120000
     },
     "camel-knowledge": {
       "type": "local",
@@ -26,7 +23,8 @@
         "-Dquarkus.log.level=WARN",
         "{KNOWLEDGE_GROUP_ID}:camel-kit-knowledge-mcp:{KNOWLEDGE_VERSION}:runner"
       ],
-      "enabled": true
+      "enabled": true,
+      "timeout": 120000
     }{#if CITRUS_ENABLED},
     "citrus": {
       "type": "local",
@@ -37,7 +35,8 @@
         "-Dquarkus.http.port=-1",
         "org.citrusframework:citrus-mcp-server:{CITRUS_MCP_VERSION}:runner"
       ],
-      "enabled": true
+      "enabled": true,
+      "timeout": 120000
     }{/if}
   }
 }

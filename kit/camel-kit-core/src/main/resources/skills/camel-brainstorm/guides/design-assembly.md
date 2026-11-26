@@ -502,6 +502,24 @@ Fix any issues inline.
    ```
 3. Copy `templates/constitution.md` to `docs/constitution.md` if it doesn't exist
 
+## Collect Deferred Mappings for Designed Contracts
+
+**Before presenting the design for approval**, check if any field mappings were deferred because contracts had status "designed" without artifacts:
+
+1. Review the interview record for any deferred mappings with reason: "depends on [source/destination] contract design approval"
+2. For each deferred mapping:
+   - The proposed contract is now in the design spec (Section 3 flow designs)
+   - Load `camel-design/guides/datamapper-interview.md` with the proposed contract as the artifact
+   - Collect the field mapping against the proposed schema
+   - Insert the completed mapping into the design spec before approval
+
+This ensures:
+- User approves both the proposed contract AND the mapping that uses it
+- Implementation has the complete canonical mapping section
+- No transformations are lost due to missing mapping sections
+
+If no mappings were deferred for designed contracts, skip this step and proceed to present the spec.
+
 Present the spec to the user:
 
 ```

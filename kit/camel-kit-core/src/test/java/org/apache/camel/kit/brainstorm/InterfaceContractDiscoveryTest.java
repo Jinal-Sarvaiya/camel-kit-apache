@@ -621,4 +621,100 @@ class InterfaceContractDiscoveryTest {
         assertTrue(q7cSection.contains("Not applicable"),
                 "Question 7c must have 'not-applicable' option");
     }
+
+    @Test
+    @DisplayName("Q7a must proceed when BOTH endpoints ready, defer when EITHER pending")
+    void testDataMapperBranchSelectionLogic() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
+
+        int q7aIndex = content.indexOf("### Question 7a: Data Transformation Detail");
+        int q9Index = content.indexOf("### Question 9: Error Handling");
+        String q7aSection = content.substring(q7aIndex, q9Index);
+
+        // Must describe proceeding when BOTH are ready
+        assertTrue(
+                q7aSection.contains("BOTH source and destination")
+                        || q7aSection.contains("BOTH source and that branch"),
+                "Q7a must check that BOTH endpoints are ready before proceeding");
+
+        assertTrue(q7aSection.contains("existing\" with artifact") || q7aSection.contains("designed\" with artifact"),
+                "Q7a must specify ready states: existing with artifact or designed with artifact");
+
+        // Must describe deferring when EITHER is not ready
+        assertTrue(q7aSection.contains("EITHER") || q7aSection.contains("Defer if EITHER"),
+                "Q7a must defer if EITHER endpoint is not ready");
+
+        assertTrue(q7aSection.contains("\"pending\"") && q7aSection.contains("defer"),
+                "Q7a must defer mappings when either endpoint has pending status");
+
+        assertTrue(q7aSection.contains("\"designed\" without artifact") && q7aSection.contains("defer"),
+                "Q7a must defer mappings when either endpoint has designed status without artifact");
+
+        // Must NOT have inverted logic like "proceed when both pending" or "defer when both ready"
+        String q7aLower = q7aSection.toLowerCase();
+        assertFalse(q7aLower.contains("proceed when both pending")
+                || q7aLower.contains("proceed if both pending")
+                || q7aLower.contains("both pending") && q7aLower.contains(" proceed"),
+                "Q7a must NOT proceed when both endpoints are pending (inverted logic check)");
+    }
+
+    @Test
+    @DisplayName("Design assembly must collect deferred mappings before approval")
+    void testDesignAssemblyCollectsDeferredMappings() throws Exception {
+        Path designAssemblyPath = Path.of("src/main/resources/skills/camel-brainstorm/guides/design-assembly.md");
+        assertTrue(Files.exists(designAssemblyPath), "Design assembly guide must exist");
+
+        String content = Files.readString(designAssemblyPath);
+
+        // Must have section about collecting deferred mappings
+        assertTrue(content.contains("Collect Deferred Mappings") || content.contains("deferred mappings"),
+                "Design assembly must have instructions for collecting deferred mappings");
+
+        // Must check for deferred mappings before approval
+        int approvalIndex = content.indexOf("Do you approve this design");
+        assertTrue(approvalIndex > 0, "Design assembly must have approval question");
+
+        String beforeApproval = content.substring(0, approvalIndex);
+        assertTrue(beforeApproval.contains("deferred") && beforeApproval.contains("designed"),
+                "Design assembly must check for deferred mappings before approval");
+
+        assertTrue(beforeApproval.contains("Load") && beforeApproval.contains("datamapper-interview.md"),
+                "Design assembly must load DataMapper to collect deferred mappings");
+
+        // Must ensure mappings are in design spec before approval
+        assertTrue(beforeApproval.contains("canonical mapping section") || beforeApproval.contains("complete"),
+                "Design assembly must ensure implementation has complete mapping section");
+    }
+
+    @Test
+    @DisplayName("DataMapper target schema paths must be unique per routing branch")
+    void testDataMapperUniqueTargetPathsPerBranch() throws Exception {
+        Path datamapperPath = Path.of("src/main/resources/skills/camel-design/guides/datamapper-interview.md");
+        String content = Files.readString(datamapperPath);
+
+        int step3Index = content.indexOf("## Step 3: Target Schema");
+        int step3bIndex = content.indexOf("## Step 3b:");
+        String step3Section = content.substring(step3Index, step3bIndex);
+
+        // Must describe unique path generation
+        assertTrue(step3Section.contains("Unique path") || step3Section.contains("unique path"),
+                "Step 3 must describe unique path generation for target schemas");
+
+        // Must handle conditional routing with branch identifiers
+        assertTrue(step3Section.contains("Conditional routing") || step3Section.contains("multiple branches"),
+                "Step 3 must handle conditional routing case");
+
+        assertTrue(step3Section.contains("branch-identifier") || step3Section.contains("branch identifier"),
+                "Step 3 must use branch identifier in filenames");
+
+        // Must prevent overwriting
+        assertTrue(step3Section.contains("prevent overwriting") || step3Section.contains("gets its own file"),
+                "Step 3 must prevent one branch's schema from overwriting another's");
+
+        // Must give example with multiple distinct filenames
+        assertTrue(step3Section.contains("billing") && step3Section.contains("warehouse"),
+                "Step 3 must show example with distinct branch filenames");
+    }
+
 }

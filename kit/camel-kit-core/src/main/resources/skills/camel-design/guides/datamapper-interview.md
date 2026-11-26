@@ -78,11 +78,20 @@ c) No schema — I'll describe the fields manually
 
 For artifacts with schemas:
 - **JSON Schema / XSD files** - Use file path as-is
-- **OpenAPI / AsyncAPI with embedded schema** - Extract message schema, save to `{flow-name}-target.schema.json` in project root, record this path
-- **WSDL with embedded XSD** - Extract XSD, save to `{flow-name}-target.xsd` in project root, record this path
-- **Inline content** - Save to `{flow-name}-target.{xsd|schema.json}` in project root, record this path
+- **OpenAPI / AsyncAPI with embedded schema** - Extract message schema, save to unique path (see below), record this path
+- **WSDL with embedded XSD** - Extract XSD, save to unique path (see below), record this path
+- **Inline content** - Save to unique path (see below), record this path
+
+**Unique path generation for extracted/inline schemas:**
+- **Single-destination flow** - Use `{flow-name}-target.schema.json` or `{flow-name}-target.xsd`
+- **Conditional routing (multiple branches)** - Use `{flow-name}-{branch-identifier}-target.schema.json` or `{flow-name}-{branch-identifier}-target.xsd`
+  - Branch identifier: use routing condition name (e.g., "billing", "warehouse") or branch index (e.g., "branch1", "branch2")
+  - Each destination's schema gets its own file to prevent overwriting
+  - Example: `orders-billing-target.schema.json`, `orders-warehouse-target.schema.json`
 
 Preserve schema references: if the extracted schema references other components in the original document, save the complete schema with all referenced components to maintain validity.
+
+Carry the exact recorded path into the mapping specification so each branch references its correct schema file.
 
 Skip request below after extracting and saving schema.
 

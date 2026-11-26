@@ -5,6 +5,7 @@ import java.io.RandomAccessFile;
 import java.io.StringWriter;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -51,13 +52,13 @@ class TargetCommandTest {
     @Test
     void mainAcceptsEvidenceInTheDocumentedShape() throws Exception {
         execute(0, "init", dir.toString(), "--ai", "claude", "--no-fetch");
+        Files.writeString(dir.resolve(".camel-kit/config.properties"),
+                "camel.catalog.repos=https://repo.maven.apache.org/maven2/\n", StandardOpenOption.APPEND);
         String guide = Files.readString(dir.resolve(".claude/skills/shared/mcp-setup.md"));
         String example = guide.substring(guide.indexOf("### Rule 3:"));
         int start = example.indexOf("```json") + 7;
         ObjectNode wire = (ObjectNode) JSON.readTree(example.substring(start, example.indexOf("```", start)));
         var profile = JSON.readTree(run(0));
-        // The example repository list is illustrative. Use the repositories configured in this workspace.
-        ((ObjectNode) wire.get("profile")).set("repositories", profile.get("repositories"));
         assertEquals(profile, wire.get("profile"));
 
         String core = profile.get("camelVersion").asText();

@@ -215,7 +215,8 @@ Informational searches can use the bundled catalog. Required lookups use Rule 3.
 
 ### Placeholder conventions
 
-At install time, Camel Kit expands uppercase names enclosed in single braces, such as the name `CAMEL_VERSION`.
+Camel Kit expands only its recognized single-brace names at install time, including `CAMEL_VERSION`.
+During the workflow, fill placeholders such as `{MODULE_PREFIX}` using the module selected for the task.
 Use context placeholders such as `{project.camelVersion}` when describing values read from `.camel-kit/config.properties`.
 Use double-brace placeholders such as `{{customer.host}}` only for literal Camel property placeholders that must remain
 in generated route files.

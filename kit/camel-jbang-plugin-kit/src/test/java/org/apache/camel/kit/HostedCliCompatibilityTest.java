@@ -45,6 +45,21 @@ class HostedCliCompatibilityTest {
     }
 
     @Test
+    void initWritesPropertyOverridesToTheLauncherAndGuides() throws Exception {
+        Result init = run("kit", "init", "orders", "--ai", "claude", "--no-fetch",
+                "-p", "camel.main.version=4.99.1", "-p", "camel.mcp.version=4.99.2",
+                "-p", "maven.dependency.plugin.version=3.99.1");
+        assertEquals(0, init.exit, init.err);
+        Path targetDir = directory.resolve("orders");
+        assertTrue(Files.readString(targetDir.resolve(".mcp.json")).contains("camel-jbang-mcp:4.99.2"));
+        Path skills = targetDir.resolve(".claude/skills");
+        assertTrue(Files.readString(skills.resolve("shared/mcp-setup.md"))
+                .contains("org.apache.camel:camel-catalog:4.99.1"));
+        assertTrue(Files.readString(skills.resolve("camel-brainstorm/guides/version-selection.md"))
+                .contains("maven-dependency-plugin:3.99.1:tree"));
+    }
+
+    @Test
     void hostExpandsFilesAndKeepsEscapedAndAttachedContextLiteral() throws Exception {
         Path arguments = Files.writeString(directory.resolve("arguments"), "kit --version");
         Result fromFile = run("@" + arguments);

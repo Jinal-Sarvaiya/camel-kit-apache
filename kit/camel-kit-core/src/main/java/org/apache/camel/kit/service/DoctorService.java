@@ -1004,7 +1004,13 @@ public class DoctorService {
                 OpenCodePermissionResolution resolution = resolutions.get(i);
                 if (resolution.matched() && "deny".equals(resolution.action())) {
                     // Only report as explicit denial if matched by an exact rule (not a wildcard)
-                    if (!resolution.rule().contains("*")) {
+                    // Extract outer key (before NESTED_RULE separator) to check for wildcards
+                    String outerKey = resolution.rule();
+                    int nestedSep = outerKey.indexOf(NESTED_RULE);
+                    if (nestedSep >= 0) {
+                        outerKey = outerKey.substring(0, nestedSep);
+                    }
+                    if (!outerKey.contains("*")) {
                         deniedTools.add(toolNames.get(i));
                     }
                 }

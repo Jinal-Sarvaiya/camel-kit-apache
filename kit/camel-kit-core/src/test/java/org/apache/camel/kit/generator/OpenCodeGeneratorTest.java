@@ -1313,6 +1313,32 @@ class OpenCodeGeneratorTest {
         }
     }
 
+    @Test
+    void regenerationPreservesHeadlessLookupsWhenSecondFileRepeatsWildcard() throws Exception {
+        // Generate base Citrus config
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // User adds only a wildcard overlay in higher-precedence file (repeating the same key)
+        // This is the scenario: opencode.json has all exact grants, opencode.jsonc just has citrus_*: ask
+        Path higherPrecedence = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherPrecedence, """
+                {
+                  "permission": {
+                    "citrus_*": "ask"
+                  }
+                }
+                """);
+
+        // Regenerate with --force
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // After regeneration: docs lookup must work because exact "allow" grants in base file
+        // precede the wildcard (wildcard position preserved, doesn't move before exact grants)
+        JsonNode after = effectivePermission();
+        assertEquals("allow", effectiveAction(after, "citrus_citrus_docs_index"),
+                "docs index must stay allowed after regeneration - wildcard must not move before exact grants");
+    }
+
     private static final List<String> CITRUS_TOOLS = List.of(
             "citrus_citrus_catalog_actions", "citrus_citrus_catalog_action", "citrus_citrus_catalog_action_schema",
             "citrus_citrus_catalog_endpoints", "citrus_citrus_catalog_endpoint",

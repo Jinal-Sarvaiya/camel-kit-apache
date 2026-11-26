@@ -573,7 +573,8 @@ class DoctorServiceTest {
     @Test
     void doctorIdentifiesExplicitToolDenialCorrectly() throws Exception {
         createHealthyWorkspace(tempDir, OPENCODE);
-        // Set only one camel tool to deny in otherwise fresh config
+
+        // Test scalar denial: "deny"
         writeMcpConfig(tempDir, OPENCODE, """
                 {
                   "permission": {
@@ -597,6 +598,31 @@ class DoctorServiceTest {
         assertFalse(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
                 "must end with a namespace-wide 'ask' rule", null),
                 "Should not suggest adding namespace-wide ask rule for explicit denial");
+
+        // Test object-valued denial: {"*": "deny"}
+        writeMcpConfig(tempDir, OPENCODE, """
+                {
+                  "permission": {
+                    "camel_*": "ask",
+                    "camel-knowledge_*": "ask",
+                    "camel_camel_catalog_component_doc": {"*": "deny"}
+                  },
+                  "mcp": {
+                    "camel": {"type": "local"},
+                    "camel-knowledge": {"type": "local"}
+                  }
+                }
+                """);
+
+        result = new DoctorService().inspect(new DoctorRequest(tempDir));
+
+        assertTrue(result.hasFailures(), result.findings().toString());
+        assertTrue(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "OpenCode tool 'camel_camel_catalog_component_doc' is explicitly denied",
+                "Remove the denial"));
+        assertFalse(hasFinding(result, DoctorFinding.Status.FAIL, "mcp",
+                "must end with a namespace-wide 'ask' rule", null),
+                "Should not suggest adding namespace-wide ask rule for object-valued explicit denial");
     }
 
     @Test

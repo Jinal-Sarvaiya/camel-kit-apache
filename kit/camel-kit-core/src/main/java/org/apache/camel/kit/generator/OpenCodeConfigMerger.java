@@ -80,11 +80,28 @@ final class OpenCodeConfigMerger {
             if (!permission.isObject()) {
                 continue;
             }
+
+            // Count how many managed keys this layer has
+            final long managedKeysInLayer = java.util.stream.StreamSupport
+                    .stream(((Iterable<Map.Entry<String, JsonNode>>) permission::fields).spliterator(), false)
+                    .filter(e -> generatedPermission.has(e.getKey()))
+                    .count();
+
             permission.fields().forEachRemaining(entry -> {
                 JsonNode generatedValue = generatedPermission.get(entry.getKey());
                 if (generatedValue != null) {
-                    managedRules.remove(entry.getKey());
-                    managedRules.put(entry.getKey(), normalizeManagedRule(entry.getValue(), generatedValue));
+                    JsonNode normalized = normalizeManagedRule(entry.getValue(), generatedValue);
+                    JsonNode previousValue = managedRules.get(entry.getKey());
+
+                    // If this layer has only one managed key and the value hasn't changed, preserve position
+                    // Otherwise, respect the new position from this layer
+                    boolean preservePosition = managedKeysInLayer == 1 && previousValue != null
+                            && normalized.equals(previousValue);
+
+                    if (!preservePosition) {
+                        managedRules.remove(entry.getKey());
+                        managedRules.put(entry.getKey(), normalized);
+                    }
                 }
             });
         }

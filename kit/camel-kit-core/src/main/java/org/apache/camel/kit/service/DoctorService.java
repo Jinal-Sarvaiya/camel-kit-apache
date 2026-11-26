@@ -992,87 +992,43 @@ public class DoctorService {
                 continue;
             }
 
-            // Check exact tool permissions (OpenCode format: <server>_<tool>)
-            List<OpenCodePermissionResolution> exactResolutions = openCodeTools(pattern).stream()
+            List<OpenCodePermissionResolution> resolutions = openCodeTools(pattern).stream()
                     .map(tool -> openCodePermissionAction(permission, tool))
                     .toList();
-
-            // Check wildcard fallback permission (pattern like camel_*)
-            OpenCodePermissionResolution wildcardResolution = openCodePermissionAction(permission, pattern);
-
-            // Test multiple unlisted tool names to verify comprehensive namespace fallback coverage
-            // Different patterns might match different subsets of unlisted tools
-            java.util.List<String> unlistedProbes = java.util.List.of(
-                    pattern.replace("*", "unlisted_probe_1"),
-                    pattern.replace("*", "another_unlisted_tool"),
-                    pattern.replace("*", "runtime_control_tool"),
-                    pattern.replace("*", "diagram_renderer"));
-            java.util.List<OpenCodePermissionResolution> unlistedResolutions = unlistedProbes.stream()
-                    .map(probe -> openCodePermissionAction(permission, probe))
-                    .toList();
-
-            // Exact tools should be "allow", wildcard fallback should be "ask"
             Set<Path> wrongSources = new LinkedHashSet<>();
-
-            // Separate concerns: deliberate restrictions vs missing permissions vs broken fallbacks
-            List<String> restrictedTools = new ArrayList<>();
-            List<String> missingTools = new ArrayList<>();
-            Set<Path> brokenFallbackSources = new LinkedHashSet<>();
-
-            // Check exact tools: collect those deliberately restricted to "ask" vs truly missing
-            for (int i = 0; i < exactResolutions.size(); i++) {
-                OpenCodePermissionResolution resolution = exactResolutions.get(i);
-                String toolName = new ArrayList<>(openCodeTools(pattern)).get(i);
-                if (!resolution.matched()) {
-                    missingTools.add(toolName);
-                } else if ("ask".equals(resolution.action())) {
-                    // User deliberately set this tool to "ask" - this is intentional
-                    restrictedTools.add(toolName);
-                }
-                // Tools with "allow" or "deny" are fine, no issue
-            }
-
-            // Check that all unlisted tools fall back to "ask"
-            for (int i = 0; i < unlistedResolutions.size(); i++) {
-                OpenCodePermissionResolution resolution = unlistedResolutions.get(i);
-                if (resolution.matched() && !"ask".equals(resolution.action())) {
-                    Path source = permissionSource(resolution.rule(), permissionSources, mcpFile);
-                    brokenFallbackSources.add(source);
-                    break; // One broken fallback is enough to report the issue
+            for (OpenCodePermissionResolution resolution : resolutions) {
+                // Skip manifest tools with 'allow' - these are intentional grants
+                if (resolution.matched() && !"ask".equals(resolution.action())
+                        && !"allow".equals(resolution.action())) {
+                    wrongSources.add(permissionSource(resolution.rule(), permissionSources, mcpFile));
                 }
             }
-
-            // Report issues
-            if (!brokenFallbackSources.isEmpty()) {
-                for (Path source : brokenFallbackSources) {
+            boolean missing = resolutions.stream().anyMatch(resolution -> !resolution.matched());
+            if (wrongSources.isEmpty() && !missing) {
+                String overridingRule = unsafeOpenCodeNamespaceOverride(permission, pattern, openCodeTools(pattern));
+                if (overridingRule != null) {
+                    wrongSources.add(permissionSource(overridingRule, permissionSources, mcpFile));
+                }
+            }
+            if (!wrongSources.isEmpty()) {
+                for (Path source : wrongSources) {
                     findings.add(DoctorFinding.fail("mcp", relativize(root, source),
                             "OpenCode permission namespace '" + pattern
-                                                                                     + "' allows unlisted tools without approval",
-                            "Unlisted tools in this namespace will run in headless mode without prompts. "
-                                                                                                                                   + "Add a namespace-wide 'ask' fallback rule, or regenerate the OpenCode config."));
+                                                                                     + "' must end with a namespace-wide 'ask' rule",
+                            "Add a final namespace-wide ask rule to retain MCP permission prompts, or regenerate the OpenCode config."));
                 }
                 valid = false;
-            }
-
-            if (!missingTools.isEmpty()) {
+            } else if (missing) {
                 if (server.path("autoApprove").isArray() || server.path("alwaysAllow").isArray()) {
                     findings.add(DoctorFinding.warn("mcp", relativize(root, mcpFile),
-                            "Legacy OpenCode config missing permissions for tools: "
-                                                                                      + String.join(", ", missingTools),
-                            "Regenerate the OpenCode config to add explicit MCP permissions."));
+                            "Legacy OpenCode config has no supported permission for '" + pattern + "'",
+                            "Regenerate the OpenCode config to retain explicit MCP approval prompts."));
                 } else {
                     findings.add(DoctorFinding.fail("mcp", relativize(root, mcpFile),
-                            "OpenCode permissions missing for tools: " + String.join(", ", missingTools),
-                            "These tools will be auto-rejected in headless mode. "
-                                                                                                          + "Add explicit permissions or regenerate the OpenCode config."));
-                    valid = false;
+                            "OpenCode permission '" + pattern + "' must be 'ask'",
+                            "Restore the generated MCP permission prompts or regenerate the OpenCode config."));
                 }
-            }
-
-            if (!restrictedTools.isEmpty()) {
-                findings.add(DoctorFinding.info("mcp", relativize(root, mcpFile),
-                        "OpenCode tools require approval: " + String.join(", ", restrictedTools),
-                        "These tools are deliberately restricted and will prompt for approval or be rejected in headless mode."));
+                valid = false;
             }
         }
         return valid;
@@ -1113,6 +1069,16 @@ public class DoctorService {
 
     /** Returns the overriding rule, {@code ""} when no namespace-wide ask rule exists, or {@code null} when safe. */
     private String unsafeOpenCodeNamespaceOverride(JsonNode permission, String managedPattern) {
+        return unsafeOpenCodeNamespaceOverride(permission, managedPattern, java.util.Collections.emptySet());
+    }
+
+    /**
+     * Returns the overriding rule, {@code ""} when no namespace-wide ask rule exists, or {@code null} when safe.
+     * Exempts manifest-listed tools from the override check.
+     */
+    private String unsafeOpenCodeNamespaceOverride(
+            JsonNode permission, String managedPattern,
+            java.util.Set<String> exemptTools) {
         if (permission == null || !permission.isObject()) {
             return "";
         }
@@ -1124,6 +1090,11 @@ public class DoctorService {
             Map.Entry<String, JsonNode> entry = rule.next();
             OpenCodePermissionResolution resolution = openCodeRuleAction(entry.getValue());
             if (!resolution.matched()) {
+                continue;
+            }
+
+            // Exempt manifest-listed exact tools
+            if (exemptTools.contains(entry.getKey())) {
                 continue;
             }
 

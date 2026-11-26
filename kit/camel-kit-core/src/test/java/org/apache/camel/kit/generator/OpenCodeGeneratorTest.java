@@ -553,16 +553,47 @@ class OpenCodeGeneratorTest {
         Path configFile = tempDir.resolve("opencode.json");
         OpenCodeGenerator generator = new OpenCodeGenerator();
         generator.generate(createContext());
-        String current = Files.readString(configFile);
-        Files.writeString(configFile, current.replace(
-                "\"citrus_*\": \"allow\"",
-                "\"citrus_*\": \"allow\",\n    \"*\": \"deny\""));
+
+        // Build fixture structurally using JSON parsing
+        JsonNode config = readOpenCodeConfig(configFile);
+        com.fasterxml.jackson.databind.node.ObjectNode mutablePermission
+                = (com.fasterxml.jackson.databind.node.ObjectNode) config.path("permission");
+
+        // Insert user wildcard after citrus_*
+        // First, collect existing permission keys in order
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        mutablePermission.fieldNames().forEachRemaining(keys::add);
+
+        // Rebuild permission object with "*": "deny" inserted after citrus_*
+        com.fasterxml.jackson.databind.node.ObjectNode newPermission = new ObjectMapper().createObjectNode();
+        for (String key : keys) {
+            newPermission.set(key, mutablePermission.get(key));
+            if ("citrus_*".equals(key)) {
+                newPermission.put("*", "deny");
+            }
+        }
+        ((com.fasterxml.jackson.databind.node.ObjectNode) config).set("permission", newPermission);
+
+        Files.writeString(configFile, new ObjectMapper().writerWithDefaultPrettyPrinter()
+                .writeValueAsString(config));
+
+        // Verify the fixture contains both keys
+        JsonNode fixture = readOpenCodeConfig(configFile);
+        assertTrue(fixture.path("permission").has("*"), "Fixture must contain user wildcard");
+        assertTrue(fixture.path("permission").has("camel_*"), "Fixture must contain camel wildcard");
 
         generator.generate(createContext());
         String reordered = Files.readString(configFile);
         generator.generate(createContext());
 
-        assertTrue(reordered.indexOf("\"*\"") < reordered.indexOf("\"camel_*\""), reordered);
+        // Verify order using string positions (both keys must exist)
+        assertTrue(reordered.contains("\"*\""), "Must contain user wildcard after generation");
+        assertTrue(reordered.contains("\"camel_*\""), "Must contain camel wildcard after generation");
+        int starPos = reordered.indexOf("\"*\"");
+        int camelStarPos = reordered.indexOf("\"camel_*\"");
+        assertTrue(starPos >= 0 && camelStarPos >= 0, "Both wildcards must be present");
+        assertTrue(starPos < camelStarPos, "User wildcard must come before camel wildcard");
+
         assertEquals(reordered, Files.readString(configFile));
         assertEquals("ask", readOpenCodeConfig(configFile).path("permission").path("camel_*").asText());
     }
@@ -1122,6 +1153,88 @@ class OpenCodeGeneratorTest {
                 "Non-restricted tool should have a permission entry");
         assertEquals("allow", higher.path("permission").path("camel_camel_catalog_components").asText(),
                 "Non-restricted generated permission must be set to 'allow'");
+    }
+
+    @Test
+    void regenerationWithEmptyHigherPrecedenceFile() throws Exception {
+        // Generate initial config with Citrus
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // User creates an empty higher-precedence file
+        Path higherPrecedence = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherPrecedence, "{}");
+
+        // Regenerate with same options
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // Verify headless lookups still work (wildcards before exact grants)
+        JsonNode higher = readOpenCodeConfig(higherPrecedence);
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        higher.path("permission").fieldNames().forEachRemaining(keys::add);
+
+        // All wildcards should come before their exact grants
+        int camelWildcardPos = keys.indexOf("camel_*");
+        int camelExactPos = keys.indexOf("camel_camel_catalog_components");
+        assertTrue(camelWildcardPos < camelExactPos,
+                "camel_* wildcard must come before exact grants for headless mode");
+    }
+
+    @Test
+    void regenerationPreservesDeliberateTrailingWildcard() throws Exception {
+        // Generate initial config
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        // User deliberately puts wildcard AFTER exact grants for all-tools approval
+        Path higherPrecedence = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherPrecedence, """
+                {
+                  "permission": {
+                    "camel_camel_validate_route": "ask",
+                    "camel_camel_catalog_components": "ask",
+                    "camel_*": "ask"
+                  }
+                }
+                """);
+
+        // Regenerate with --force
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        // Verify wildcard is preserved at the end
+        JsonNode higher = readOpenCodeConfig(higherPrecedence);
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        higher.path("permission").fieldNames().forEachRemaining(keys::add);
+
+        int camelWildcardPos = keys.indexOf("camel_*");
+        int camelExactPos = keys.indexOf("camel_camel_catalog_components");
+        assertTrue(camelWildcardPos > camelExactPos,
+                "Deliberately placed trailing wildcard must be preserved");
+    }
+
+    @Test
+    void regenerationPreservesObjectValuedPermissionRules() throws Exception {
+        // Generate initial config
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        // User creates a higher-precedence file with an object-valued "ask" rule
+        Path higherPrecedence = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherPrecedence, """
+                {
+                  "permission": {
+                    "camel_camel_validate_route": {"*": "ask"}
+                  }
+                }
+                """);
+
+        // Regenerate with --force (simulated by calling generate again)
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        // Verify object-valued rule is preserved and round-trips correctly
+        JsonNode higher = readOpenCodeConfig(higherPrecedence);
+        assertTrue(higher.path("permission").path("camel_camel_validate_route").isObject(),
+                "Object-valued permission rule must be preserved");
+        assertEquals("ask",
+                higher.path("permission").path("camel_camel_validate_route").path("*").asText(),
+                "Object-valued ask rule must round-trip correctly");
     }
 
     @Test

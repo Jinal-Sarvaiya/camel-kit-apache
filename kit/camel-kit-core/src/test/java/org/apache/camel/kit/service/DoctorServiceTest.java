@@ -553,7 +553,7 @@ class DoctorServiceTest {
                     "camel_*": "ask",
                     "camel-knowledge_*": "ask",
                     "citrus_*": "ask",
-                    "camel-knowledge_camel_docs_search": "allow"
+                    "camel-knowledge_future_tool": "allow"
                   },
                   "mcp": {
                     "camel": {"type": "local"},

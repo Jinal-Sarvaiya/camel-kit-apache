@@ -7,6 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.camel.kit.config.OpenCodeProjectConfig;
@@ -46,7 +47,8 @@ final class OpenCodeConfigMerger {
 
         // Collect user restrictions from all files before removing managed entries
         // Traverse from lowest to highest precedence, so the last (highest) restriction wins
-        ObjectNode userRestrictions = JSON.createObjectNode();
+        // Use LinkedHashMap to preserve insertion order (which will be user's original order)
+        java.util.LinkedHashMap<String, JsonNode> userRestrictionsMap = new java.util.LinkedHashMap<>();
         ObjectNode generatedPermission = (ObjectNode) generated.path("permission");
 
         for (ExistingConfiguration config : configurations) {
@@ -56,27 +58,57 @@ final class OpenCodeConfigMerger {
             }
             ObjectNode permission = (ObjectNode) permissionNode;
 
-            generatedPermission.fieldNames().forEachRemaining(key -> {
-                JsonNode generatedValue = generatedPermission.get(key);
-                JsonNode existingValue = permission.get(key);
+            // Check if wildcards appear after exact grants (user override for all-tools approval)
+            java.util.List<String> existingKeys = new java.util.ArrayList<>();
+            permission.fieldNames().forEachRemaining(existingKeys::add);
 
+            // Iterate in user's original order to preserve it
+            for (String key : existingKeys) {
+                JsonNode generatedValue = generatedPermission.get(key);
+                if (generatedValue == null) {
+                    continue; // Not a managed key
+                }
+
+                JsonNode existingValue = permission.get(key);
                 if (existingValue != null) {
                     if (existingValue.isTextual() && generatedValue.isTextual()) {
                         String existingAction = existingValue.asText();
                         String generatedAction = generatedValue.asText();
-                        // Preserve if stricter, OR if it's a wildcard with same value
-                        // (user may have placed it last to override exact grants)
-                        if (isStricterThan(existingAction, generatedAction)
-                                || (key.endsWith("_*") && existingAction.equals(generatedAction))) {
+
+                        boolean preserveWildcard = false;
+                        if (key.endsWith("_*") && existingAction.equals(generatedAction)) {
+                            // Check if wildcard appears AFTER any exact grants from same namespace
+                            // (user override for all-tools approval)
+                            String namespace = key.substring(0, key.length() - 1); // Remove '*'
+                            int wildcardPos = existingKeys.indexOf(key);
+                            // Look for exact grants BEFORE the wildcard position
+                            for (int i = 0; i < wildcardPos; i++) {
+                                if (existingKeys.get(i).startsWith(namespace)
+                                        && !existingKeys.get(i).endsWith("_*")) {
+                                    // Found an exact grant before the wildcard - this is a user override
+                                    preserveWildcard = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // Preserve if stricter OR if wildcard placed after exact grants
+                        if (isStricterThan(existingAction, generatedAction) || preserveWildcard) {
                             // Keep replacing to retain the highest-precedence restriction
-                            userRestrictions.put(key, existingAction);
+                            userRestrictionsMap.put(key, JSON.getNodeFactory().textNode(existingAction));
                         }
                     } else if (existingValue.isObject()) {
                         // Preserve object-valued rules (e.g., {env: "ALLOW_CAMEL_ROUTES"})
-                        userRestrictions.set(key, existingValue);
+                        userRestrictionsMap.put(key, existingValue);
                     }
                 }
-            });
+            }
+        }
+
+        // Convert map to ObjectNode preserving order
+        ObjectNode userRestrictions = JSON.createObjectNode();
+        for (Map.Entry<String, JsonNode> entry : userRestrictionsMap.entrySet()) {
+            userRestrictions.set(entry.getKey(), entry.getValue());
         }
 
         List<PendingWrite> writes = new ArrayList<>();

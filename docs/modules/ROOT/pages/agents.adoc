@@ -205,8 +205,9 @@ The generated `opencode.json` uses OpenCode's permission model with rule-order p
 Wildcard fallbacks (`camel_*: "ask"`, `camel-knowledge_*: "ask"`, `citrus_*: "ask"` when enabled) ensure any unlisted tools require approval,
 while exact `"allow"` permissions for each MCP tool listed in the workflow manifest follow
 (e.g., `camel_camel_catalog_component_doc`, `camel-knowledge_camel_docs_search`, `citrus_citrus_catalog_actions`).
-By default, 38 tools are granted (33 from `camel`, 5 from `camel-knowledge`); with `--with-citrus-mcp`, 46 tools are granted
-(adding 8 from `citrus`). These tools are read-only operations (catalog lookups, documentation search, route validation,
+By default, 38 tools are explicitly granted exact `"allow"` permissions (33 from `camel`, 5 from `camel-knowledge`);
+with `--with-citrus-mcp`, 46 tools receive exact grants (adding 8 from `citrus`).
+These tools are read-only operations (catalog lookups, documentation search, route validation,
 migration analysis, test actions) with no file writes or shell execution, making them safe to allow without user approval.
 
 OpenCode matches permission rules in declaration order. Wildcard rules must appear first so that exact grants can override them.
@@ -297,7 +298,7 @@ v1 mode-rule files.
 
 == Claude MCP approvals
 
-Fresh and regenerated Claude workspaces pre-approve only the explicit MCP tools listed in the workflow manifest. Other server tools remain visible and require Claude Code permission. Regenerate older workspaces to replace server-wide wildcard grants; review user-level settings separately. The generated Read and Maven command grants retain their existing behavior.
+Fresh and regenerated Claude workspaces pre-approve only the explicit MCP tools listed in the workflow manifest. Other server tools remain visible and require Claude Code permission. Regenerate older workspaces to replace overly-broad wildcard grants; review user-level settings separately. The generated Read and Maven command grants retain their existing behavior.
 
 == Generated path checks
 

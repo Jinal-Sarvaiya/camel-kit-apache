@@ -8,6 +8,7 @@ import java.util.Map;
 import java.util.Properties;
 
 import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -119,10 +120,17 @@ public final class TargetPomCheck {
     }
 
     private static String resolvedCore(Model model, byte[] tree) throws IOException {
-        JsonNode root = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
-                .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(tree);
+        String expected = "Expected dependency:tree JSON for the destination module. "
+                          + "Use Maven Dependency Plugin 3.7.0 or later with -DoutputType=json.";
+        JsonNode root;
+        try {
+            root = new ObjectMapper().enable(JsonParser.Feature.STRICT_DUPLICATE_DETECTION)
+                    .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).readTree(tree);
+        } catch (JsonProcessingException e) {
+            throw new IOException(expected, e);
+        }
         if (root == null || !root.isObject()) {
-            throw new IOException("Expected dependency:tree JSON for the destination module");
+            throw new IOException(expected);
         }
         requireVersion("dependency tree groupId", model.getGroupId(), root.path("groupId").textValue());
         requireVersion("dependency tree artifactId", model.getArtifactId(), root.path("artifactId").textValue());

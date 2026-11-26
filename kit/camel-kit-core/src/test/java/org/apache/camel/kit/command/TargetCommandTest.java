@@ -50,27 +50,23 @@ class TargetCommandTest {
 
     @Test
     void mainAcceptsEvidenceInTheDocumentedShape() throws Exception {
-        execute(0, "init", dir.toString(), "--ai", "claude", "--no-fetch",
-                "-p", "camel.main.version=4.99.1", "-p", "camel.mcp.version=4.99.2",
-                "-p", "maven.dependency.plugin.version=3.99.1",
-                "-p", "camel.catalog.repos=https://repo.maven.apache.org/maven2/");
-        assertTrue(Files.readString(dir.resolve(".mcp.json")).contains("camel-jbang-mcp:4.99.2"));
-        Path skills = dir.resolve(".claude/skills");
-        assertTrue(Files.readString(skills.resolve("camel-brainstorm/guides/version-selection.md"))
-                .contains("maven-dependency-plugin:3.99.1:tree"));
-        String guide = Files.readString(skills.resolve("shared/mcp-setup.md"));
+        execute(0, "init", dir.toString(), "--ai", "claude", "--no-fetch");
+        String guide = Files.readString(dir.resolve(".claude/skills/shared/mcp-setup.md"));
         String example = guide.substring(guide.indexOf("### Rule 3:"));
         int start = example.indexOf("```json") + 7;
         ObjectNode wire = (ObjectNode) JSON.readTree(example.substring(start, example.indexOf("```", start)));
-        assertEquals(JSON.readTree(run(0)), wire.get("profile"));
-        ((ObjectNode) wire.at("/list/result/content/0")).put("text",
-                """
-                        {"camelVersion":"4.99.1","components":[{"name":"timer"}],"count":1}
-                        """);
-        ((ObjectNode) wire.at("/maven/result/content/0")).put("text",
-                """
-                        {"name":"timer","groupId":"org.apache.camel","artifactId":"camel-timer","version":"4.99.1"}
-                        """);
+        var profile = JSON.readTree(run(0));
+        // The example repository list is illustrative. Use the repositories configured in this workspace.
+        ((ObjectNode) wire.get("profile")).set("repositories", profile.get("repositories"));
+        assertEquals(profile, wire.get("profile"));
+
+        String core = profile.get("camelVersion").asText();
+        var list = JSON.createObjectNode().put("camelVersion", core).put("count", 1);
+        list.putArray("components").addObject().put("name", "timer");
+        var artifact = JSON.createObjectNode().put("name", "timer").put("groupId", "org.apache.camel")
+                .put("artifactId", "camel-timer").put("version", core);
+        ((ObjectNode) wire.at("/list/result/content/0")).put("text", list.toString());
+        ((ObjectNode) wire.at("/maven/result/content/0")).put("text", artifact.toString());
         Path file = dir.resolve("evidence.json");
         JSON.writeValue(file.toFile(), wire);
         run(0, "--check-catalog", file.toString());
@@ -135,6 +131,10 @@ class TargetCommandTest {
         Files.writeString(dir.resolve("catalog"), "{}");
         assertTrue(run(1, "--check-effective-pom", "model", "--dependency-tree", "tree", "--check-catalog", "catalog")
                 .contains("Catalog evidence"));
+        Files.writeString(dir.resolve("tree"), "example:app:jar:1");
+        String textTree = run(1, "--check-effective-pom", "model", "--dependency-tree", "tree");
+        assertTrue(textTree.contains("Expected dependency:tree JSON"));
+        assertTrue(textTree.contains("Maven Dependency Plugin 3.7.0 or later with -DoutputType=json"));
         Files.writeString(dir.resolve("tree"), tree.replace("example", "other"));
         assertTrue(run(1, "--check-effective-pom", "model", "--dependency-tree", "tree").contains("tree groupId"));
         Files.writeString(dir.resolve("tree"), tree.replace("compile", "test"));

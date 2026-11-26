@@ -32,6 +32,7 @@ asciidoc:
     camel-cli-version: 4.24.0-SNAPSHOT
     camel-quarkus-version: 4.18.3
     quarkus-platform-version: 3.33.3.2
+    maven-dependency-plugin-version: 3.8.1
     forage-version: 1.6.1
     citrus-version: 5.0.1
     pi-version: 0.84.2

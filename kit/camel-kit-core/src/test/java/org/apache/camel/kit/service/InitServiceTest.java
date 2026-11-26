@@ -517,6 +517,25 @@ class InitServiceTest {
     }
 
     @Test
+    void propagatesIndependentDistributionOverridesToTheLauncherAndInstalledGuides() throws Exception {
+        Path targetDir = tempDir.resolve("orders");
+        Properties overrides = new Properties();
+        overrides.setProperty("camel.main.version", "4.99.1");
+        overrides.setProperty("camel.mcp.version", "4.99.2");
+        overrides.setProperty("maven.dependency.plugin.version", "3.99.1");
+        DistributionConfig distribution = DistributionConfig.load(overrides);
+        new InitService().initialize(request(targetDir, "claude", distribution.citrusVersion(), distribution,
+                InitProgress.noop(), InitReporter.noop()));
+
+        assertTrue(Files.readString(targetDir.resolve(".mcp.json")).contains("camel-jbang-mcp:4.99.2"));
+        Path skills = targetDir.resolve(".claude/skills");
+        assertTrue(Files.readString(skills.resolve("shared/mcp-setup.md"))
+                .contains("org.apache.camel:camel-catalog:4.99.1"));
+        assertTrue(Files.readString(skills.resolve("camel-brainstorm/guides/version-selection.md"))
+                .contains("maven-dependency-plugin:3.99.1:tree"));
+    }
+
+    @Test
     void explicitCitrusMcpVersionOverrideIsUsedWithCustomCitrusVersion() throws Exception {
         Path targetDir = tempDir.resolve("orders");
         Properties properties = new Properties();

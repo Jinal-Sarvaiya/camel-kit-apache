@@ -206,6 +206,7 @@ Any property from `distribution.properties` can be overridden at layers 2 or 3. 
 | `springboot.bom.version` | `4.22.1` | Spring Boot BOM version |
 | `camel.quarkus.version` | `4.18.3` | Apache Camel version for Quarkus projects |
 | `quarkus.platform.version` | `3.33.3.2` | Quarkus platform BOM version |
+| `maven.dependency.plugin.version` | See `distribution.properties` | Maven Dependency Plugin version used to recover a BOM-only application's Camel core from a JSON dependency tree |
 | `camel.mcp.version` | See `distribution.properties` | Camel MCP server version |
 | `knowledge.mcp.group-id` | `io.github.luigidemasi` | Group of the pinned Knowledge runner; use `org.apache.camel` with migrated builds |
 | `knowledge.mcp.version` | `0.0.2` | Knowledge MCP server version |

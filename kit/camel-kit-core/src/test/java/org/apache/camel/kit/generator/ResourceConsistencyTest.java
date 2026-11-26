@@ -169,6 +169,16 @@ class ResourceConsistencyTest {
     Path tempDir;
 
     @Test
+    void websiteCoreRecoveryUsesTheBundledDependencyPluginVersion() throws IOException {
+        Path docs = repositoryRoot().resolve("docs");
+        String version = DistributionConfig.loadBundled().mavenDependencyPluginVersion();
+        assertTrue(Files.readAllLines(docs.resolve("antora.yml")).stream().map(String::strip)
+                .anyMatch(("maven-dependency-plugin-version: " + version)::equals));
+        assertTrue(Files.readString(docs.resolve("modules/ROOT/pages/existing-project.adoc"))
+                .contains("org.apache.maven.plugins:maven-dependency-plugin:{maven-dependency-plugin-version}:tree"));
+    }
+
+    @Test
     void catalogGuidesUseDistributionVersionsOrObservedResults() throws IOException {
         Path skills = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
         Pattern literalVersion = Pattern.compile("\\b\\d+\\.\\d+\\.\\d+\\b");

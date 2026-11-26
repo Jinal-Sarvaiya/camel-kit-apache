@@ -174,15 +174,14 @@ A starter or platform BOM can have a different version from Camel core. If init 
 determine the core, it sets `project.needsResolvedCore=true`. Use the application's Maven settings and
 profiles. From the workspace root, run the following for each Camel application module, replacing `app/pom.xml`
 with its POM. For a vendor Spring Boot BOM, first set `project.catalogBom` to the published catalog provider
-GAV from its starter release metadata. Use fresh output paths for each module. The tree goal requires a Maven
-Dependency Plugin with JSON support. If the project uses an older plugin, use the fully qualified goal in the
-installed `camel-brainstorm/guides/version-selection.md`. Init renders that goal from the distribution’s
-`maven.dependency.plugin.version` setting.
+GAV from its starter release metadata. Use fresh output paths for each module. The example selects a JSON-capable
+Dependency Plugin explicitly because older Maven releases can default to plain text. If you override
+`maven.dependency.plugin.version`, use the goal from the installed `camel-brainstorm/guides/version-selection.md`.
 
-[source,shell]
+[source,shell,subs="attributes+"]
 ----
 ./mvnw -f app/pom.xml help:effective-pom -Doutput="$PWD/app/target/model.xml"
-./mvnw -f app/pom.xml dependency:tree -DoutputType=json -Dincludes=org.apache.camel:camel-core-engine -DoutputFile="$PWD/app/target/tree.json"
+./mvnw -f app/pom.xml org.apache.maven.plugins:maven-dependency-plugin:{maven-dependency-plugin-version}:tree -DoutputType=json -Dincludes=org.apache.camel:camel-core-engine -DoutputFile="$PWD/app/target/tree.json"
 camel-kit target --check-effective-pom app/target/model.xml --dependency-tree app/target/tree.json
 ----
 

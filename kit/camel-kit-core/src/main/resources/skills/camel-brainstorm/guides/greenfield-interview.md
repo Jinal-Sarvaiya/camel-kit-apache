@@ -414,7 +414,7 @@ Load `camel-design/guides/datamapper-interview.md` and `shared/datamapper-canoni
 
 Record: `flow.datamapper.mappings[]`
 
-After completing DataMapper (or noting deferred mappings), return to Question 9.
+After completing DataMapper (or noting deferred mappings), continue to Question 9 (Error Handling).
 
 ### Question 9: Error Handling (per flow)
 

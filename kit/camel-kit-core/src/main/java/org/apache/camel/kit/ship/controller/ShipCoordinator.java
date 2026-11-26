@@ -978,6 +978,26 @@ public final class ShipCoordinator {
                             .append(attempt.run().pipelineId())
                             .append(".\n");
                 }
+                prompt.append("For each integration boundary (source and destination), establish the ")
+                        .append("interface contract status separately. Ask one boundary at a time. ")
+                        .append("Analyze supplied material first—check if the user already provided ")
+                        .append("OpenAPI, AsyncAPI, WSDL, JSON Schema, XSD, or documented message contract. ")
+                        .append("If found, read it, extract constraints, record status as \"existing\", ")
+                        .append("and skip the question for that boundary. ")
+                        .append("Four possible statuses: ")
+                        .append("(1) existing—request artifact, type, constraints; read and establish schema version, ")
+                        .append("required vs. optional fields, data type constraints, breaking vs. non-breaking policies; ")
+                        .append("(2) pending—record dependency, note field-level decisions remain open, do not invent placeholder, ")
+                        .append("defer DataMapper or transformations that depend on this contract; ")
+                        .append("(3) designed—propose contract based on requirements, include in design spec for approval, ")
+                        .append("only for user-controlled endpoints, never redesign external interfaces; ")
+                        .append("(4) not-applicable—record rationale, no further action. ")
+                        .append("Capture separately for source and destination: status, artifact, type, constraints, dependencies. ")
+                        .append("For conditional routing, record one contract per distinct target. ")
+                        .append("Record all findings in the report field. Record every unresolved contract question ")
+                        .append("in unansweredQuestions with the default applied or null if none. ")
+                        .append("Use the grouped report structure: analyzed material, established contracts, ")
+                        .append("pending contracts, designed contracts, not-applicable contracts.\n");
             }
             case DESIGN -> prompt.append(
                     "Produce the complete Camel integration design. "

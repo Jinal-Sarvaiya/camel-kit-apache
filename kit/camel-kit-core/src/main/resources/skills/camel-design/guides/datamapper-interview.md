@@ -270,4 +270,4 @@ The shared guide will:
 
 **Schema-less path:** If source or target has no schema file (Step 2c or 3c selected), the type is still `JSON_SCHEMA` or `XML_SCHEMA` (based on the data format) — the schema path is `"none"`. Pass the manually described field names and types. The shared guide will compute XPaths from the field paths without needing schema files. Only use `Primitive` if the data is a truly scalar value (single string, number, or boolean).
 
-**When done:** return control to `camel-brainstorm` and continue at Question 9 (Error Handling).
+**When done:** return control to the calling guide. The calling guide determines the next step.

@@ -508,14 +508,21 @@ Fix any issues inline.
 
 1. Review the interview record for any deferred mappings with reason: "depends on [source/destination] contract design approval"
 2. For each deferred mapping:
-   - The proposed contract is now in the design spec (Section 3 flow designs)
-   - Load `camel-design/guides/datamapper-interview.md` with the proposed contract as the artifact
-   - Collect the field mapping against the proposed schema
-   - Insert the completed mapping into the design spec before approval
+   - **Recheck that BOTH endpoints are now ready** using Q7a's readiness rule:
+     - Proceed if BOTH source and destination allow mapping (status "existing" with artifact, "designed" with artifact, or "not-applicable")
+     - Keep the mapping deferred if EITHER endpoint still requires deferral (status "pending" or "designed" without artifact yet)
+   - For mappings where both endpoints are now ready:
+     - The proposed contract is now in the design spec (Section 3 flow designs)
+     - Load `camel-design/guides/datamapper-interview.md` with the proposed contract as the artifact
+     - Collect the field mapping against the proposed schema
+     - Insert the completed mapping into the design spec before approval
+   - For mappings still deferred (e.g., pending source, designed destination):
+     - Leave the mapping deferred and note the remaining dependency in the spec
 
 This ensures:
 - User approves both the proposed contract AND the mapping that uses it
-- Implementation has the complete canonical mapping section
+- Mappings with unresolved dependencies remain deferred until all contracts are available
+- Implementation has the complete canonical mapping section for resolved mappings
 - No transformations are lost due to missing mapping sections
 
 If no mappings were deferred for designed contracts, skip this step and proceed to present the spec.

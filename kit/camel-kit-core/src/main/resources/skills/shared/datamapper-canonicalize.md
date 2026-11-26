@@ -303,9 +303,10 @@ Omit the Collection Mappings section if there are no collection mappings.
 
 ## Step 6: Return Control
 
-**When done:** return control to the calling guide.
+**When done:** return control to the calling guide. The calling guide determines the next step.
 
-- If called from `datamapper-interview.md`: return to `camel-brainstorm` at Question 9 (Error Handling).
+- If called from `datamapper-interview.md` during greenfield interview (Q7a): the interview continues at Question 9 (Error Handling).
+- If called from `datamapper-interview.md` during design assembly: control returns to design assembly to collect the mapping.
 - If called from `datamapper-migrate.md`: return to `camel-migrate-mule` Step 2.3.
 
 ---
@@ -444,7 +445,8 @@ Omit the Collection Mappings section if there are no collection mappings.
 
 ## Step 4G: Return Control
 
-**When done:** return control to the calling guide.
+**When done:** return control to the calling guide. The calling guide determines the next step.
 
-- If called from `datamapper-interview.md`: return to `camel-brainstorm` at Question 9 (Error Handling).
+- If called from `datamapper-interview.md` during greenfield interview (Q7a): the interview continues at Question 9 (Error Handling).
+- If called from `datamapper-interview.md` during design assembly: control returns to design assembly to collect the mapping.
 - If called from `datamapper-migrate.md`: return to `camel-migrate-mule` Step 2.3.

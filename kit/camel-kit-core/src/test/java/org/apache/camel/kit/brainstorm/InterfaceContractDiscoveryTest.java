@@ -180,9 +180,9 @@ class InterfaceContractDiscoveryTest {
                 || q7aSection.contains("not already available"),
                 "Question 7a must ask only for information not already in contract artifacts");
 
-        // Must return to Question 9
-        assertTrue(q7aSection.contains("return to Question 9"),
-                "Question 7a must explicitly return to Question 9 after completion");
+        // Must continue to Question 9 after DataMapper returns
+        assertTrue(q7aSection.contains("continue to Question 9"),
+                "Question 7a must continue to Question 9 after DataMapper returns control");
     }
 
     @Test
@@ -238,9 +238,12 @@ class InterfaceContractDiscoveryTest {
 
         String content = Files.readString(canonicalizePath);
 
-        // Must return to Question 9, not Question 8
-        assertTrue(content.contains("return to `camel-brainstorm` at Question 9"),
-                "DataMapper canonicalize must return to Question 9");
+        // Must return to calling guide, and when called from greenfield interview, continues to Q9
+        assertTrue(content.contains("return control to the calling guide"),
+                "DataMapper canonicalize must return control to the calling guide");
+
+        assertTrue(content.contains("greenfield interview") && content.contains("Question 9"),
+                "DataMapper canonicalize must specify that greenfield interview continues to Question 9");
 
         assertFalse(content.contains("return to `camel-brainstorm` at Question 8"),
                 "DataMapper canonicalize must NOT return to Question 8");
@@ -504,7 +507,7 @@ class InterfaceContractDiscoveryTest {
     }
 
     @Test
-    @DisplayName("DataMapper final exit must return to Q9")
+    @DisplayName("DataMapper final exit must return to calling guide")
     void testDataMapperFinalExitReturnsToQ9() throws Exception {
         Path datamapperPath = Path.of("src/main/resources/skills/camel-design/guides/datamapper-interview.md");
         String content = Files.readString(datamapperPath);
@@ -515,9 +518,9 @@ class InterfaceContractDiscoveryTest {
 
         String whenDoneSection = content.substring(whenDoneIndex, Math.min(content.length(), whenDoneIndex + 200));
 
-        // Must return to Q9, not Q8
-        assertTrue(whenDoneSection.contains("Question 9"),
-                "DataMapper 'When done' instruction must return to Question 9");
+        // Must return to calling guide
+        assertTrue(whenDoneSection.contains("calling guide"),
+                "DataMapper 'When done' instruction must return to calling guide");
         assertFalse(whenDoneSection.contains("Question 8"),
                 "DataMapper 'When done' instruction must NOT return to Question 8");
     }
@@ -697,24 +700,68 @@ class InterfaceContractDiscoveryTest {
         int step3bIndex = content.indexOf("## Step 3b:");
         String step3Section = content.substring(step3Index, step3bIndex);
 
-        // Must describe unique path generation
-        assertTrue(step3Section.contains("Unique path") || step3Section.contains("unique path"),
-                "Step 3 must describe unique path generation for target schemas");
+        // Must have template with branch identifier placeholder
+        assertTrue(step3Section.contains("{flow-name}-{branch-identifier}-target"),
+                "Step 3 must specify filename template with branch identifier placeholder");
 
         // Must handle conditional routing with branch identifiers
         assertTrue(step3Section.contains("Conditional routing") || step3Section.contains("multiple branches"),
                 "Step 3 must handle conditional routing case");
 
-        assertTrue(step3Section.contains("branch-identifier") || step3Section.contains("branch identifier"),
-                "Step 3 must use branch identifier in filenames");
-
         // Must prevent overwriting
         assertTrue(step3Section.contains("prevent overwriting") || step3Section.contains("gets its own file"),
                 "Step 3 must prevent one branch's schema from overwriting another's");
 
-        // Must give example with multiple distinct filenames
-        assertTrue(step3Section.contains("billing") && step3Section.contains("warehouse"),
-                "Step 3 must show example with distinct branch filenames");
+        // Must show actual distinct complete filenames in examples
+        assertTrue(step3Section.contains("orders-billing-target.schema.json")
+                && step3Section.contains("orders-warehouse-target.schema.json"),
+                "Step 3 must show billing and warehouse examples with complete distinct filenames");
+
+        // Verify they are different paths (not accidentally the same)
+        int billingIndex = step3Section.indexOf("orders-billing-target.schema.json");
+        int warehouseIndex = step3Section.indexOf("orders-warehouse-target.schema.json");
+        assertTrue(billingIndex >= 0 && warehouseIndex >= 0 && billingIndex != warehouseIndex,
+                "billing and warehouse must be distinct paths at different positions");
+    }
+
+    @Test
+    @DisplayName("Ship DISCOVERY task must contain contract rules in issued prompt")
+    void testShipDiscoveryPromptContainsRules() throws Exception {
+        Path shipCoordinatorPath = Path.of(SHIP_COORDINATOR_PATH);
+        String content = Files.readString(shipCoordinatorPath);
+
+        // Find the prompt() method DISCOVERY case
+        int promptMethodIndex = content.indexOf("private String prompt(");
+        int discoveryIndex = content.indexOf("case DISCOVERY ->", promptMethodIndex);
+        int designIndex = content.indexOf("case DESIGN ->", discoveryIndex);
+
+        assertTrue(discoveryIndex > 0 && designIndex > discoveryIndex,
+                "Ship prompt method must have DISCOVERY case");
+
+        String discoveryCase = content.substring(discoveryIndex, designIndex);
+
+        // Must have contract rules in the DISCOVERY task itself, not just briefing
+        assertTrue(discoveryCase.contains("interface contract"),
+                "DISCOVERY task must mention interface contract");
+
+        assertTrue(discoveryCase.contains("existing") && discoveryCase.contains("pending")
+                && discoveryCase.contains("designed") && discoveryCase.contains("not-applicable"),
+                "DISCOVERY task must list all four contract statuses");
+
+        assertTrue(discoveryCase.contains("prompt.append") && discoveryCase.contains("boundary"),
+                "DISCOVERY task must append contract boundary rules to prompt");
+
+        // Must reference report and unansweredQuestions structure
+        assertTrue(discoveryCase.contains("report") && discoveryCase.contains("unansweredQuestions"),
+                "DISCOVERY task must specify where to record contract findings");
+
+        // Verify these rules are in the issued prompt, not in briefing() method
+        int briefingMethodIndex = content.indexOf("private Path briefing(");
+        int promptMethodEndIndex = content.indexOf("private", promptMethodIndex + 1);
+
+        // Rules should be in prompt() method range, not before it
+        assertTrue(discoveryIndex > promptMethodIndex && discoveryIndex < promptMethodEndIndex,
+                "Contract rules must be in prompt() method (issued task), not just briefing");
     }
 
 }

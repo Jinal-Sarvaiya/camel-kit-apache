@@ -82,7 +82,7 @@ Guides under `skills/shared/` are loaded by several skills, so one guide serves 
 |===
 | Guide | Purpose
 
-| `iron-laws.md` | The six pipeline process rules
+| `iron-laws.md` | The seven pipeline process rules
 | `context-authority.md` | Data versus instruction authority for every loaded context, response and handoff
 | `camel-security-checklist.md` | Camel security rules, detection patterns and fix snippets for design, validation and review
 | `mcp-setup.md` | MCP server configuration, version binding rules and fallback policy

@@ -33,7 +33,7 @@ class CrossLinkerTest {
         graph.addEdge(new GraphEdge("route:routeA", "endpoint:direct:foo", EdgeType.ROUTES_TO, Map.of()));
         graph.addEdge(new GraphEdge("route:routeB", "endpoint:direct:foo", EdgeType.ROUTES_FROM, Map.of()));
         new CrossLinker().link(graph);
-        List<GraphEdge> links = graph.getEdges().stream().filter(e -> e.type() == EdgeType.LINKS_TO).toList();
+        List<GraphEdge> links = graph.getEdges().stream().filter(e -> e.type().equals(EdgeType.LINKS_TO)).toList();
         assertEquals(1, links.size());
     }
 
@@ -48,7 +48,7 @@ class CrossLinkerTest {
         graph.addEdge(new GraphEdge("route:routeA", "endpoint:seda:queue", EdgeType.ROUTES_TO, Map.of()));
         graph.addEdge(new GraphEdge("route:routeB", "endpoint:seda:queue", EdgeType.ROUTES_FROM, Map.of()));
         new CrossLinker().link(graph);
-        List<GraphEdge> links = graph.getEdges().stream().filter(e -> e.type() == EdgeType.LINKS_TO).toList();
+        List<GraphEdge> links = graph.getEdges().stream().filter(e -> e.type().equals(EdgeType.LINKS_TO)).toList();
         assertEquals(1, links.size());
     }
 
@@ -63,7 +63,7 @@ class CrossLinkerTest {
         graph.addEdge(new GraphEdge("route:r1", "endpoint:kafka:topic", EdgeType.ROUTES_FROM, Map.of()));
         new CrossLinker().link(graph);
         List<GraphEdge> usesComponent
-                = graph.getEdges().stream().filter(e -> e.type() == EdgeType.USES_COMPONENT).toList();
+                = graph.getEdges().stream().filter(e -> e.type().equals(EdgeType.USES_COMPONENT)).toList();
         assertEquals(1, usesComponent.size());
         assertEquals("maven:org.apache.camel:camel-kafka", usesComponent.get(0).to());
     }
@@ -76,7 +76,8 @@ class CrossLinkerTest {
         graph.addNode(new GraphNode(
                 "endpoint:kafka:topic", NodeType.CAMEL_ENDPOINT, Map.of("uri", "kafka:topic", "scheme", "kafka")));
         new CrossLinker().link(graph);
-        List<GraphEdge> configures = graph.getEdges().stream().filter(e -> e.type() == EdgeType.CONFIGURES).toList();
+        List<GraphEdge> configures
+                = graph.getEdges().stream().filter(e -> e.type().equals(EdgeType.CONFIGURES)).toList();
         assertEquals(1, configures.size());
     }
 
@@ -104,7 +105,7 @@ class CrossLinkerTest {
         new CrossLinker().expandInterfaces(graph);
 
         var expansion = graph.getOutgoingEdges("class:com.example.OrderRoute").stream()
-                .filter(e -> e.type() == EdgeType.DEPENDS_ON_VIA_INTERFACE)
+                .filter(e -> e.type().equals(EdgeType.DEPENDS_ON_VIA_INTERFACE))
                 .toList();
         assertEquals(1, expansion.size());
         assertEquals("class:com.example.OrderServiceImpl", expansion.get(0).to());
@@ -127,7 +128,7 @@ class CrossLinkerTest {
         new CrossLinker().expandInterfaces(graph);
 
         var expansions = graph.getOutgoingEdges("class:Consumer").stream()
-                .filter(e -> e.type() == EdgeType.DEPENDS_ON_VIA_INTERFACE)
+                .filter(e -> e.type().equals(EdgeType.DEPENDS_ON_VIA_INTERFACE))
                 .toList();
         assertEquals(2, expansions.size());
     }

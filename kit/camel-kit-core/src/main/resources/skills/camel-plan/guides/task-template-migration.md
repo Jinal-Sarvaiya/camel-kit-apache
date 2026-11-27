@@ -47,6 +47,7 @@ design is not eligible for Camel Main and must return to runtime selection befor
   - Deprecated API replacements
   - Updated Processor/Exchange interface methods
 - [ ] Adapt package structure to target project
+- [ ] For a new Maven destination use `{COMMAND_PREFIX} target --migration --pom-template`, then check the effective POM against the same profile.
 - [ ] Verify: `./mvnw -f [MODULE_DIR]pom.xml -DskipTests compile` exits 0 with `BUILD SUCCESS`; omit the entire
   `[MODULE_DIR]` prefix when the POM is at the project root
 

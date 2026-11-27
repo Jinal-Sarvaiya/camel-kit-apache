@@ -13,6 +13,7 @@ retains its single CLI invocation with the supplied options.
 
 - [CLI Commands](#cli-commands)
   - [camel-kit init](#camel-kit-init)
+  - [camel-kit target](#camel-kit-target)
   - [camel-kit doctor](#camel-kit-doctor)
   - [camel-kit graph](#camel-kit-graph)
   - [camel-kit doc](#camel-kit-doc)
@@ -205,6 +206,7 @@ Any property from `distribution.properties` can be overridden at layers 2 or 3. 
 | `springboot.bom.version` | `4.22.1` | Spring Boot BOM version |
 | `camel.quarkus.version` | `4.18.3` | Apache Camel version for Quarkus projects |
 | `quarkus.platform.version` | `3.33.3.2` | Quarkus platform BOM version |
+| `maven.dependency.plugin.version` | See `distribution.properties` | Maven Dependency Plugin version used to recover a BOM-only application's Camel core from a JSON dependency tree |
 | `camel.mcp.version` | See `distribution.properties` | Camel MCP server version |
 | `knowledge.mcp.group-id` | `io.github.luigidemasi` | Group of the pinned Knowledge runner; use `org.apache.camel` with migrated builds |
 | `knowledge.mcp.version` | `0.0.2` | Knowledge MCP server version |
@@ -260,6 +262,15 @@ For OpenAI Codex CLI, Camel-Kit generates `AGENTS.md`, native project skills und
 For GitHub Copilot CLI, Camel-Kit also generates `.github/copilot-instructions.md`, project skills under `.github/skills/`, custom agents under `.github/agents/`, and a conservative `.github/hooks/camel-kit-safety.json` hook that denies destructive or secret-sensitive shell commands while leaving normal Copilot permission prompts intact. Copilot users should start by asking Copilot to "Use the `/camel-start` skill." Run `/skills list` to inspect available project skills.
 
 For Pi, Camel-Kit generates `AGENTS.md`, project skills under `.pi/skills/`, prompt templates under `.pi/prompts/`, `.mcp.json` for `pi-mcp-adapter`, and `.pi/extensions/camel-kit-guard.ts` plus a JSON guard policy. Install the adapter with `pi install npm:pi-mcp-adapter@2.11.0`, trust the project with `/trust`, then run `/skill:camel-start`. Headless checks must use `pi -a`.
+
+### camel-kit target
+
+`camel-kit target` prints the current application profile as JSON. Add `--migration` to use the destination
+selected in `target.*` in the workspace configuration. Use `--project-dir` to select the workspace.
+`--pom-template` prints the Maven template with runtime coordinates filled in. To check a generated
+application, supply `--check-effective-pom <xml>`, `--check-catalog <json>`, or both. For a transitive core
+dependency, add `--dependency-tree <json>` from the same Maven module to the effective-POM check. Keep all evidence inside the workspace. Incomplete checks exit with status 1. Invalid option combinations exit with status 2. The Camel JBang plugin exposes the same options under
+`camel kit target`. See [target selection](modules/ROOT/pages/migration.adoc#target-profile).
 
 ### camel-kit doctor
 
@@ -334,7 +345,8 @@ camel-kit graph <subcommand> [options]
 | Subcommand | Description |
 |------------|-------------|
 | `generate [--require-parser <id>]` | Rebuild the graph. A required migration parser must be available in the distribution. |
-| `stats` | Show graph statistics (node counts by type, edge counts by type) |
+| `stats` | Show node and edge totals and node counts by type. |
+| `analyze <namespace>` | Run the selected graph adapter. A missing adapter exits with status 1. |
 | `find <query>` | Find nodes by name, type, or pattern |
 | `neighbors <nodeId>` | Show direct neighbors of a node |
 | `impact <nodeId>` | Show all downstream dependencies of a node |
@@ -1230,5 +1242,5 @@ Standalone Ship preserves literal `@` values. The new plugin follows Camel's arg
 `--text @@literal` or `--text=@literal` to pass `@literal`; shell quotes alone do not prevent expansion.
 An unescaped missing file produces `Argument file not found` and exit code 2 before Kit runs.
 Development Kit and Knowledge require Java 21 or later.
-Use `-h`/`--help` on the root, `init`, `doctor` or `ship`, and the `help` subcommand for `doc`, `graph` and `plan`.
+Use `-h`/`--help` on the root, `init`, `doctor`, `target` or `ship`, and the `help` subcommand for `doc`, `graph` and `plan`.
 Use root `-V`/`--version` for the Kit artifact version.

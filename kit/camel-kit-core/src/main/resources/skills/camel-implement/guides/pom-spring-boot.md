@@ -8,7 +8,7 @@
 ## Existing Projects: Never Replace the POM
 
 <HARD-RULE>
-If `.camel-kit/config.properties` has `project.type=existing`, the project already owns its `pom.xml`. Do NOT copy the
+When adding to an existing application, if `.camel-kit/config.properties` has `project.type=existing`, the project already owns its `pom.xml`. Do NOT copy the
 template over it, do NOT replace its placeholders, and do NOT change its parent, BOMs, plugins, Camel version, platform
 BOM version or Spring Boot version. Skip "POM Template File" below entirely.
 
@@ -24,15 +24,9 @@ version table. If the dependency cannot be added without changing a locked versi
 ## POM Template File
 
 <HARD-RULE>
-Do NOT generate the POM from scratch. Read the literal template file `templates/pom-spring-boot.xml` and COPY it to `pom.xml`. Then replace ONLY these placeholders:
-- `[PROJECT_GROUP_ID]` — from design spec
-- `[PROJECT_ARTIFACT_ID]` — from design spec
-- `[PROJECT_VERSION]` — from design spec
-- `[PROJECT_NAME]` — from design spec
-- `[PLATFORM_BOM_VERSION]` — from design spec header `platformBomVersion` field
-- `[SPRING_BOOT_VERSION]` — from `.camel-kit/config.properties` key `project.springBootVersion`
-
-Do NOT modify any other values. The template already contains the correct groupId (`org.apache.camel.springboot`), artifactId, and plugin configuration. Then add project-specific dependencies in the DEPENDENCIES section.
+Use `{COMMAND_PREFIX} target --pom-template` (add `--migration` for a migration destination). Only
+fill in `[PROJECT_GROUP_ID]`, `[PROJECT_ARTIFACT_ID]`, `[PROJECT_VERSION]` and `[PROJECT_NAME]` in its output.
+Add dependencies from the approved design. Verify the effective model as described in `maven-dependencies.md`.
 </HARD-RULE>
 
 ## Reference
@@ -56,78 +50,12 @@ Do NOT use `spring-boot-starter-parent` as a parent POM.
 </parent>
 ```
 
-The `camel-spring-boot-bom` manages ALL dependency versions — both Camel and Spring Boot. A parent POM creates version conflicts.
+The selected application BOM manages starters. The template imports it first, then the Camel core
+BOM for core modules such as `camel-test-spring-junit5` and the Spring Boot dependencies BOM for
+framework starters. These three versions come from the target profile.
 </HARD-RULE>
 
----
-
-## Rule 2: Two Version Properties
-
-Define exactly two version properties:
-
-```xml
-<properties>
-    <camel-spring-boot-version>{CAMEL_SPRINGBOOT_VERSION}</camel-spring-boot-version>
-    <spring-boot-version>{SPRING_BOOT_VERSION}</spring-boot-version>
-</properties>
-```
-
-| Property | Purpose | Naming |
-|----------|---------|--------|
-| `camel-spring-boot-version` | BOM version | Hyphenated, not a generic Camel property name |
-| `spring-boot-version` | Spring Boot Maven plugin version | Hyphenated |
-
-### Version Discovery
-
-<HARD-RULE>
-Read the Spring Boot BOM version from `.camel-kit/config.properties`:
-
-```properties
-project.runtime=spring-boot
-project.camelVersion={CAMEL_SPRINGBOOT_VERSION}
-project.platformBomVersion={SPRINGBOOT_BOM_VERSION}  # <- use THIS value
-project.springBootVersion=<selected mapping value>   # <- plugin version
-```
-
-**Do NOT guess or derive** the Spring Boot BOM version from the Camel version. The correct value is pre-computed by `camel-kit init`.
-Use `project.springBootVersion` for the `spring-boot-maven-plugin` version. Do NOT inspect Maven Central during code
-generation.
-</HARD-RULE>
-
----
-
-## Rule 3: Single BOM in dependencyManagement
-
-```xml
-<dependencyManagement>
-    <dependencies>
-        <dependency>
-            <groupId>org.apache.camel.springboot</groupId>
-            <artifactId>camel-spring-boot-bom</artifactId>
-            <version>${camel-spring-boot-version}</version>
-            <type>pom</type>
-            <scope>import</scope>
-        </dependency>
-    </dependencies>
-</dependencyManagement>
-```
-
-| Field | Value | Notes |
-|-------|-------|-------|
-| groupId | `org.apache.camel.springboot` | Apache Camel community groupId |
-| artifactId | `camel-spring-boot-bom` | Manages Camel + Spring Boot + third-party versions |
-| version | `${camel-spring-boot-version}` | Property from Rule 2 |
-
-This BOM manages versions for:
-- All `org.apache.camel.springboot:camel-*-starter` dependencies
-- All `org.springframework.boot:spring-boot-*` dependencies
-- Common third-party libraries (Jackson, Netty, etc.)
-
-No other BOMs should be necessary for Camel + Spring Boot dependencies.
-
----
-
-## Rule 4: Spring Boot Maven Plugin with Explicit Version
+## Rule 2: Spring Boot Maven Plugin with Explicit Version
 
 Since there is no parent POM, the plugin version MUST be explicit:
 
@@ -154,7 +82,7 @@ The `repackage` goal creates the executable fat JAR. Without it, `java -jar` won
 
 ---
 
-## Rule 5: Jakarta Namespace Only
+## Rule 3: Jakarta Namespace Only
 
 Camel 4.x and Spring Boot 3.x use Jakarta EE 10. Never use `javax.*` packages:
 
@@ -168,95 +96,12 @@ In most cases, you don't need to add Jakarta APIs explicitly — the BOM or Spri
 
 ---
 
-## Complete POM Skeleton
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
-    <modelVersion>4.0.0</modelVersion>
-
-    <!-- NO <parent> element -->
-
-    <groupId>[project-groupId]</groupId>
-    <artifactId>[project-artifactId]</artifactId>
-    <version>[project-version]</version>
-    <packaging>jar</packaging>
-    <name>[Project Name]</name>
-
-    <properties>
-        <camel-spring-boot-version>[discovered-version]</camel-spring-boot-version>
-        <spring-boot-version>[matching-spring-boot-version]</spring-boot-version>
-    </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>org.apache.camel.springboot</groupId>
-                <artifactId>camel-spring-boot-bom</artifactId>
-                <version>${camel-spring-boot-version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
-    <dependencies>
-        <!-- Spring Boot -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter</artifactId>
-        </dependency>
-
-        <!-- Camel -->
-        <dependency>
-            <groupId>org.apache.camel.springboot</groupId>
-            <artifactId>camel-spring-boot-starter</artifactId>
-        </dependency>
-
-        <!-- Add component starters as needed (see maven-dependencies.md) -->
-
-        <!-- Test -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-test</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.apache.camel</groupId>
-            <artifactId>camel-test-spring-junit5</artifactId>
-            <scope>test</scope>
-        </dependency>
-    </dependencies>
-
-    <build>
-        <plugins>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${spring-boot-version}</version>
-                <executions>
-                    <execution>
-                        <goals>
-                            <goal>repackage</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
-</project>
-```
-
----
-
 ## Migration-Specific Notes
 
 When migrating from Fuse/Blueprint/Camel 2.x:
 
 1. **Remove the old parent** — Fuse BOMs, Spring Boot parent, any `org.jboss.fuse` parent
-2. **Remove all FuseSource/JBoss repositories** — they are legacy
+2. **Use the selected repositories** — retain the operator-configured vendor repository when the destination needs it
 3. **Replace component dependencies** — `camel-core` -> `camel-spring-boot-starter`, `camel-blueprint` -> remove (not needed on Spring Boot), `camel-jms` -> `camel-jms-starter`
 4. **Update Java namespace** — `javax.*` -> `jakarta.*` in all source code AND dependencies
 5. **Remove version tags** from dependencies managed by the BOM

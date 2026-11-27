@@ -40,6 +40,7 @@ public class DistributionConfig {
     private final String camelQuarkusSupported;
     private final String citrusVersion;
     private final String camelMcpVersion;
+    private final String mavenDependencyPluginVersion;
     private final String knowledgeMcpVersion;
     private final String knowledgeMcpGroupId;
     private final String citrusMcpVersion;
@@ -66,6 +67,7 @@ public class DistributionConfig {
         this.camelSpringbootSupported = configured(props, bundled, "camel.springboot.supported");
         this.camelQuarkusSupported = configured(props, bundled, "camel.quarkus.supported");
         this.citrusVersion = configured(props, bundled, "citrus.version");
+        this.mavenDependencyPluginVersion = configured(props, bundled, "maven.dependency.plugin.version");
         this.camelMcpVersion = configured(props, bundled, "camel.mcp.version");
         this.knowledgeMcpGroupId = configured(props, bundled, "knowledge.mcp.group-id");
         this.knowledgeMcpVersion = configured(props, bundled, "knowledge.mcp.version");
@@ -73,7 +75,7 @@ public class DistributionConfig {
         this.camelMcpRepos = configured(props, bundled, "camel.mcp.repos");
         this.knowledgeMcpRepos = configured(props, bundled, "knowledge.mcp.repos");
         this.citrusMcpRepos = configured(props, bundled, "citrus.mcp.repos");
-        this.camelCatalogRepos = configured(props, bundled, "camel.catalog.repos");
+        this.camelCatalogRepos = configured(props, bundled, "camel.catalog.repos").strip().replaceAll("\\s*,\\s*", ",");
         this.piVersion = configured(props, bundled, "pi.version");
         requiredProperty(bundled, "pi.supported");
         this.piSupported = props.getProperty("pi.supported", this.piVersion);
@@ -348,6 +350,10 @@ public class DistributionConfig {
 
     public String citrusVersion() {
         return citrusVersion;
+    }
+
+    public String mavenDependencyPluginVersion() {
+        return mavenDependencyPluginVersion;
     }
 
     public String camelMcpVersion() {

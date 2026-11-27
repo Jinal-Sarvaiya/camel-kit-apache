@@ -52,7 +52,7 @@ public class GraphMigrationContextCommand extends GraphQueryCommand {
         // Components: deduplicated schemes from CAMEL_ENDPOINT nodes
         Set<String> components = new TreeSet<>();
         for (GraphNode node : expanded) {
-            if (node.type() == NodeType.CAMEL_ENDPOINT) {
+            if (node.type().equals(NodeType.CAMEL_ENDPOINT)) {
                 String scheme = node.properties().get("scheme");
                 if (scheme == null) {
                     String uri = node.properties().getOrDefault("uri", "");
@@ -72,7 +72,7 @@ public class GraphMigrationContextCommand extends GraphQueryCommand {
         // Routes: all CAMEL_ROUTE nodes
         ArrayNode routesArray = root.putArray("routes");
         for (GraphNode node : expanded) {
-            if (node.type() == NodeType.CAMEL_ROUTE) {
+            if (node.type().equals(NodeType.CAMEL_ROUTE)) {
                 ObjectNode routeJson = GraphJsonWriter.createObject();
                 routeJson.put("id", node.id());
                 routeJson.put("from", node.properties().getOrDefault("fromUri", ""));
@@ -84,7 +84,7 @@ public class GraphMigrationContextCommand extends GraphQueryCommand {
         // Services: CLASS nodes with bean=true
         ArrayNode servicesArray = root.putArray("services");
         for (GraphNode node : expanded) {
-            if (node.type() == NodeType.CLASS && "true".equals(node.properties().get("bean"))) {
+            if (node.type().equals(NodeType.CLASS) && "true".equals(node.properties().get("bean"))) {
                 ObjectNode serviceJson = GraphJsonWriter.createObject();
                 serviceJson.put("class", node.properties().getOrDefault("fqn", node.id()));
                 serviceJson.put("bean", true);
@@ -96,7 +96,7 @@ public class GraphMigrationContextCommand extends GraphQueryCommand {
         // Artifacts: MAVEN_ARTIFACT nodes
         ArrayNode artifactsArray = root.putArray("artifacts");
         for (GraphNode node : expanded) {
-            if (node.type() == NodeType.MAVEN_ARTIFACT) {
+            if (node.type().equals(NodeType.MAVEN_ARTIFACT)) {
                 ObjectNode artifactJson = GraphJsonWriter.createObject();
                 artifactJson.put("groupId", node.properties().getOrDefault("groupId", ""));
                 artifactJson.put("artifactId", node.properties().getOrDefault("artifactId", ""));
@@ -108,7 +108,7 @@ public class GraphMigrationContextCommand extends GraphQueryCommand {
         // Properties: CONFIG_PROPERTY nodes with their outgoing edge types
         ArrayNode propertiesArray = root.putArray("properties");
         for (GraphNode node : expanded) {
-            if (node.type() == NodeType.CONFIG_PROPERTY) {
+            if (node.type().equals(NodeType.CONFIG_PROPERTY)) {
                 List<GraphEdge> outgoing = graph.getOutgoingEdges(node.id());
                 if (outgoing.isEmpty()) {
                     ObjectNode propJson = GraphJsonWriter.createObject();

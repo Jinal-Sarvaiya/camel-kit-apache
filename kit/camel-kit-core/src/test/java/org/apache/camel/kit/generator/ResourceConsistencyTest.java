@@ -169,6 +169,40 @@ class ResourceConsistencyTest {
     Path tempDir;
 
     @Test
+    void websiteCoreRecoveryUsesTheBundledDependencyPluginVersion() throws IOException {
+        Path docs = repositoryRoot().resolve("docs");
+        String version = DistributionConfig.loadBundled().mavenDependencyPluginVersion();
+        assertTrue(Files.readAllLines(docs.resolve("antora.yml")).stream().map(String::strip)
+                .anyMatch(("maven-dependency-plugin-version: " + version)::equals));
+        assertTrue(Files.readString(docs.resolve("modules/ROOT/pages/existing-project.adoc"))
+                .contains("org.apache.maven.plugins:maven-dependency-plugin:{maven-dependency-plugin-version}:tree"));
+    }
+
+    @Test
+    void websiteUsesTheBundledCamelMcpRunnerInItsLauncherExamples() throws IOException {
+        Path docs = repositoryRoot().resolve("docs");
+        String version = DistributionConfig.loadBundled().camelMcpVersion();
+        assertTrue(Files.readAllLines(docs.resolve("antora.yml")).stream().map(String::strip)
+                .anyMatch(("camel-mcp-version: " + version)::equals));
+        String page = Files.readString(docs.resolve("modules/ROOT/pages/mcp.adoc"));
+        String coordinate = "org.apache.camel:camel-jbang-mcp:";
+        assertTrue(page.contains(coordinate));
+        assertTrue(page.lines().filter(line -> line.contains(coordinate))
+                .allMatch(line -> line.contains(coordinate + "{camel-mcp-version}:runner")));
+    }
+
+    @Test
+    void catalogGuidesUseDistributionVersionsOrObservedResults() throws IOException {
+        Path skills = repositoryRoot().resolve("kit/camel-kit-core/src/main/resources/skills");
+        Pattern literalVersion = Pattern.compile("\\b\\d+\\.\\d+\\.\\d+\\b");
+        for (String file : List.of("shared/mcp-setup.md", "camel-migrate/SKILL.md",
+                "camel-brainstorm/guides/version-selection.md")) {
+            String instructions = Files.readString(skills.resolve(file)).replaceFirst("(?s)\\A---\\R.*?\\R---\\R", "");
+            assertFalse(literalVersion.matcher(instructions).find(), file);
+        }
+    }
+
+    @Test
     void retiredCommandScanAllowsGuidePaths() {
         Pattern retiredCommand = STALE_PATTERNS.stream()
                 .filter(stale -> stale.description().equals("retired internal command exposed as slash command"))
@@ -985,7 +1019,7 @@ class ResourceConsistencyTest {
                     "Every MCP-summary consumer or subagent must inherit context authority");
         }
         assertContainsAll(catalogResearcher,
-                "camel_catalog_component_maven(component, runtime, platformBom)",
+                "camel_catalog_component_maven(component, runtime, camelVersion, platformBom)",
                 "`camel_catalog_components`, `camel_catalog_eips`",
                 "`camel_catalog_dataformats`, or `camel_catalog_languages`",
                 "A detail-call error is `UNVERIFIED`, not authoritative absence",
@@ -1364,8 +1398,10 @@ class ResourceConsistencyTest {
         String componentMap = Files.readString(root.resolve("camel-migrate/guides/camel2-component-mapping.md"));
         String brainstorm = Files.readString(root.resolve("camel-brainstorm/SKILL.md"));
 
-        assertTrue(migrate.contains("project.runtime={{RUNTIME}}"));
+        assertContainsAll(migrate, "`target.runtime`", "`target.camelVersion`", "target --migration",
+                "retaining `project.*`");
         assertFalse(migrate.contains("project.runtime=quarkus"));
+        assertFalse(migrate.contains("target.runtime=quarkus"));
         assertTrue(migrate.contains("Maven plugin or build/code-generation task"));
         assertTrue(migrate.contains("Recheck the completed design before approval"));
         assertTrue(versionSelection.contains("project.runtime=main"));
@@ -1454,7 +1490,7 @@ class ResourceConsistencyTest {
         // keys init writes only for greenfield or internal bookkeeping are not workflow constraints
         Set<String> notConstraints
                 = Set.of("project.type", "project.unsupportedReason",
-                        "project.detectedPlatformBomVersion", "project.sourcePlatform");
+                        "project.detectedPlatformBomVersion", "project.sourcePlatform", "project.mavenInputs");
         Set<String> documentedButNeverWritten = new LinkedHashSet<>(documented);
         documentedButNeverWritten.removeAll(written);
         assertTrue(documentedButNeverWritten.isEmpty(),

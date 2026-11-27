@@ -2,14 +2,13 @@
 
 > **Context variables provided by master SKILL.md:**
 > - `FLOW_NAME` — the flow being tested
-> - `CAMEL_VERSION` — from `.camel-kit/config.properties`
-> - `RUNTIME` — from `.camel-kit/config.properties` (`project.runtime`, default: `main`)
-> - `PLATFORM_BOM` — resolved from `CAMEL_VERSION` + `RUNTIME` via the version mapping table in `skills/shared/mcp-setup.md`
+> - `CAMEL_VERSION` — the selected profile’s `camelVersion`
+> - `RUNTIME` — the selected profile’s `runtime`
+> - `PLATFORM_BOM` — the selected profile’s `catalog.platformBom` from `shared/mcp-setup.md`
 > - `CITRUS_VERSION` — from `.camel-kit/config.properties` (`citrus.version`)
 > - `CITRUS_MCP_VERSION` — from the generated MCP server coordinate, cross-checked against `.camel-kit/config.properties`
 >
-> **Version mapping:** When calling Camel MCP catalog tools, translate `CAMEL_VERSION` to the correct catalog version
-> using the version mapping table in `skills/shared/mcp-setup.md`.
+> Use the selected profile’s three `catalog` arguments on every version-sensitive call under `shared/mcp-setup.md`.
 
 ---
 

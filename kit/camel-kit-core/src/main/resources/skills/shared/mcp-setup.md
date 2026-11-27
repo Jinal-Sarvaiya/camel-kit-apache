@@ -132,17 +132,15 @@ Fallback policy:
 
 ### Rule 1: Use `platformBom` for versioned catalog queries
 
-The `platformBom` parameter accepts a full Maven GAV (`groupId:artifactId:version`) and is the preferred way to query a specific catalog version. It works for all runtimes:
-
-- **main**: `org.apache.camel:camel-catalog:{project.camelVersion}`
-- **spring-boot**: `org.apache.camel.springboot:camel-catalog-provider-springboot:{project.camelVersion}`
-- **quarkus**: `io.quarkus.platform:quarkus-camel-bom:{project.platformBomVersion}`
-
-The correct `platformBom` value for each runtime is derived from `.camel-kit/config.properties`. Version layering is:
-distribution defaults in `distribution.properties`, then init/version selection, then workspace values in
-`.camel-kit/config.properties`, then any downstream runtime context passed to a specific task.
-
-When `platformBom` is provided, `camelVersion` is ignored.
+Run `{COMMAND_PREFIX} target --migration` for a migration or `{COMMAND_PREFIX} target` for the current
+application. Pass the three fields in its `catalog` object (`runtime`, `camelVersion`, `platformBom`) unchanged
+on every version-sensitive call. For a migration, compare the complete profile with the approved destination, pass
+it to each worker and scope edits to that destination. A change invalidates the design's POM and catalog evidence.
+In-place additions use the existing application's locks. The application BOM is for Maven. Spring Boot lookup takes the GAV of
+`camel-catalog-provider-springboot` at its own release. Quarkus lookup takes the complete `quarkus-camel-bom`
+GAV. Main takes `org.apache.camel:camel-catalog` at the selected core version.
+Check that the active Camel MCP launcher uses the profile's `repositories` for catalog resolution. Use only the
+repositories already configured by the operator for Maven and MCP. An unresolved repository is an incomplete check.
 
 ### Rule 2: Pass the correct `runtime`
 
@@ -156,10 +154,47 @@ The runtime affects which components are returned (e.g., Quarkus extensions vs S
 
 ### Rule 3: Bind catalog results to the resolved Camel version
 
-The version binding comes from `.camel-kit/config.properties` (`project.runtime`, `project.camelVersion`,
-`project.platformBomVersion`). Always pass `runtime` and the full `platformBom` GAV derived from these properties on
-every catalog call — those parameters **are** the binding. A call without them is answered from the catalog bundled in
-the MCP server JAR, which may be a different version.
+The version binding comes from `.camel-kit/config.properties`. For a required check:
+
+1. Save the complete output of the appropriate target command under `profile` **before** dispatch.
+2. Copy its three `catalog` fields into both calls. For `camel_catalog_components` add `filter="timer"`, `label=""`, `limit=2`.
+   For `camel_catalog_component_maven` add `component="timer"`.
+3. Capture the actual sent arguments and returned MCP results in a fresh workspace-relative file under `.camel-kit/.cache/`.
+   The JSON below illustrates the wire shape for Main. Replace the entire profile, arguments and result content with
+   the observed values. Copy text verbatim using JSON string encoding. If the harness exposes only a confirmed successful
+   single text block, wrap that text in `content` as shown and omit `isError`. If success or the original text is
+   unavailable, report INCOMPLETE. Never substitute sample data or reconstruct a result from a summary.
+
+```json
+{
+  "profile": {
+    "runtime": "main", "camelVersion": "{CAMEL_MAIN_VERSION}", "applicationBom": null, "springBootVersion": null,
+    "repositories": ["https://repo.maven.apache.org/maven2/"], "runtimeCatalogVersion": "{CAMEL_MAIN_VERSION}",
+    "catalog": {"runtime":"main","camelVersion":"{CAMEL_MAIN_VERSION}","platformBom":"org.apache.camel:camel-catalog:{CAMEL_MAIN_VERSION}"}
+  },
+  "list": {
+    "name": "camel_catalog_components",
+    "arguments": {"runtime":"main","camelVersion":"{CAMEL_MAIN_VERSION}","platformBom":"org.apache.camel:camel-catalog:{CAMEL_MAIN_VERSION}","filter":"timer","label":"","limit":2},
+    "result": {"content":[{"type":"text","text":"<original list response text>"}]}
+  },
+  "maven": {
+    "name": "camel_catalog_component_maven",
+    "arguments": {"runtime":"main","camelVersion":"{CAMEL_MAIN_VERSION}","platformBom":"org.apache.camel:camel-catalog:{CAMEL_MAIN_VERSION}","component":"timer"},
+    "result": {"content":[{"type":"text","text":"<original Maven response text>"}]}
+  }
+}
+```
+
+4. Run the same target command with `--check-catalog <file>`. For Quarkus record the managed
+   `camel-quarkus-catalog` version in `target.catalogVersion` (migration) or `project.catalogVersion`.
+   Require both the returned core version and runtime-specific timer artifact to match.
+5. Record the profile and outcome. Remove the temporary file during report-only validation. An error, missing result,
+   changed profile or version mismatch makes the required check **INCOMPLETE**. Leave dependent lookups unverified.
+   Repeat after any profile change.
+
+A runner can return its bundled Camel core for a different requested target. Before design approval,
+report the actual Rule 3 result for the configured runner. If the returned catalog core differs from the
+requested core, report both versions and mark the check INCOMPLETE. Design assembly requires verified catalog artifacts.
 
 Detail tools do not all return `camelVersion`. Do not require or invent a field that is absent from a tool's schema.
 Validate each returned artifact identity and each consumed field against the requested type and name, bound to the
@@ -176,38 +211,13 @@ the limit until the returned count is below it; if completeness or the version b
 When both are omitted, the MCP server uses its built-in catalog for the server artifact configured by the distribution.
 Use this as a fallback when the exact version doesn't matter.
 
-**Examples:**
-- Project has `runtime: quarkus` → `runtime=quarkus`, `platformBom=io.quarkus.platform:quarkus-camel-bom:{project.platformBomVersion}`
-- Project has `runtime: spring-boot` → `runtime=spring-boot`, `platformBom=org.apache.camel.springboot:camel-catalog-provider-springboot:{project.camelVersion}`
-- Quick lookup, version doesn't matter → `runtime=main`, omit `platformBom`
-
-### Version configuration
-
-Version numbers are stored in `.camel-kit/config.properties`, set during initialization and updated by
-`/camel-start`-routed workflow skills when the user confirms target runtime/version choices:
-
-Example for a Quarkus project:
-
-```properties
-project.runtime=quarkus
-project.camelVersion={CAMEL_QUARKUS_VERSION}
-project.platformBomVersion={QUARKUS_PLATFORM_VERSION}
-```
-
-Default platform BOMs by runtime:
-
-| Runtime | platformBom GAV |
-|---------|----------------|
-| main | `org.apache.camel:camel-catalog:{project.camelVersion}` |
-| spring-boot | `org.apache.camel.springboot:camel-catalog-provider-springboot:{project.camelVersion}` |
-| quarkus | `io.quarkus.platform:quarkus-camel-bom:{project.platformBomVersion}` |
-
-Users can override any property via `-p key=value` CLI flags or a custom config file (`-c path`).
+Informational searches can use the bundled catalog. Required lookups use Rule 3.
 
 ### Placeholder conventions
 
-Use single-brace placeholders such as `{CAMEL_VERSION}` only for camel-kit install-time template expansion. Use
-context placeholders such as `{project.camelVersion}` when describing values read from `.camel-kit/config.properties`.
+Camel Kit expands only its recognized single-brace names at install time, including `CAMEL_VERSION`.
+During the workflow, fill placeholders such as `{MODULE_PREFIX}` using the module selected for the task.
+Use context placeholders such as `{project.camelVersion}` when describing values read from `.camel-kit/config.properties`.
 Use double-brace placeholders such as `{{customer.host}}` only for literal Camel property placeholders that must remain
 in generated route files.
 
@@ -215,4 +225,4 @@ in generated route files.
 
 ## Fallback Policy
 
-Always attempt MCP tool calls directly — do not check for `.mcp.json` or try to detect MCP availability upfront. If a tool call fails (tool not found, network error, timeout), fall back to bundled skill files or proceed with a warning.
+Always attempt MCP tool calls directly — do not check for `.mcp.json` or try to detect MCP availability upfront. When a required call fails, record INCOMPLETE under Rule 3. Bundled skill files can still answer informational questions.

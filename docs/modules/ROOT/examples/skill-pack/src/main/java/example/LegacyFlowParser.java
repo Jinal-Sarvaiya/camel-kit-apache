@@ -6,20 +6,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
 import org.apache.camel.kit.graph.ProjectGraph;
-import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.graph.parser.GraphParser;
 import org.apache.camel.kit.graph.parser.MigrationParser;
 
 public class LegacyFlowParser implements MigrationParser {
     private final List<String> warnings = new ArrayList<>();
-
-    private record Flow(String name, String source) {
-    }
 
     @Override
     public int apiVersion() {
@@ -37,13 +31,12 @@ public class LegacyFlowParser implements MigrationParser {
         for (Path file : files) {
             String source = GraphParser.relativeFileName(root, file);
             try {
-                Flow flow = new Flow(new String(GraphParser.readSource(file), StandardCharsets.UTF_8).strip(), source);
+                var flow = new LegacyGraphAdapter.Flow(new String(GraphParser.readSource(file), StandardCharsets.UTF_8).strip(), source);
                 if (flow.name().isEmpty()) {
                     warnings.add("Missing flow name in " + source);
                     continue;
                 }
-                fragment.addNode(new GraphNode("legacy-flow:" + flow.source(), NodeType.RESOURCE_FILE,
-                        Map.of("name", flow.name(), "file", flow.source())));
+                flow.addTo(fragment);
             } catch (IOException e) {
                 throw new UncheckedIOException("Cannot read " + source, e);
             }

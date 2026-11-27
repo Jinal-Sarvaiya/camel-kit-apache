@@ -44,7 +44,7 @@ public class DeadCodeAnalyzer {
     private List<GraphNode> findUnusedArtifacts() {
         // Collect all artifact IDs that have at least one USES_COMPONENT edge pointing to them
         Set<String> usedArtifactIds = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.USES_COMPONENT)
+                .filter(e -> e.type().equals(EdgeType.USES_COMPONENT))
                 .map(GraphEdge::to)
                 .collect(Collectors.toSet());
 
@@ -68,7 +68,7 @@ public class DeadCodeAnalyzer {
     private List<GraphNode> findOrphanedRoutes() {
         // Pre-build set of URIs that have producers (ROUTES_TO edges)
         Set<String> producedUris = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.ROUTES_TO)
+                .filter(e -> e.type().equals(EdgeType.ROUTES_TO))
                 .map(GraphEdge::to)
                 .map(graph::getNode)
                 .filter(java.util.Objects::nonNull)
@@ -80,7 +80,7 @@ public class DeadCodeAnalyzer {
                 .filter(route -> {
                     // Find the from-endpoint for this route
                     List<GraphEdge> fromEdges = graph.getOutgoingEdges(route.id()).stream()
-                            .filter(e -> e.type() == EdgeType.ROUTES_FROM)
+                            .filter(e -> e.type().equals(EdgeType.ROUTES_FROM))
                             .collect(Collectors.toList());
 
                     for (GraphEdge fromEdge : fromEdges) {
@@ -116,7 +116,7 @@ public class DeadCodeAnalyzer {
     private List<GraphNode> findUnusedProperties() {
         // Collect all property node IDs that have a CONFIGURES edge
         Set<String> configuredPropertyIds = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.CONFIGURES)
+                .filter(e -> e.type().equals(EdgeType.CONFIGURES))
                 .map(GraphEdge::from)
                 .collect(Collectors.toSet());
 

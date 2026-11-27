@@ -14,6 +14,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Properties;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -26,6 +27,10 @@ import org.apache.camel.kit.CamelKitMain;
 import org.apache.camel.kit.config.AgentRegistry;
 import org.apache.camel.kit.doc.FrontmatterHandler;
 import org.apache.camel.kit.graph.GraphSerializer;
+import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.model.EdgeType;
+import org.apache.camel.kit.graph.model.GraphTypeAdapter;
+import org.apache.camel.kit.graph.model.NodeType;
 import org.apache.camel.kit.graph.parser.GraphParser;
 import org.apache.camel.kit.graph.parser.MuleXmlFlowParser;
 
@@ -990,7 +995,8 @@ class SkillPackCompilerTest {
         Path dist = Files.createDirectory(temp.resolve("distribution"));
         assertEquals(0, ToolProvider.getSystemJavaCompiler().run(null, null, null,
                 "-classpath", System.getProperty("java.class.path"), "-d", dist.toString(),
-                example.resolve("java/example/LegacyFlowParser.java").toString()));
+                example.resolve("java/example/LegacyFlowParser.java").toString(),
+                example.resolve("java/example/LegacyGraphAdapter.java").toString()));
         Path archive = dist.resolve(SkillCatalog.DISTRIBUTION);
         Files.createDirectories(archive.getParent());
         try (var loader = loader(dist, example.resolve("resources"))) {
@@ -1032,6 +1038,24 @@ class SkillPackCompilerTest {
         assertEquals("mule.xml", result.getNode("mule-flow:orders").properties().get("file"));
         assertFalse(result.hasNode("legacy-flow:ignored.txt"));
 
+        String analyze = step.lines().filter(line -> line.startsWith("Run `graph analyze ")).findFirst().orElseThrow();
+        assertTrue(step.contains("If analysis fails, report the diagnostic and leave the inventory incomplete"), step);
+        String[] analysis = analyze.substring(analyze.indexOf('`') + 1, analyze.lastIndexOf('`')).split(" ");
+        assertEquals(List.of("graph", "analyze", "legacy", "--graph-file", "GRAPH"), List.of(analysis));
+        analysis[4] = graph.toString();
+        assertEquals("Legacy flow inventory (flows=1, source files=1)",
+                SkillCatalog.JSON.readTree(assertCli(0, dist, workspace, analysis)).required("summary").textValue());
+        assertEquals("legacy:flow", result.getNode("legacy-flow:orders.flow").type().name());
+        var edge = result.getOutgoingEdges("legacy-flow:orders.flow").getFirst();
+        assertEquals("legacy:declared-in", edge.type().name());
+        assertEquals("legacy-file:orders.flow", edge.to());
+
+        // The default distribution has neither the example catalog entry nor its implementation.
+        Path plain = Files.createDirectory(temp.resolve("plain"));
+        assertTrue(assertCli(1, plain, workspace, analysis).contains("analysis unavailable for provider/legacy"));
+        assertTrue(assertCli(0, plain, workspace, "graph", "neighbors", edge.from(), "--edge-type", edge.type().name(),
+                "--graph-file", graph.toString()).contains(edge.to()));
+
         byte[] saved = Files.readAllBytes(graph);
         try (var file = new java.io.RandomAccessFile(project.resolve("large.flow").toFile(), "rw")) {
             file.setLength(GraphParser.MAX_SOURCE_BYTES + 1L);
@@ -1040,6 +1064,11 @@ class SkillPackCompilerTest {
         assertTrue(oversized.contains("Graph input exceeds") && oversized.contains("large.flow"), oversized);
         assertArrayEquals(saved, Files.readAllBytes(graph));
         Files.delete(project.resolve("large.flow"));
+        Files.delete(dist.resolve("example/LegacyGraphAdapter.class"));
+        assertTrue(assertCli(1, dist, workspace, analysis).contains("example.LegacyGraphAdapter"));
+        assertTrue(assertCli(0, dist, workspace, "graph", "find", "--type", "legacy:flow", "--graph-file",
+                graph.toString())
+                .contains("legacy-flow:orders.flow"));
         Files.delete(dist.resolve("example/LegacyFlowParser.class"));
         String missing = assertCli(1, dist, workspace, args);
         assertTrue(missing.contains("provider/legacy-flow") && missing.contains("example.LegacyFlowParser"), missing);
@@ -1067,6 +1096,91 @@ class SkillPackCompilerTest {
         String missing = assertCli(1, dist, source, "graph", "generate", "--require-parser", "mule-xml");
         assertTrue(missing.contains("Required migration parser provider/mule-xml is unavailable"), missing);
         assertArrayEquals(saved, Files.readAllBytes(graph));
+    }
+
+    public static class FailingSummary implements GraphTypeAdapter {
+        public Map<String, NodeType> nodeTypes() {
+            return Map.of();
+        }
+
+        public Map<String, EdgeType> edgeTypes() {
+            return Map.of();
+        }
+
+        public Optional<String> summarize(ProjectGraph graph) {
+            throw new IllegalStateException();
+        }
+    }
+
+    public static class FirstSummary extends FailingSummary {
+        @Override
+        public int summaryOrder() {
+            return -2;
+        }
+
+        @Override
+        public Optional<String> summarize(ProjectGraph graph) {
+            return Optional.of("Custom inventory");
+        }
+    }
+
+    public static class ConflictingAdapter extends FailingSummary {
+        @Override
+        public Map<String, NodeType> nodeTypes() {
+            return Map.of("EXAMPLE_NODE", new NodeType("aaa:node"));
+        }
+
+        @Override
+        public Map<String, EdgeType> edgeTypes() {
+            return Map.of("MULE_CALLS_SUBFLOW", new EdgeType("aaa:calls"));
+        }
+    }
+
+    @Test
+    void customDistributionKeepsBundledAdaptersAndIsolatesRegistrationAndSummaryFailures() throws Exception {
+        String descriptor = String.format(Locale.ROOT, """
+                add:
+                  provider/aaa: {contract: 1, provider: {service: %1$s, implementation: %2$s}}
+                  provider/broken: {contract: 1, provider: {service: %1$s, implementation: %3$s}}
+                  provider/zz: {contract: 1, provider: {service: %1$s, implementation: %4$s}}
+                """, GraphTypeAdapter.class.getName(), ConflictingAdapter.class.getName(),
+                FailingSummary.class.getName(), FirstSummary.class.getName());
+        Path dist = distribution(pack("custom", descriptor), "custom");
+        Path project = Files.createDirectory(temp.resolve("mixed-project"));
+        Files.writeString(project.resolve("mule.xml"),
+                "<mule xmlns='http://www.mulesoft.org/schema/mule/core'><flow name='orders'/></mule>");
+        Files.copy(Path.of("../camel-kit-graph/src/test/resources/testdata/biztalk/SimpleOrchestration.odx"),
+                project.resolve("orders.odx"));
+        Files.writeString(project.resolve("pom.xml"),
+                """
+                                <project><modelVersion>4.0.0</modelVersion><groupId>example</groupId><artifactId>orders</artifactId>
+                                <version>1</version><properties><camel.version>4.8.0</camel.version></properties>
+                        <dependencies><dependency><groupId>org.apache.camel.quarkus</groupId>
+                                <artifactId>camel-quarkus-core</artifactId><version>3.15.0</version></dependency></dependencies></project>
+                                """);
+        String init = assertCli(0, dist, project, "init", "--here", "--ai", "claude", "--no-fetch");
+        assertTrue(init.contains("Graph summary unavailable for provider/aaa") && init.contains("from provider/mule"),
+                init);
+        assertTrue(init.contains("Graph summary failed for provider/broken: java.lang.IllegalStateException"), init);
+        assertTrue(init.contains("Custom inventory, MuleSoft Mule (1 flows, 0 sub-flows), Microsoft BizTalk"), init);
+        assertFalse(init.contains("Could not build project graph"), init);
+        assertTrue(
+                Files.readString(project.resolve(".camel-kit/config.properties")).contains("project.runtime=quarkus"));
+        assertTrue(SkillCatalog.JSON.readTree(assertCli(0, dist, project, "graph", "stats")).required("available")
+                .booleanValue());
+        assertEquals(1, SkillCatalog.JSON.readTree(assertCli(0, dist, project, "graph", "find", "--type", "MULE_FLOW"))
+                .required("total").intValue());
+        assertTrue(assertCli(0, dist, project, "graph", "find", "--type", "EXAMPLE_NODE")
+                .contains("Invalid node type: EXAMPLE_NODE"));
+        assertTrue(assertCli(1, dist, project, "graph", "analyze", "aaa").contains("from provider/mule"));
+        assertEquals("Graph summary failed for provider/broken: java.lang.IllegalStateException",
+                assertCli(1, dist, project, "graph", "analyze", "broken").strip());
+        Path legacy = Files.writeString(project.resolve("legacy.json"),
+                "{\"version\":\"1.0\",\"nodes\":{\"flow\":{\"type\":\"MULE_FLOW\"}},\"edges\":[]}");
+        assertEquals(1, SkillCatalog.JSON.readTree(assertCli(0, dist, project, "graph", "find", "--type", "mule:flow",
+                "--graph-file", legacy.toString())).required("total").intValue());
+        assertTrue(assertCli(0, dist, project, "graph", "analyze", "mule", "--graph-file", legacy.toString())
+                .contains("MuleSoft Mule"));
     }
 
     public static class BrokenParser extends MuleXmlFlowParser {

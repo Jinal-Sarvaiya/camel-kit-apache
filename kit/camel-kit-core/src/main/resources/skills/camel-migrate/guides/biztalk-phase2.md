@@ -17,7 +17,7 @@
 - Re-read `docs/camel-kit/<PIPELINE_ID>/business-requirements.md`
 - Re-read `docs/camel-kit/<PIPELINE_ID>/migration-analysis.md`
 - Read `docs/constitution.md` if it exists (for reference)
-- Re-read `.camel-kit/config.properties` — **REQUIRED**: extract `project.camelVersion` as `CAMEL_VERSION` and `project.runtime` as `RUNTIME`. If the file does not exist, ask the user for the Camel version before proceeding.
+- Re-read `.camel-kit/config.properties` — **REQUIRED**: run `{COMMAND_PREFIX} target --migration` and use its `catalog` arguments. Ask for an unresolved destination before proceeding.
 
 **Conditionally load:**
 - `skills/camel-migrate/guides/biztalk-map-conversion.md` — load once per orchestration that contains a BizTalk map
@@ -38,10 +38,8 @@ approval do not authorize any deployment, cutover, rollback, or traffic action.
 
 **MCP catalog tools — MANDATORY when MCP is configured (same rules as the design assembly guide):**
 
-Before every MCP catalog call, resolve `CAMEL_VERSION` + `RUNTIME` to the full runtime-specific `PLATFORM_BOM` GAV using
-Rule 1 in `skills/shared/mcp-setup.md`, and pass that same runtime/BOM binding (derived from
-`.camel-kit/config.properties`) to the list and detail calls. Never substitute a stripped minor version (for example
-`4.14`) or treat the separately supplied `camelVersion` field as the binding when `platformBom` is present. Never use a
+Use the confirmed migration profile’s `catalog` arguments for every list and detail call. Verify the core and
+runtime catalog with `shared/mcp-setup.md` before marking a lookup verified. Never use a
 Camel component name, EIP name, data format name, or expression language name from training data or the mapping guide
 without first verifying it in the catalog. For behaviour questions (YAML shape, runtime configuration, version changes),
 call `camel_docs_search` on the `camel-knowledge` server — see `shared/mcp-setup.md` for the server niche and tool list.

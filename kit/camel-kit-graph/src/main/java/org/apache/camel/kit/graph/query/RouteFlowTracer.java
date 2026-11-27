@@ -55,7 +55,7 @@ public class RouteFlowTracer {
 
         // Find routes that consume from this endpoint
         for (GraphEdge edge : graph.getIncomingEdges(endpointId)) {
-            if (edge.type() == EdgeType.ROUTES_FROM) {
+            if (edge.type().equals(EdgeType.ROUTES_FROM)) {
                 traceRoute(edge.from(), 1, flow, visited);
             }
         }
@@ -68,12 +68,12 @@ public class RouteFlowTracer {
             return;
 
         GraphNode route = graph.getNode(routeId);
-        if (route == null || route.type() != NodeType.CAMEL_ROUTE)
+        if (route == null || !route.type().equals(NodeType.CAMEL_ROUTE))
             return;
 
         // 1. Add from endpoint
         for (GraphEdge edge : graph.getOutgoingEdges(routeId)) {
-            if (edge.type() == EdgeType.ROUTES_FROM) {
+            if (edge.type().equals(EdgeType.ROUTES_FROM)) {
                 GraphNode fromEndpoint = graph.getNode(edge.to());
                 if (fromEndpoint != null) {
                     flow.add(new FlowStep(
@@ -85,7 +85,7 @@ public class RouteFlowTracer {
 
         // 2. Add processors in order
         List<GraphEdge> processorEdges = graph.getOutgoingEdges(routeId).stream()
-                .filter(e -> e.type() == EdgeType.PROCESSES)
+                .filter(e -> e.type().equals(EdgeType.PROCESSES))
                 .sorted(Comparator.comparing(e -> {
                     String order = e.properties().get("order");
                     return order != null ? Integer.parseInt(order) : 0;
@@ -103,7 +103,7 @@ public class RouteFlowTracer {
 
         // 3. Add to endpoints, and follow direct/seda links
         for (GraphEdge edge : graph.getOutgoingEdges(routeId)) {
-            if (edge.type() == EdgeType.ROUTES_TO) {
+            if (edge.type().equals(EdgeType.ROUTES_TO)) {
                 GraphNode toEndpoint = graph.getNode(edge.to());
                 if (toEndpoint != null) {
                     String uri = toEndpoint.properties().get("uri");
@@ -113,7 +113,7 @@ public class RouteFlowTracer {
                     String scheme = extractScheme(uri);
                     if (scheme != null && LINKABLE_SCHEMES.contains(scheme)) {
                         for (GraphEdge consumerEdge : graph.getIncomingEdges(edge.to())) {
-                            if (consumerEdge.type() == EdgeType.ROUTES_FROM) {
+                            if (consumerEdge.type().equals(EdgeType.ROUTES_FROM)) {
                                 traceRoute(consumerEdge.from(), depth + 1, flow, visited);
                             }
                         }

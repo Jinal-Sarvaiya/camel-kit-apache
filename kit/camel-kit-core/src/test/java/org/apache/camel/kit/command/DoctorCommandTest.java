@@ -98,7 +98,8 @@ class DoctorCommandTest {
     @Tag("cli-compat")
     void malformedPropertiesProduceAnActionableJsonFinding() throws Exception {
         writeConfig("agent.name=bob2\nextra=\\u12x4\n");
-        Files.writeString(tempDir.resolve(".camel-kit/project-graph.json"), "{}");
+        Files.writeString(tempDir.resolve(".camel-kit/project-graph.json"),
+                "{\"version\":\"1.0\",\"nodes\":{},\"edges\":[]}");
         RunResult result = runDoctor("--project-dir", tempDir.toString(), "--json");
 
         assertEquals(1, result.exitCode());
@@ -257,7 +258,8 @@ class DoctorCommandTest {
                 agent.name=bob2
                 agent.folder=.bob/commands
                 """);
-        Files.writeString(root.resolve(".camel-kit/project-graph.json"), "{}");
+        Files.writeString(root.resolve(".camel-kit/project-graph.json"),
+                "{\"version\":\"1.0\",\"nodes\":{},\"edges\":[]}");
         Files.writeString(root.resolve("AGENTS.md"), "Integration work -> /camel-start\n");
         Files.writeString(root.resolve("mvnw"), "#!/bin/sh\n");
 
@@ -306,7 +308,8 @@ class DoctorCommandTest {
                 agent.name=%s
                 agent.folder=%s
                 """, agentName, agent.folder()));
-        Files.writeString(root.resolve(".camel-kit/project-graph.json"), "{}");
+        Files.writeString(root.resolve(".camel-kit/project-graph.json"),
+                "{\"version\":\"1.0\",\"nodes\":{},\"edges\":[]}");
         Files.writeString(root.resolve("mvnw"), "#!/bin/sh\n");
 
         Path commandsDir = agent.generatesCommandStubs()

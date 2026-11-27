@@ -93,6 +93,11 @@ metadata; Kit configures it for each harness, and it also serves MCP clients tha
   | **Other local accounts on the same host** | Weaker adversary | Camel-Kit must not widen what they can read *(documented — Apache Camel Security Model, "A second, weaker adversary")*. |
   | **Network peers** between the CLI and its HTTPS origins | Untrusted; TLS assumed | §4.5. |
 
+- `target` reads workspace configuration, bounded Maven models and dependency trees, and bounded catalog evidence as data. It prints the selected coordinates
+  or a Maven template. It does not run Maven, fetch coordinates, or change the MCP launcher's repository policy.
+  Required catalog checks compare the actual request parameters, core version and runtime artifact against the
+  selected profile. Recorded evidence depends on the harness faithfully capturing those calls.
+
 - **Component-family table.** Lead with this when routing a finding.
 
   | Family | Representative entry points | Touches outside the process? | In this model? |
@@ -548,6 +553,10 @@ violation warrants coordinated disclosure and a CVE; **hardening** means it is f
    phase only *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*; YAML routes and configuration use Jackson's tree model, DataWeave and properties are
    regular-expression scans *(documented — `ParserSourceReadingContractTest`; [V1 evidence](security-verification.md#v1-source-reading))*. `GraphBuilder` applies a 60-second timeout to every parser, including the POM parser.
    The distribution's compiled catalog selects trusted migration parser classes on the Kit runtime classpath.
+   The same catalog selects graph type adapters for alias resolution and migration summaries. A graph file
+   supplies only record IDs, types, properties and relationships to these operations. Type strings never name
+   classes to load. A step requiring a specialized summary checks the exit status of `graph analyze` even
+   when generic traversal succeeds.
    A required parser ID is looked up in that catalog. Analyzed projects cannot register providers. Registered
    file extensions count toward the shared discovery budget before content inspection and parsing. A step's
    `requires` declaration checks the dependency at build time. Its shipped instructions must invoke the installed
@@ -791,7 +800,7 @@ This is the most important section for a developer adopting Camel-Kit and for an
   `central_snap` entries in the default repository lists or for the development JBang alias *(documented — README
   "Release channels")*. Snapshots are retained for development with their mutability documented; release defaults
   pin released versions; "snapshot mutability does not waive any other security control" *(maintainer, 2026-10-27 —
-  Q4)*.
+  Q4)*. Kit release validation requires `camel.mcp.version` to have a release version before staging.
 - **Validation of generated routes is a quality gate, not a security audit.** The five security-checklist rules
   (no hardcoded credentials, TLS everywhere, no sensitive data in logs, input validation at every external ingress,
   authentication on external endpoints) all fail validation when violated *(documented —

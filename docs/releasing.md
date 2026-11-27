@@ -21,7 +21,11 @@ Use JDK 21 or later for every release target; the release and snapshot workflows
 Kit release validation rejects snapshot, timestamped snapshot, and prerelease Camel CLI host pins.
 Set `camel.cli.version` in `distribution.properties` to a tested released Aesh-based Camel host
 (4.24.0 or later), synchronize the Maven mirror, and run the hosted compatibility suite before staging.
-Development builds may use the snapshot host. Generated integration pins are independent.
+Development builds may use snapshot versions of the host and the Camel MCP runner. Before staging Kit, set
+`camel.mcp.version` to the tested release in Maven Central and update `camel-mcp-version` in `docs/antora.yml`.
+Repeat the catalog checks for all shipped runtime profiles and the documented Red Hat example. Record the tested
+runner and results in `docs/modules/ROOT/pages/mcp.adoc` and update the unreleased entry in `CHANGELOG.md`.
+Generated integration pins are independent.
 
 1. Start from reviewed source on a release branch. Change only the selected product
    POM version and its child parent versions (or only the root version for a parent
@@ -55,6 +59,10 @@ Development builds may use the snapshot host. Generated integration pins are ind
 8. Advance only the released target to its next snapshot and restore its SCM tag to
    `HEAD`. For Kit, synchronize launcher fallback versions again. Verify clean-cache
    installation of the released CLI/plugin or standalone Knowledge runner.
+
+Before the nightly and manual Kit snapshot deployments, `python3 tools/check_camel_mcp_runner.py` resolves the
+pinned runner with an empty Maven repository. When the pin is a snapshot and its release JAR appears on Maven
+Central, the check stops deployment and identifies the version to verify and select.
 
 The nightly snapshot workflow builds the root reactor. Manual snapshot dispatch can
 select just the parent, Kit, or Knowledge. Independent product builds require their

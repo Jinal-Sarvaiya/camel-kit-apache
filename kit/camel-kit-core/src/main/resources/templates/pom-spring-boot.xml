@@ -40,9 +40,23 @@
     <dependencyManagement>
         <dependencies>
             <dependency>
-                <groupId>org.apache.camel.springboot</groupId>
+                <groupId>[PLATFORM_BOM_GROUP_ID]</groupId>
                 <artifactId>camel-spring-boot-bom</artifactId>
                 <version>${camel-spring-boot-version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.apache.camel</groupId>
+                <artifactId>camel-bom</artifactId>
+                <version>[CAMEL_CORE_VERSION]</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot-version}</version>
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>

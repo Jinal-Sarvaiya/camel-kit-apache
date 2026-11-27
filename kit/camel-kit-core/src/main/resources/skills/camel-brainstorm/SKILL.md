@@ -219,10 +219,10 @@ You MUST complete these items in order:
 - `camel_catalog_dataformat_doc` — verify dataformat exists
 - `camel_catalog_language_doc` — verify expression language exists
 
-Pass `runtime` and the full `platformBom` GAV (derived from `.camel-kit/config.properties` per `shared/mcp-setup.md` — the file stores bare versions, not the GAV) on every call, and establish the catalog-version binding there (Iron Law 1).
+Pass the selected profile’s `catalog` arguments from `shared/mcp-setup.md` on every call, and establish the catalog-version binding there (Iron Law 1).
 
-For the orchestrator's own calls, record `Catalog binding:` with the runtime, full platform BOM derived from
-`.camel-kit/config.properties`, and `binding=MATCHED`. For each artifact, record `Artifact identity:`, `Result:`, and
+For the orchestrator's own calls, record `Catalog binding:` with the selected profile’s runtime, Camel version and full catalog GAV.
+Record `binding=MATCHED` only after the required catalog check passes. For each artifact, record `Artifact identity:`, `Result:`, and
 `Verification provenance:` using the catalog-researcher labels: exact type/name, result, tool name(s), requested
 identity, and catalog binding. Populate section 5's `Catalog Verification Evidence` in `guides/design-assembly.md` from
 these validated fields, including equivalent fields returned by the integration architect. A `VERIFIED` result requires a

@@ -5,6 +5,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.adapter.mule.MuleGraphAdapter;
 import org.apache.camel.kit.graph.model.*;
 
 import org.junit.jupiter.api.BeforeAll;
@@ -29,7 +30,7 @@ class MuleXmlFlowParserTest {
     @Test
     void parsesMule4Flow() {
         assertTrue(graph.hasNode("mule-flow:order-ingestion-flow"));
-        assertEquals(NodeType.MULE_FLOW,
+        assertEquals(MuleGraphAdapter.FLOW,
                 graph.getNode("mule-flow:order-ingestion-flow").type());
     }
 
@@ -37,18 +38,18 @@ class MuleXmlFlowParserTest {
     void parsesMule4SubFlows() {
         assertTrue(graph.hasNode("mule-subflow:enrich-order-subflow"));
         assertTrue(graph.hasNode("mule-subflow:validate-order-subflow"));
-        assertEquals(NodeType.MULE_SUB_FLOW,
+        assertEquals(MuleGraphAdapter.SUB_FLOW,
                 graph.getNode("mule-subflow:enrich-order-subflow").type());
-        assertEquals(NodeType.MULE_SUB_FLOW,
+        assertEquals(MuleGraphAdapter.SUB_FLOW,
                 graph.getNode("mule-subflow:validate-order-subflow").type());
     }
 
     @Test
     void parsesMule4HttpListener() {
         List<GraphEdge> endpoints = graph.getOutgoingEdges("mule-flow:order-ingestion-flow").stream()
-                .filter(e -> e.type() == EdgeType.MULE_FLOW_CONTAINS)
+                .filter(e -> e.type().equals(MuleGraphAdapter.FLOW_CONTAINS))
                 .filter(e -> graph.getNode(e.to()) != null
-                        && graph.getNode(e.to()).type() == NodeType.MULE_ENDPOINT)
+                        && graph.getNode(e.to()).type().equals(MuleGraphAdapter.ENDPOINT))
                 .toList();
         assertTrue(endpoints.size() >= 1, "flow should contain at least 1 endpoint");
     }
@@ -56,9 +57,9 @@ class MuleXmlFlowParserTest {
     @Test
     void parsesMule4Transform() {
         List<GraphEdge> transforms = graph.getOutgoingEdges("mule-flow:order-ingestion-flow").stream()
-                .filter(e -> e.type() == EdgeType.MULE_FLOW_CONTAINS)
+                .filter(e -> e.type().equals(MuleGraphAdapter.FLOW_CONTAINS))
                 .filter(e -> graph.getNode(e.to()) != null
-                        && graph.getNode(e.to()).type() == NodeType.MULE_TRANSFORM)
+                        && graph.getNode(e.to()).type().equals(MuleGraphAdapter.TRANSFORM))
                 .toList();
         assertEquals(1, transforms.size(), "flow should contain exactly 1 transform");
     }
@@ -66,9 +67,9 @@ class MuleXmlFlowParserTest {
     @Test
     void parsesMule4Processors() {
         List<GraphEdge> processors = graph.getOutgoingEdges("mule-flow:order-ingestion-flow").stream()
-                .filter(e -> e.type() == EdgeType.MULE_FLOW_CONTAINS)
+                .filter(e -> e.type().equals(MuleGraphAdapter.FLOW_CONTAINS))
                 .filter(e -> graph.getNode(e.to()) != null
-                        && graph.getNode(e.to()).type() == NodeType.MULE_PROCESSOR)
+                        && graph.getNode(e.to()).type().equals(MuleGraphAdapter.PROCESSOR))
                 .toList();
         assertTrue(processors.size() >= 1, "flow should contain at least 1 processor (choice)");
     }
@@ -76,9 +77,9 @@ class MuleXmlFlowParserTest {
     @Test
     void parsesMule4ErrorHandler() {
         List<GraphEdge> errorHandlers = graph.getOutgoingEdges("mule-flow:order-ingestion-flow").stream()
-                .filter(e -> e.type() == EdgeType.MULE_FLOW_CONTAINS)
+                .filter(e -> e.type().equals(MuleGraphAdapter.FLOW_CONTAINS))
                 .filter(e -> graph.getNode(e.to()) != null
-                        && graph.getNode(e.to()).type() == NodeType.MULE_ERROR_HANDLER)
+                        && graph.getNode(e.to()).type().equals(MuleGraphAdapter.ERROR_HANDLER))
                 .toList();
         assertEquals(1, errorHandlers.size(), "flow should contain exactly 1 error handler");
     }
@@ -86,7 +87,7 @@ class MuleXmlFlowParserTest {
     @Test
     void parsesMule4FlowRef() {
         List<GraphEdge> refs = graph.getOutgoingEdges("mule-subflow:enrich-order-subflow").stream()
-                .filter(e -> e.type() == EdgeType.MULE_CALLS_SUBFLOW)
+                .filter(e -> e.type().equals(MuleGraphAdapter.CALLS_SUBFLOW))
                 .toList();
         assertTrue(refs.stream().anyMatch(
                 e -> e.to().equals("mule-subflow:validate-order-subflow")),
@@ -110,7 +111,7 @@ class MuleXmlFlowParserTest {
         parser.parseFiles(tempDir, List.of(mule), graph);
 
         assertTrue(graph.getOutgoingEdges("mule-flow:main-flow").stream()
-                .anyMatch(edge -> edge.type() == EdgeType.MULE_CALLS_SUBFLOW
+                .anyMatch(edge -> edge.type().equals(MuleGraphAdapter.CALLS_SUBFLOW)
                         && edge.to().equals("mule-subflow:later-subflow")));
     }
 
@@ -137,7 +138,7 @@ class MuleXmlFlowParserTest {
         parser.parseFiles(tempDir, List.of(caller, callee), graph);
 
         assertTrue(graph.getOutgoingEdges("mule-flow:caller-flow").stream()
-                .anyMatch(edge -> edge.type() == EdgeType.MULE_CALLS_SUBFLOW
+                .anyMatch(edge -> edge.type().equals(MuleGraphAdapter.CALLS_SUBFLOW)
                         && edge.to().equals("mule-flow:target-flow")),
                 "flow-ref to a flow defined in a later file must resolve to the flow node, not a subflow guess");
     }
@@ -155,7 +156,7 @@ class MuleXmlFlowParserTest {
     @Test
     void createsConnectorEdges() {
         List<GraphEdge> connectorEdges = graph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.MULE_USES_CONNECTOR)
+                .filter(e -> e.type().equals(MuleGraphAdapter.USES_CONNECTOR))
                 .toList();
         assertTrue(connectorEdges.size() >= 1,
                 "at least 1 MULE_USES_CONNECTOR edge should exist");
@@ -166,16 +167,16 @@ class MuleXmlFlowParserTest {
     @Test
     void parsesMule3Flow() {
         assertTrue(graph.hasNode("mule-flow:legacy-order-flow"));
-        assertEquals(NodeType.MULE_FLOW,
+        assertEquals(MuleGraphAdapter.FLOW,
                 graph.getNode("mule-flow:legacy-order-flow").type());
     }
 
     @Test
     void parsesMule3InboundEndpoint() {
         List<GraphEdge> endpoints = graph.getOutgoingEdges("mule-flow:legacy-order-flow").stream()
-                .filter(e -> e.type() == EdgeType.MULE_FLOW_CONTAINS)
+                .filter(e -> e.type().equals(MuleGraphAdapter.FLOW_CONTAINS))
                 .filter(e -> graph.getNode(e.to()) != null
-                        && graph.getNode(e.to()).type() == NodeType.MULE_ENDPOINT)
+                        && graph.getNode(e.to()).type().equals(MuleGraphAdapter.ENDPOINT))
                 .toList();
         assertTrue(endpoints.size() >= 1, "Mule 3 flow should contain at least 1 endpoint");
     }
@@ -183,9 +184,9 @@ class MuleXmlFlowParserTest {
     @Test
     void parsesMule3Transform() {
         List<GraphEdge> transforms = graph.getOutgoingEdges("mule-flow:legacy-order-flow").stream()
-                .filter(e -> e.type() == EdgeType.MULE_FLOW_CONTAINS)
+                .filter(e -> e.type().equals(MuleGraphAdapter.FLOW_CONTAINS))
                 .filter(e -> graph.getNode(e.to()) != null
-                        && graph.getNode(e.to()).type() == NodeType.MULE_TRANSFORM)
+                        && graph.getNode(e.to()).type().equals(MuleGraphAdapter.TRANSFORM))
                 .toList();
         assertEquals(1, transforms.size(), "Mule 3 flow should contain exactly 1 transform");
     }
@@ -193,9 +194,9 @@ class MuleXmlFlowParserTest {
     @Test
     void parsesMule3ExceptionStrategy() {
         List<GraphEdge> handlers = graph.getOutgoingEdges("mule-flow:legacy-order-flow").stream()
-                .filter(e -> e.type() == EdgeType.MULE_FLOW_CONTAINS)
+                .filter(e -> e.type().equals(MuleGraphAdapter.FLOW_CONTAINS))
                 .filter(e -> graph.getNode(e.to()) != null
-                        && graph.getNode(e.to()).type() == NodeType.MULE_ERROR_HANDLER)
+                        && graph.getNode(e.to()).type().equals(MuleGraphAdapter.ERROR_HANDLER))
                 .toList();
         assertEquals(1, handlers.size(), "Mule 3 flow should contain exactly 1 error handler");
     }
@@ -204,7 +205,7 @@ class MuleXmlFlowParserTest {
     void parsesMule3Connector() {
         assertTrue(graph.hasNode("mule-connector:httpConnector"),
                 "Mule 3 connector should exist");
-        assertEquals(NodeType.MULE_CONNECTOR,
+        assertEquals(MuleGraphAdapter.CONNECTOR,
                 graph.getNode("mule-connector:httpConnector").type());
     }
 

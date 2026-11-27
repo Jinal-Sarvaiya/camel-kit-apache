@@ -1103,8 +1103,8 @@ class InitServiceTest {
                 "Error should mention version detection failure");
         assertTrue(exception.getMessage().contains("camel.version property"),
                 "Error should suggest adding camel.version property");
-        assertTrue(exception.getMessage().contains("-p project.camelVersion"),
-                "Error should suggest -p flag");
+        assertFalse(exception.getMessage().contains("-p project.camelVersion"),
+                "A distribution override cannot record a discovered project version");
         assertTrue(exception.getMessage().contains("Refusing to guess"),
                 "Error should explicitly refuse to guess");
     }
@@ -1857,6 +1857,62 @@ class InitServiceTest {
         assertEquals("4.9.0", refreshed.getProperty("project.camelVersion"));
         assertEquals("value", refreshed.getProperty("team.custom"));
         assertFalse(refreshed.getProperty("project.discoveryGaps", "").contains("Project discovery failed"));
+    }
+
+    @Test
+    void reinitRefreshesObservedPlatformAndPreservesTheMigrationDestination() throws Exception {
+        Path project = tempDir.resolve("migration-source");
+        Files.createDirectories(project.resolve(".camel-kit"));
+        Files.writeString(project.resolve(".camel-kit/config.properties"), """
+                target.runtime=main
+                target.camelVersion=4.22.1
+                """);
+        String source = minimalCamelPom("3.20.0").replace("<dependencies>", """
+                <dependencyManagement><dependencies><dependency>
+                  <groupId>com.vendor.platform</groupId><artifactId>camel-spring-boot-bom</artifactId>
+                  <version>3.20.2</version><type>pom</type><scope>import</scope>
+                </dependency></dependencies></dependencyManagement>
+                <dependencies>
+                """);
+        Files.writeString(project.resolve("pom.xml"), source);
+        new InitService()
+                .initialize(requestForExistingProject(project, "claude", InitProgress.noop(), InitReporter.noop()));
+        var config = loadConfig(project);
+        assertEquals("3.20.0", config.getProperty("project.detectedCamelVersion"));
+        assertEquals("com.vendor.platform:camel-spring-boot-bom:3.20.2", config.getProperty("project.applicationBom"));
+        assertEquals("spring-boot", config.getProperty("project.runtime"));
+        assertEquals("main", config.getProperty("target.runtime"));
+        assertEquals("4.22.1", config.getProperty("target.camelVersion"));
+        assertEquals(source, Files.readString(project.resolve("pom.xml")));
+    }
+
+    @Test
+    void reinitKeepsRecoveredCoreAndProviderOnlyForTheSamePlatform() throws Exception {
+        Path project = Files.createDirectories(tempDir.resolve("starter-only"));
+        String pom
+                = """
+                        <project><modelVersion>4.0.0</modelVersion><groupId>example</groupId><artifactId>app</artifactId><version>1</version>
+                        <dependencyManagement><dependencies><dependency><groupId>org.apache.camel.springboot</groupId>
+                        <artifactId>camel-spring-boot-bom</artifactId><version>4.2</version><type>pom</type><scope>import</scope>
+                        </dependency></dependencies></dependencyManagement></project>
+                        """;
+        Files.writeString(project.resolve("pom.xml"), pom);
+        var request = requestForExistingProject(project, "claude", InitProgress.noop(), InitReporter.noop());
+        var service = new InitService();
+        service.initialize(request);
+        assertEquals("true", loadConfig(project).getProperty("project.needsResolvedCore"));
+        Files.writeString(project.resolve(".camel-kit/config.properties"),
+                "\nproject.camelVersion=4.1\nproject.springBootVersion=3.5\nproject.catalogBom=org.apache.camel.springboot:camel-catalog-provider-springboot:4.2\n",
+                java.nio.file.StandardOpenOption.APPEND);
+        service.initialize(request);
+        assertEquals("4.1", loadConfig(project).getProperty("project.camelVersion"));
+        assertTrue(loadConfig(project).containsKey("project.catalogBom"));
+        Files.writeString(project.resolve("pom.xml"), pom.replace(
+                "</project>", "<dependencies><dependency><groupId>org.apache.camel.springboot</groupId>"
+                              + "<artifactId>camel-timer-starter</artifactId></dependency></dependencies></project>"));
+        service.initialize(request);
+        assertNull(loadConfig(project).getProperty("project.camelVersion"));
+        assertNull(loadConfig(project).getProperty("project.catalogBom"));
     }
 
     private static String minimalCamelPom(String camelVersion) {

@@ -11,7 +11,7 @@ This guide defines file paths and execution order for the implementation pipelin
 > - `RUNTIME` — `main` (default Camel Main packaging), `spring-boot`, or `quarkus`
 > - `FLOW_NAME`, `CAMEL_VERSION`, `TARGET_MODULE`
 > - `MODULE_NAME`, plus complete module `ROUTE_FILES` and `XSL_FILES` inventories for consolidated runtime artifacts
-> - `PLATFORM_BOM` — resolved from `CAMEL_VERSION` + `RUNTIME` via `skills/shared/mcp-setup.md`
+> - `PLATFORM_BOM` — the selected profile’s `catalog.platformBom` from `shared/mcp-setup.md`
 
 **Migration design specs:** If the active flow design contains a "Migrated From" field, handle its additional artifacts
 alongside the standard pipeline steps. Camel Main designs must already have translated all Java/Blueprint logic to

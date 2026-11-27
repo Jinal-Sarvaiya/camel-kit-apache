@@ -68,7 +68,15 @@ Provides the domain knowledge guides needed to validate generated Apache Camel r
 
 ## Runtime Path Inventory (MANDATORY)
 
-Before loading validation stages, read `project.runtime` and every flow's `Target Module`. Build an exact inventory for
+Use the target profile and migration handoff in `shared/mcp-setup.md`, Rule 1. For a direct migration,
+identify the destination from its migration note and ask which application to validate if scope is ambiguous.
+
+For a Maven destination, run the wrapper's `help:effective-pom` for the destination module and pass the output to
+the same target command with `--check-effective-pom <file>`. For in-place validation also supply the fresh
+`--dependency-tree <json>` from that leaf under the same Maven settings (see the version-selection guide). Keep the output workspace-relative and temporary
+during report-only validation. Record a missing model or version mismatch as INCOMPLETE.
+
+Before loading validation stages, read the selected profile's `runtime` and every flow's `Target Module`. Build an exact inventory for
 each module using the same optional relative module prefix as `camel-implement/guides/orchestrator.md`:
 
 - Main: `ROUTE_FILES` is every `{MODULE_PREFIX}*.camel.yaml`; `PROPS_FILE` is
@@ -418,8 +426,9 @@ generated:
 
 **Date:** YYYY-MM-DD HH:mm
 **Project:** {project name from .camel-kit/config.properties}
-**Runtime:** {project.runtime from config.properties, or "not yet selected"}
-**Camel Version:** {project.camelVersion from config.properties, or "not yet selected"}
+**Runtime:** {selected profile runtime, or "not yet selected"}
+**Camel Version:** {selected profile camelVersion, or "not yet selected"}
+**Required catalog check:** {PASS or INCOMPLETE with the diagnostic from target --check-catalog}
 
 ## Summary
 

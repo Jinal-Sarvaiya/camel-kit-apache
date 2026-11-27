@@ -1,9 +1,7 @@
 # Camel Migrate Mule - MuleSoft → Apache Camel Migration
 
 > **Context variables provided by master SKILL.md:**
-> - `CAMEL_VERSION` — target Camel version from `.camel-kit/config.properties`
-> - `RUNTIME` — from `.camel-kit/config.properties` (`project.runtime`, default: `main`)
-> - `PLATFORM_BOM` — resolved from `CAMEL_VERSION` + `RUNTIME` via the version mapping table in `skills/shared/mcp-setup.md`
+> - `CAMEL_VERSION`, `RUNTIME`, `PLATFORM_BOM` — use the exact `catalog` fields from `{COMMAND_PREFIX} target --migration`
 > - Confirmed analysis summary (with ✓/~/? markers) from `camel-migrate`
 > - Full list of source artifact paths
 > - Detected vendor: MuleSoft Mule (3.x or 4.x)

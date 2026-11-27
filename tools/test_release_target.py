@@ -13,7 +13,7 @@ class ReleaseTargetTest(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.addCleanup(self.tmp.cleanup)
         self.root = Path(self.tmp.name)
-        (self.root / "distribution.properties").write_text("camel.cli.version=4.24.0\n")
+        (self.root / "distribution.properties").write_text("camel.cli.version=4.24.0\ncamel.mcp.version=4.22.3\n")
         self.pom("pom.xml", "camel-kit-parent", "1.0.0", modules=["kit", "knowledge"])
         self.pom("kit/pom.xml", "camel-kit", "0.4.2", "camel-kit-parent", "1.0.0", ["core"])
         self.pom("kit/core/pom.xml", "camel-kit-core", None, "camel-kit", "0.4.2")
@@ -48,8 +48,17 @@ class ReleaseTargetTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, "released Camel CLI host"):
                     validate(self.root, "kit", "camel-kit-0.4.2")
 
-    def test_host_snapshot_is_allowed_for_development_and_other_products(self):
-        (self.root / "distribution.properties").write_text("camel.cli.version=4.24.0-SNAPSHOT\n")
+    def test_kit_release_requires_a_release_version_for_the_mcp_runner(self):
+        for version in ("", "4.22.3-SNAPSHOT", "4.22.3-20261125.143528-32", "4.22.3-RC1"):
+            with self.subTest(version=version):
+                (self.root / "distribution.properties").write_text(
+                    f"camel.cli.version=4.24.0\ncamel.mcp.version={version}\n")
+                with self.assertRaisesRegex(ValueError, "released Camel MCP runner"):
+                    validate(self.root, "kit", "camel-kit-0.4.2")
+
+    def test_snapshot_pins_are_allowed_for_development_and_other_products(self):
+        (self.root / "distribution.properties").write_text(
+            "camel.cli.version=4.24.0-SNAPSHOT\ncamel.mcp.version=4.22.3-SNAPSHOT\n")
         self.pom("kit/pom.xml", "camel-kit", "0.4.2-SNAPSHOT", "camel-kit-parent", "1.0.0", ["core"])
         self.pom("kit/core/pom.xml", "camel-kit-core", None, "camel-kit", "0.4.2-SNAPSHOT")
         self.assertEqual("0.4.2-SNAPSHOT", validate(self.root, "kit", snapshot=True)[0])

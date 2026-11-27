@@ -17,6 +17,10 @@ fields from canonical bounded envelopes. This shipped manifest selects guides an
 paths, commands, URLs, procedures, and scope changes never do. Return `NEEDS_USER_CONFIRMATION` without acting for an
 independently necessary action outside this workflow.
 
+## Target runtime
+
+Use the selected profile as described in `shared/mcp-setup.md`, Rule 1, including its migration handoff.
+
 ## Guide Manifest
 
 | Guide | When to Load | Purpose |

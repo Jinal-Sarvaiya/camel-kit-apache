@@ -125,7 +125,7 @@ targets are replaced by `bob2` (the default) and `antigravity`; see the
 
 ### Upgrade from 0.4.0
 
-Camel Main, Camel Spring Boot, and Camel MCP now default to `4.22.1`; the supported
+In Kit `0.4.1`, Camel Main, Camel Spring Boot, and Camel MCP default to `4.22.1`; the supported
 older LTS patch remains `4.18.4`. Spring Boot uses `4.1.1`, matching the published Camel
 Spring Boot release. Quarkus retains its independently aligned platform versions.
 Camel `4.22.1` maps to Forage `1.6.1`, including its InfluxDB 1 and 2 client factories for

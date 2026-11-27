@@ -48,7 +48,7 @@ class GroovyGraphParserTest {
     @Test
     void parsesToEndpoints() {
         List<GraphEdge> routesTo = graph.getOutgoingEdges("route:groovyTimer").stream()
-                .filter(e -> e.type() == EdgeType.ROUTES_TO)
+                .filter(e -> e.type().equals(EdgeType.ROUTES_TO))
                 .toList();
         assertEquals(1, routesTo.size());
         assertEquals("endpoint:direct:enrichOrder", routesTo.get(0).to());
@@ -57,7 +57,7 @@ class GroovyGraphParserTest {
     @Test
     void detectsInlineGroovyScript() {
         List<GraphEdge> processors = graph.getOutgoingEdges("route:groovyTimer").stream()
-                .filter(e -> e.type() == EdgeType.PROCESSES)
+                .filter(e -> e.type().equals(EdgeType.PROCESSES))
                 .toList();
         boolean hasGroovyScript = processors.stream()
                 .map(e -> graph.getNode(e.to()))

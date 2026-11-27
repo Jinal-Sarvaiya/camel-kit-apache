@@ -40,6 +40,10 @@ Do NOT generate any implementation artifacts (YAML, properties, POM, Docker Comp
 
 ---
 
+## Target runtime
+
+Use the selected profile as described in `shared/mcp-setup.md`, Rule 1, including its migration handoff.
+
 ## Invocation Modes
 
 This skill supports two invocation modes (see `shared/pipeline-infrastructure.md` for details):
@@ -155,7 +159,7 @@ otherwise unauthorized action is genuinely required, return `NEEDS_USER_CONFIRMA
 
 ## Existing Project Scope Protection
 
-**Check `.camel-kit/config.properties` for `project.type=existing`.**
+**Check `.camel-kit/config.properties` for `project.type=existing`.** Apply source version locks only when adding to the existing application. For a migration plan use the approved destination.
 
 If this is an existing project, enforce these additional constraints during planning:
 
@@ -168,7 +172,8 @@ project.type=existing              # Confirms existing project mode
 project.camelVersion=4.8.0         # LOCKED - cannot upgrade
 project.detectedCamelVersion=4.8.0 # Original detected version
 project.runtime=spring-boot        # LOCKED - cannot change
-project.platformBomVersion=3.3.4   # LOCKED - cannot upgrade
+project.applicationBom=org.apache.camel.springboot:camel-spring-boot-bom:4.8.0  # Observed import, when available
+project.platformBomVersion=4.8.0   # LOCKED - cannot upgrade
 project.springBootVersion=3.3.4    # Spring Boot framework version read from the pom - LOCKED, never taken from the version tables
 project.primaryDsl=yaml            # LOCKED - all new routes must use this DSL
 project.dslTypes=YAML              # All detected DSL types
@@ -180,6 +185,7 @@ project.moduleCount=2              # Number of entries in project.modules
 project.beansCount=2               # Annotated classes plus YAML `beans:` entries; @Bean methods are not counted
 project.configFilesCount=1         # application*.properties / application*.yml files read by the graph
 project.contractFilesCount=1       # Interface contract files (OpenAPI, WSDL, XSD, proto, Avro) listed in .camel-kit/baseline-contracts.txt
+project.needsResolvedCore=true     # When core evidence is missing, recover it from the Maven model and tree
 project.discoveryGaps=...          # Only present when discovery could not cover something - inspect source, ask the user
 project.unsupportedCombination=... # Only present for an unsupported runtime/DSL - STOP, do not plan additions
 project.unsupportedVersion=true    # Only present for Camel 3.x - STOP, do not plan additions
@@ -191,8 +197,9 @@ them to upgrade to Camel 4.x before planning. Do not plan against a guessed or n
 **`project.unsupportedCombination` is a hard stop.** Report its value to the user. Do not plan additions, convert the
 DSL or switch the runtime to make the project fit.
 
-**A missing `project.runtime` or `project.camelVersion` is a hard stop.** It means discovery found conflicting
-evidence (two runtimes, or two Camel versions) or could not read the project. The matching `project.discoveryGaps` entry
+When `project.needsResolvedCore=true` and `project.camelVersion` is missing, first follow “Recover the core version from Maven” in
+`camel-brainstorm/guides/version-selection.md`. **A missing `project.runtime` or `project.camelVersion` after recovery is a hard stop.** Check the discovery report for conflicting
+evidence (two runtimes or two Camel versions) or an unreadable project. The matching `project.discoveryGaps` entry
 names the evidence. Report it and ask the user to resolve it; do not pick one, and do not fill the value in from the
 shipped version tables.
 

@@ -34,9 +34,9 @@ class FullGraphIntegrationTest {
 
     @Test
     void crossLinkerCreatedLinks() {
-        long linksTo = graph.getEdges().stream().filter(e -> e.type() == EdgeType.LINKS_TO).count();
-        long usesComponent = graph.getEdges().stream().filter(e -> e.type() == EdgeType.USES_COMPONENT).count();
-        long configures = graph.getEdges().stream().filter(e -> e.type() == EdgeType.CONFIGURES).count();
+        long linksTo = graph.getEdges().stream().filter(e -> e.type().equals(EdgeType.LINKS_TO)).count();
+        long usesComponent = graph.getEdges().stream().filter(e -> e.type().equals(EdgeType.USES_COMPONENT)).count();
+        long configures = graph.getEdges().stream().filter(e -> e.type().equals(EdgeType.CONFIGURES)).count();
 
         assertTrue(linksTo >= 1, "At least one direct/seda link");
         assertTrue(usesComponent >= 1, "At least one component-to-artifact link");
@@ -80,19 +80,19 @@ class FullGraphIntegrationTest {
 
         // USES_TYPE edges exist
         var usesTypeEdges = diGraph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.USES_TYPE)
+                .filter(e -> e.type().equals(EdgeType.USES_TYPE))
                 .toList();
         assertFalse(usesTypeEdges.isEmpty(), "Should have USES_TYPE edges");
 
         // Interface expansion worked
         var expansionEdges = diGraph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.DEPENDS_ON_VIA_INTERFACE)
+                .filter(e -> e.type().equals(EdgeType.DEPENDS_ON_VIA_INTERFACE))
                 .toList();
         assertFalse(expansionEdges.isEmpty(), "Should have DEPENDS_ON_VIA_INTERFACE edges");
 
         // PropertyBindingParser created INSTANTIATES edge
         var instantiatesEdges = diGraph.getEdges().stream()
-                .filter(e -> e.type() == EdgeType.INSTANTIATES)
+                .filter(e -> e.type().equals(EdgeType.INSTANTIATES))
                 .toList();
         assertFalse(instantiatesEdges.isEmpty(), "Should have INSTANTIATES edges from #class: properties");
 

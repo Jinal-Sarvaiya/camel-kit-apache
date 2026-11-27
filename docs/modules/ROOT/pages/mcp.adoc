@@ -23,11 +23,11 @@ configured repositories.
 | The Citrus action and endpoint catalogs, the YAML DSL schema and the test-authoring guidance used by `camel-test`
 |===
 
-The JBang runner coordinates of this release:
+The distribution configures these JBang runner coordinates.
 
 [subs="attributes+"]
 ----
-camel            org.apache.camel:camel-jbang-mcp:{camel-version}:runner
+camel            org.apache.camel:camel-jbang-mcp:{camel-mcp-version}:runner
 camel-knowledge  io.github.luigidemasi:camel-kit-knowledge-mcp:{camel-kit-knowledge-version}:runner
 citrus           org.citrusframework:citrus-mcp-server:{citrus-version}:runner
 ----
@@ -45,7 +45,7 @@ The generated configuration is, in the target's JSON or TOML shape:
         "-Dcamel.catalog.repos=<configured catalog repositories>",
         "-Dquarkus.log.level=WARN",
         "-Dquarkus.http.port=-1",
-        "org.apache.camel:camel-jbang-mcp:{camel-version}:runner"
+        "org.apache.camel:camel-jbang-mcp:{camel-mcp-version}:runner"
       ]
     }
   }
@@ -68,25 +68,23 @@ response's authority rather than increasing it. See xref:skills.adoc#context-aut
 [[binding]]
 == Version binding
 
-Every version-sensitive catalog call passes the project's `runtime` (`main`, `spring-boot` or `quarkus`) and the full
-platform BOM coordinate derived from `.camel-kit/config.properties`; a call without them is answered from the catalog
-bundled in the server, which may be the wrong version.
+Every version-sensitive call uses the `catalog` arguments from `camel-kit target`
+(`--migration` for a migration destination). The `platformBom` tool parameter accepts these coordinates:
 
 [cols="1,3"]
 |===
-| Runtime | Platform BOM
-
-| `main` | `org.apache.camel:camel-catalog:<project.camelVersion>`
-| `spring-boot` | `org.apache.camel.springboot:camel-catalog-provider-springboot:<project.camelVersion>`
-| `quarkus` | `io.quarkus.platform:quarkus-camel-bom:<project.platformBomVersion>`
+| Runtime | Catalog lookup coordinate
+| Main | `org.apache.camel:camel-catalog` at the selected Camel core version
+| Spring Boot | The full `camel-catalog-provider-springboot` coordinate at its provider version
+| Quarkus | The selected platform's `quarkus-camel-bom` coordinate
 |===
 
-The version binding comes from `.camel-kit/config.properties` (`project.runtime`, `project.camelVersion`,
-`project.platformBomVersion`). Every catalog call passes `runtime` and the full `platformBom` GAV derived from those
-properties — those parameters are the binding. Detail tools do not all echo a version, so each artifact is validated
-by type and name against the request instead. A detail-call error is not proof of absence: an artifact is recorded as
-`NOT_FOUND` only after a successful list call with a complete enumeration contains no exact match, and as `UNVERIFIED`
-when completeness or the binding cannot be established.
+The workflow checks the core version reported by `camel_catalog_components` and the runtime-specific
+timer artifact returned by `camel_catalog_component_maven`. It records each request and result against the
+whole profile. A missing tool, a bundled core version different from the selection, or a mismatched runtime
+artifact produces `INCOMPLETE` even when an individual lookup succeeds. Detail tools may omit the core
+version. They use the verified binding and must match the requested artifact identity.
+A complete, successful exact-name list is required to establish absence.
 
 For behaviour questions — YAML shape, runtime configuration, version changes, header propagation — skills call
 `camel_docs_search` on the `camel-knowledge` server, not `camel`. The knowledge server tools (`camel_docs_search`,
@@ -94,7 +92,32 @@ For behaviour questions — YAML shape, runtime configuration, version changes, 
 the catalog with documentation search; catalog tools (`camel_catalog_*`) remain on `camel`.
 
 The current defaults are Camel {camel-version} for Camel Main and Spring Boot, with Camel {camel-quarkus-version}
-on the Quarkus platform {quarkus-platform-version}; the catalog server artifact follows the Camel Main stream.
+on Quarkus platform {quarkus-platform-version}. The distribution sets the catalog runner independently with
+`camel.mcp.version`.
+
+[[catalog-compatibility]]
+=== Catalog results for the tested runner
+
+The table records catalog checks against the Camel MCP `4.22.3` runner published on Maven Central.
+Each check verified both the returned Camel core and the version of the runtime's timer artifact.
+
+[cols="1,2,1,1",options="header"]
+|===
+|Runtime |Application BOM version |Requested and returned Camel core |Check
+|Main |None |4.22.1 |Pass
+|Main |None |4.18.4 |Pass
+|Spring Boot |4.22.1 |4.22.1 |Pass
+|Spring Boot |4.18.4 |4.18.4 |Pass
+|Quarkus (default) |3.33.3.2 |4.18.3 |Pass
+|Quarkus |3.27.4.1 |4.14.7 |Pass
+|===
+
+The Red Hat Spring Boot example with starter BOM `4.14.4.redhat-00010` resolved core `4.14.4.redhat-00008`
+in Maven. The tested runner returned its bundled `4.22.3` core, so its catalog check was `INCOMPLETE`.
+
+The check applies to greenfield designs, existing applications and migrations.
+Verify the actual responses for the configured runner and target before using catalog evidence in a design.
+See the xref:existing-project.adoc#catalog-limitation[runtime catalog limitation].
 
 [[camel-tools]]
 == The Camel catalog server

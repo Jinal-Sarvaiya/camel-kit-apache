@@ -104,7 +104,7 @@ with that exact revision. See xref:commands.adoc[] for `nextId`, `doc check` and
 [[iron-laws]]
 == Iron Laws
 
-Six rules apply at every stage; every skill and every reviewer persona refers to them.
+Seven rules apply at every stage; every skill and every reviewer persona refers to them.
 
 . *Catalog verification.* Every component, EIP, data format and language is verified through the catalog MCP server,
   for the project's runtime and platform BOM, before it is written into a design or a route. The tool call and its
@@ -125,6 +125,10 @@ Six rules apply at every stage; every skill and every reviewer persona refers to
   runs them in fresh contexts where the agent supports subagents, or sequentially in the same session otherwise,
   recording the missing isolation. Verified findings go back to the implementer, for at most three cycles.
 . *Surgical changes.* A task touches only what it requires: no adjacent refactoring, cleanup or unrelated TODO work.
+. *Deliverables in project directory.* All implementation artifacts (routes, configuration, POMs, Java files, tests,
+  Docker Compose for the application) are written directly into the project directory from the first edit and
+  iterated on in place. Temporary directories are only for throwaway verification artifacts like the environment
+  probe skeleton, which uses `mktemp -d /tmp/camel-kit-probe-XXXXXX` and is cleaned up after the probe completes.
 
 [[internal-skills]]
 == Internal skills

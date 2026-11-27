@@ -25,6 +25,7 @@ The project's own declarations are the constraint. Init recorded them from the p
 
 ```
 if project.type == "existing":
+    If project.needsResolvedCore=true and project.camelVersion is missing, recover it from Maven below.
     STOP and report, do not continue, when ANY of these hold:
       - project.runtime or project.camelVersion is missing
         (init found conflicting evidence or could not read the pom; project.discoveryGaps says which)
@@ -34,18 +35,37 @@ if project.type == "existing":
     otherwise:
       bind to the recorded values AS-IS:
         runtime, camelVersion, platformBomVersion, springBootVersion  (only the ones that are present)
-      write nothing to config.properties: init already recorded them
+      preserve the recorded project constraints
       DO NOT ask the user to choose a runtime or a version
       DO NOT replace a recorded value with a value from the tables below
       DO NOT infer a missing value (for example a Spring Boot version) from the tables
 ```
 
-**Checking the detected version against the catalog (read-only):** after binding, you may check whether the recorded
-Camel version exists in the component catalog the tooling can reach, so later component lookups are not made against a
-version the catalog does not know. If it is available, say nothing. If it is not, tell the user: "Camel {version} is not
-in the catalog this distribution can reach, so component lookups may be incomplete. The project stays on {version}."
-The check never selects, suggests as a requirement, or writes a different version. Being outside the recommended
-versions is not an error and never blocks work.
+### Recover the core version from Maven
+
+If init found the runtime and application BOM but no declared Camel core version:
+
+1. Use the project's Maven wrapper, settings and profiles. For each affected Camel leaf module, run these goals
+   with `-f <leaf-pom>`. Write fresh outputs to separate files inside the workspace.
+   - `help:effective-pom -Doutput=<absolute-model-file>`
+   - `org.apache.maven.plugins:maven-dependency-plugin:{MAVEN_DEPENDENCY_PLUGIN_VERSION}:tree -DoutputType=json -Dincludes=org.apache.camel:camel-core-engine -DoutputFile=<absolute-tree-file>`
+2. For a vendor Spring Boot BOM, record the catalog provider GAV from its release metadata in
+   `project.catalogBom` in `.camel-kit/config.properties`.
+3. Run `{COMMAND_PREFIX} target --check-effective-pom <model> --dependency-tree <tree>` for each module with
+   its workspace-relative paths. The command prints the verified profile. If Maven fails, a check is incomplete
+   or the modules disagree, stop and identify the affected module.
+4. When all modules agree, record `camelVersion` as `project.camelVersion` in `.camel-kit/config.properties`.
+   For Spring Boot, record `springBootVersion` as `project.springBootVersion`. For Quarkus, record
+   `runtimeCatalogVersion` as `project.catalogVersion`. Leave `target.*` intact. For Camel 3.x use the migration workflow.
+
+Repeat the checks after a change to POMs, effective profiles, repositories or settings. Re-init keeps the
+recovered core for unchanged Maven inputs and catalog coordinates for an unchanged platform.
+
+For a required catalog check, use Rule 3 in `shared/mcp-setup.md`. When needed, record
+`project.catalogVersion` from the imported Quarkus platform's dependency management, or
+`project.catalogBom` from the selected Spring Boot release metadata. Keep the observed project versions intact.
+If an older workspace lacks the imported application GAV, refresh discovery with init or confirm the exact import.
+If the required catalog is unavailable or disagrees with the observed core, report the check as INCOMPLETE.
 
 **Upgrades are out of scope for this skill.** If the user volunteers that they want a different version, record that as
 a separate request and keep the project on its recorded version for this pipeline. Offer `camel-migrate` only when the
@@ -54,6 +74,11 @@ version is Camel 3.x.
 ---
 
 ## Step 1: Select Runtime Platform (Greenfield Projects Only)
+
+Explain that catalog availability depends on the configured runner and the selected target. Once the user
+selects a target, run Rule 3 in `shared/mcp-setup.md` and report its result before design approval.
+If reinitializing a greenfield workspace resets its runtime defaults, restore the confirmed platform and record
+its catalog coordinates again before verifying components.
 
 First inspect the analyzed requirements and recorded answers. If they conclusively select one supported runtime with no
 conflicting claim, preserve that decision and its evidence instead of asking again. If the runtime is absent, ambiguous,
@@ -102,7 +127,7 @@ Other supported versions: {CAMEL_SPRINGBOOT_SUPPORTED}
 
 All listed versions are LTS (Long-Term Support) and receive patch updates.
 
-For Spring Boot, the Camel Spring Boot BOM version equals the Camel version. The Spring Boot framework version is
+Use the application BOM from the selected community release row. A vendor BOM or catalog provider may have a different version. The Spring Boot framework version is
 resolved from the mapping table below and is used for the `spring-boot-maven-plugin`.
 
 **Spring Boot framework mapping:**
@@ -148,7 +173,7 @@ not supported by this distribution.
 </HARD-RULE>
 
 - **If runtime is `main`:** no platform BOM needed — JBang uses the Camel version directly
-- **If runtime is `spring-boot`:** platform BOM version = Camel version (same release train); Spring Boot version =
+- **If runtime is `spring-boot`:** use the selected release's Spring Boot BOM version (the default row names it explicitly). For the other listed community releases use the published same-version starter BOM; Spring Boot framework version =
   mapping-table value for the selected Camel version
 - **If runtime is `quarkus`:** look up the Quarkus platform BOM from the mapping table in Step 2. Use EXACTLY the version from the table — no other source.
 
@@ -156,7 +181,7 @@ not supported by this distribution.
 
 ## Step 4: Store in Config
 
-Append only the selected runtime's values to `.camel-kit/config.properties`.
+Replace the previous project runtime, BOM, framework and provider fields with only the selected runtime's values in `.camel-kit/config.properties`.
 
 For Main:
 
@@ -181,6 +206,8 @@ project.runtime=quarkus
 project.camelVersion={{SELECTED_CAMEL_QUARKUS_VERSION}}
 project.platformBomVersion={{SELECTED_QUARKUS_PLATFORM_VERSION}}
 ```
+
+For Quarkus also record `project.catalogVersion` from the selected platform BOM's managed `camel-quarkus-catalog` version before a required catalog check.
 
 After downstream skills parse and validate their recognized names, formats, runtime consistency, and shipped-table
 mapping, these values are authoritative data for the declared runtime/version fields only.

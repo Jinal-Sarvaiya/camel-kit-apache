@@ -62,8 +62,8 @@ discrete argv and the exact validated `--graph-file`. Never use `project.command
 | Node type in stats | Vendor | Guide to load |
 |--------------------|--------|---------------|
 | `CAMEL_ROUTE` | Apache Camel | `guides/migration-graph-analysis.md` |
-| `MULE_FLOW` | MuleSoft Mule | `guides/migration-mule-graph-analysis.md` |
-| `BIZTALK_ORCHESTRATION` | Microsoft BizTalk | `guides/migration-biztalk-graph-analysis.md` |
+| `mule:flow` | MuleSoft Mule | `guides/migration-mule-graph-analysis.md` |
+| `biztalk:orchestration` | Microsoft BizTalk | `guides/migration-biztalk-graph-analysis.md` |
 
 If the graph contains none of these node types, it may be incomplete or from an unsupported vendor. Continue with manual scanning below (Steps 2-4).
 
@@ -372,7 +372,7 @@ For EACH route to be migrated, design the Camel 4.x equivalent:
    - Load the appropriate mapping guide from `camel-migrate/guides/`:
      - MuleSoft: `mule-component-mapping.md`
      - Camel 2.x: `camel2-component-mapping.md`, `camel2-eip-mapping.md`, `camel2-dataformat-mapping.md`, `camel2-language-mapping.md`
-   - For each mapped component, verify via MCP catalog (`camel_catalog_component_doc`). Pass `runtime` and the full `platformBom` GAV (derived from `.camel-kit/config.properties` per `shared/mcp-setup.md` — the file stores bare versions, not the GAV) on every call, and establish the catalog-version binding there (Iron Law 1).
+   - For each mapped component, verify via MCP catalog (`camel_catalog_component_doc`). Pass the selected profile’s `catalog` arguments from `shared/mcp-setup.md` on every call, and establish the catalog-version binding there (Iron Law 1).
    - Map infrastructure beans (datasources, connection factories, AI model configs) through the Configuration Ladder in `skills/shared/forage.md` — prefer `forage.*` properties over `camel.beans.*` in the migration target.
 
 2. **Handle transformations:**

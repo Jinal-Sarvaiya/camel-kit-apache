@@ -2,20 +2,25 @@ package org.apache.camel.kit.service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.AccessDeniedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.camel.kit.catalog.CitrusSchemaDownloader;
@@ -33,11 +38,16 @@ import org.apache.camel.kit.generator.QuteTemplateEngine;
 import org.apache.camel.kit.graph.GraphBuildResult;
 import org.apache.camel.kit.graph.GraphSerializer;
 import org.apache.camel.kit.graph.ParserDiagnostic;
+import org.apache.camel.kit.graph.ProjectDiscovery;
+import org.apache.camel.kit.graph.ProjectDiscovery.DiscoveryResult;
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.RuntimeDetector;
 import org.apache.camel.kit.graph.model.NodeType;
+import org.apache.camel.kit.graph.parser.GraphParser;
 import org.apache.camel.kit.util.ConfinedPaths;
 import org.apache.camel.kit.util.TemplateUtils;
 import org.apache.camel.kit.workflow.MigrationParsers;
+import org.apache.camel.kit.workflow.SkillCatalog;
 
 /**
  * Initializes Camel-Kit workspaces.
@@ -165,10 +175,12 @@ public class InitService {
                 targetDir, camelKitDir, docsDir, createdPaths);
         progress.finishTask();
 
+        Properties previous;
         try {
             progress.startTask("\uD83D\uDCDD", "Writing configuration");
             files.beginCatalogTracking();
-            createConfigFile(camelKitDir, request.projectName(), request.agentName(), agent, request, createdPaths,
+            previous = createConfigFile(camelKitDir, request.projectName(), request.agentName(), agent, request,
+                    createdPaths,
                     isExistingProject);
             createConstitution(docsDir, request, files, createdPaths);
             copyAdditionalTemplates(camelKitDir.resolve("templates"), createdPaths);
@@ -197,7 +209,7 @@ public class InitService {
         }
 
         progress.startTask("\uD83D\uDD0D", "Building project graph");
-        InitGraphSummary graph = buildProjectGraph(targetDir, camelKitDir, request, warnings, createdPaths);
+        InitGraphSummary graph = buildProjectGraph(targetDir, camelKitDir, request, warnings, createdPaths, previous);
         progress.finishTask();
 
         int citrusSchemaCount = 0;
@@ -264,7 +276,7 @@ public class InitService {
         createdPaths.add(path);
     }
 
-    private void createConfigFile(
+    private Properties createConfigFile(
             Path dir,
             String name,
             String agentName,
@@ -281,9 +293,14 @@ public class InitService {
                 config.load(in);
             }
         }
+        Properties previous = (Properties) config.clone();
         // Discovery must not retain constraints from an earlier scan when declarations disappear or conflict.
         for (String key : List.of("project.runtime", "project.camelVersion", "project.detectedCamelVersion",
-                "project.platformBomVersion", "project.detectedPlatformBomVersion", "project.springBootVersion",
+                "project.needsResolvedCore", "project.mavenInputs", "project.applicationBom", "project.catalogBom",
+                "project.catalogVersion",
+                "project.platformBomVersion",
+                "project.detectedPlatformBomVersion",
+                "project.springBootVersion",
                 "project.primaryDsl", "project.dslTypes", "project.hasTests", "project.baselineTestStatus",
                 "project.routeCount", "project.contractFilesCount", "project.discoveryGaps",
                 "project.unsupportedCombination", "project.modules", "project.moduleCount", "project.beansCount",
@@ -297,6 +314,7 @@ public class InitService {
         config.setProperty("agent.name", agentName);
         config.setProperty("agent.folder", agent.folder());
         config.setProperty("citrus.version", request.resolvedCitrusVersion());
+        config.setProperty("camel.catalog.repos", request.distribution().camelCatalogRepos());
         if (request.withCitrusMcp()) {
             config.setProperty("citrus.mcp.version", request.distribution().citrusMcpVersion());
             config.setProperty("citrus.mcp.enabled", "true");
@@ -319,6 +337,7 @@ public class InitService {
         config.store(out, "Camel-Kit Project Configuration");
         AtomicFileWriter.write(configFile, out.toByteArray());
         createdPaths.add(configFile);
+        return previous;
     }
 
     private void cacheForageCatalog(Path camelKitDir, InitRequest request, List<InitWarning> warnings)
@@ -425,7 +444,7 @@ public class InitService {
             Path camelKitDir,
             InitRequest request,
             List<InitWarning> warnings,
-            List<Path> createdPaths)
+            List<Path> createdPaths, Properties previous)
             throws Exception {
         Path graphFile = camelKitDir.resolve("project-graph.json");
         try {
@@ -446,10 +465,9 @@ public class InitService {
                     Files.deleteIfExists(temporary);
                 }
                 createdPaths.add(graphFile);
-                String detectedProjectType = detectProjectType(projectGraph);
+                String detectedProjectType = detectProjectType(projectGraph, request, warnings);
                 String detectedRuntime
-                        = updateConfigWithRuntime(camelKitDir, projectGraph, request.distribution(), request, warnings,
-                                targetDir);
+                        = updateConfigWithRuntime(camelKitDir, result, request, warnings, targetDir, previous);
                 InitGraphSummary graph = new InitGraphSummary(
                         graphFile,
                         projectGraph.nodeCount(),
@@ -531,11 +549,8 @@ public class InitService {
 
     private String updateConfigWithRuntime(
             Path dir,
-            ProjectGraph graph,
-            DistributionConfig distribution,
-            InitRequest request,
-            List<InitWarning> warnings,
-            Path projectRoot)
+            GraphBuildResult result, InitRequest request, List<InitWarning> warnings,
+            Path projectRoot, Properties previous)
             throws Exception {
         Path configFile = dir.resolve("config.properties");
         Properties config = new Properties();
@@ -546,9 +561,9 @@ public class InitService {
             }
         }
 
-        // Use ProjectDiscovery for comprehensive metadata
-        org.apache.camel.kit.graph.ProjectDiscovery.DiscoveryResult discovery
-                = org.apache.camel.kit.graph.ProjectDiscovery.discover(graph);
+        ProjectGraph graph = result.graph();
+        DistributionConfig distribution = request.distribution();
+        DiscoveryResult discovery = ProjectDiscovery.discover(graph);
 
         boolean isExistingProject = "existing".equals(config.getProperty("project.type"));
         String runtime = discovery.runtime();
@@ -565,22 +580,47 @@ public class InitService {
             if (discovery.camelVersion() != null) {
                 config.setProperty("project.camelVersion", discovery.camelVersion());
                 config.setProperty("project.detectedCamelVersion", discovery.camelVersion());
-            } else if (!discovery.hasConflict()) {
+            } else if (!discovery.hasConflict() && !"spring-boot".equals(runtime) && !"quarkus".equals(runtime)) {
                 // ERROR: Cannot proceed with undetectable version on existing project
                 throw new IllegalStateException(
                         "Cannot detect Camel version from existing project. "
-                                                + "Add a camel.version property to pom.xml, or specify the version explicitly with "
-                                                + "-p project.camelVersion=<version>. "
+                                                + "Add a verified camel.version property to pom.xml. "
                                                 + "Refusing to guess a version for an existing project.");
             }
             // With conflicting evidence neither value is locked; the gap below tells the user what to resolve.
 
             if (discovery.platformBomVersion() != null) {
+                String applicationBom = ProjectDiscovery.applicationBom(graph, runtime);
+                if (applicationBom != null) {
+                    config.setProperty("project.applicationBom", applicationBom);
+                }
                 config.setProperty("project.platformBomVersion", discovery.platformBomVersion());
                 config.setProperty("project.detectedPlatformBomVersion", discovery.platformBomVersion());
             }
             if (discovery.springBootVersion() != null) {
                 config.setProperty("project.springBootVersion", discovery.springBootVersion());
+            }
+
+            // A POM edit can change the resolved dependency tree even when the imported platform stays the same.
+            String inputs = mavenInputs(projectRoot, result);
+            config.setProperty("project.mavenInputs", inputs);
+            boolean sameModel = inputs.equals(previous.getProperty("project.mavenInputs"))
+                    && config.getProperty("project.applicationBom") != null && !discovery.hasConflict()
+                    && Objects.equals(runtime, previous.getProperty("project.runtime"))
+                    && Objects.equals(config.getProperty("project.applicationBom"),
+                            previous.getProperty("project.applicationBom"))
+                    && Objects.equals(config.getProperty("camel.catalog.repos"),
+                            previous.getProperty("camel.catalog.repos"));
+            if (sameModel && discovery.camelVersion() == null) {
+                copyProperty(previous, config, "project.camelVersion");
+            }
+
+            if (discovery.camelVersion() == null && !discovery.hasConflict()
+                    && config.containsKey("project.applicationBom")) {
+                config.setProperty("project.needsResolvedCore", "true");
+            }
+            if (sameModel && config.getProperty("project.springBootVersion") == null && "spring-boot".equals(runtime)) {
+                copyProperty(previous, config, "project.springBootVersion");
             }
 
             if (!discovery.dslTypes().isEmpty()) {
@@ -622,7 +662,10 @@ public class InitService {
             }
 
             // Gaps the graph could not fill (e.g. routes defined in unsupported layouts): workflow must inspect source
-            List<String> gaps = discovery.coverageGaps();
+            List<String> gaps = new ArrayList<>(discovery.coverageGaps());
+            if (discovery.camelVersion() == null && config.containsKey("project.camelVersion")) {
+                gaps.remove(ProjectDiscovery.UNRESOLVED_PLATFORM_CORE);
+            }
             if (!gaps.isEmpty()) {
                 config.setProperty("project.discoveryGaps", String.join(" | ", gaps));
                 gaps.forEach(gap -> reportWarning(request, warnings, gap));
@@ -651,18 +694,18 @@ public class InitService {
                 config.setProperty("project.configFilesCount", String.valueOf(discovery.configFilesCount()));
             }
 
-            // Flag unsupported versions
-            if (discovery.isUnsupportedVersion()) {
+            String camelVersion = config.getProperty("project.camelVersion");
+            if (DiscoveryResult.isUnsupportedVersion(camelVersion)) {
                 config.setProperty("project.unsupportedVersion", "true");
                 config.setProperty("project.unsupportedReason",
                         "Camel 3.x is not supported. Please upgrade to Camel 4.x.");
                 reportWarning(request, warnings,
-                        "Camel " + discovery.camelVersion() + " is not supported. Please upgrade to Camel 4.x "
+                        "Camel " + camelVersion
+                                                 + " is not supported. Please upgrade to Camel 4.x "
                                                  + "before adding features.");
             }
 
             // forage.version must track project.camelVersion
-            String camelVersion = config.getProperty("project.camelVersion");
             if (camelVersion != null) {
                 String forageVersion = distribution.forageVersionForCamel(camelVersion);
                 if (forageVersion != null) {
@@ -676,10 +719,42 @@ public class InitService {
             writeVersionConfig(config, distribution, runtime);
         }
 
+        // Catalog coordinates belong to the selected platform and repositories, independently of other POM edits.
+        if (runtime != null && config.getProperty("project.camelVersion") != null
+                && config.getProperty("project.platformBomVersion") != null
+                && List.of("project.type", "project.runtime", "project.camelVersion", "project.applicationBom",
+                        "project.platformBomVersion", "project.springBootVersion", "camel.catalog.repos").stream()
+                        .allMatch(key -> Objects.equals(config.getProperty(key), previous.getProperty(key)))) {
+            copyProperty(previous, config, "project.catalogBom");
+            copyProperty(previous, config, "project.catalogVersion");
+        }
         var out = new ByteArrayOutputStream();
         config.store(out, "Camel-Kit Project Configuration");
         AtomicFileWriter.write(configFile, out.toByteArray());
         return runtime == null ? "" : runtime;
+    }
+
+    private static void copyProperty(Properties from, Properties to, String key) {
+        if (from.containsKey(key)) {
+            to.setProperty(key, from.getProperty(key));
+        }
+    }
+
+    private static String mavenInputs(Path root, GraphBuildResult result) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("SHA-256");
+        MessageDigest content = MessageDigest.getInstance("SHA-256");
+        for (ParserDiagnostic parser : result.diagnostics()) {
+            if ("PomParser".equals(parser.parserName())) {
+                for (String file : parser.scannedFiles().stream().sorted().toList()) {
+                    Path pom = root.resolve(file);
+                    ConfinedPaths.requirePath(root, pom);
+                    digest.update(file.getBytes(StandardCharsets.UTF_8));
+                    digest.update((byte) 0);
+                    digest.update(content.digest(GraphParser.readSource(pom)));
+                }
+            }
+        }
+        return HexFormat.of().formatHex(digest.digest());
     }
 
     private void writeVersionConfig(Properties config, DistributionConfig distribution, String runtime) {
@@ -768,32 +843,25 @@ public class InitService {
         return false;
     }
 
-    private String detectProjectType(ProjectGraph graph) {
+    private String detectProjectType(ProjectGraph graph, InitRequest request, List<InitWarning> warnings) {
         var types = new ArrayList<String>();
 
-        if (!graph.findByType(NodeType.MULE_FLOW).isEmpty()) {
-            int flows = graph.findByType(NodeType.MULE_FLOW).size();
-            int subFlows = graph.findByType(NodeType.MULE_SUB_FLOW).size();
-            int dwl = graph.findByType(NodeType.DATAWEAVE_SCRIPT).size();
-            String muleVersion = findMavenProperty(graph, "mule.version");
-            if (muleVersion == null)
-                muleVersion = findMavenProperty(graph, "app.runtime");
-            if (muleVersion == null)
-                muleVersion = findArtifactVersion(graph, "org.mule.runtime", "mule-core");
-            if (muleVersion == null)
-                muleVersion = findArtifactVersion(graph, "org.mule", "mule-core");
-            types.add("MuleSoft Mule" + (muleVersion != null ? " " + muleVersion : "")
-                      + " (" + flows + " flows, " + subFlows + " sub-flows"
-                      + (dwl > 0 ? ", " + dwl + " DataWeave scripts" : "") + ")");
-        }
-
-        int orchs = graph.findByType(NodeType.BIZTALK_ORCHESTRATION).size();
-        int maps = graph.findByType(NodeType.BIZTALK_MAP).size();
-        int pipelines = graph.findByType(NodeType.BIZTALK_PIPELINE).size();
-        if (orchs > 0 || maps > 0 || pipelines > 0) {
-            types.add("Microsoft BizTalk (" + orchs + " orchestrations"
-                      + (maps > 0 ? ", " + maps + " maps" : "")
-                      + (pipelines > 0 ? ", " + pipelines + " pipelines" : "") + ")");
+        try {
+            var registry = SkillCatalog.bundled().graphTypes();
+            registry.unavailable().forEach((id, reason) -> reportWarning(request, warnings,
+                    "Graph summary unavailable for provider/" + id + ": " + reason));
+            var summaries = new TreeMap<Integer, List<String>>();
+            registry.adapters().forEach((id, adapter) -> {
+                try {
+                    adapter.summarize(graph).ifPresent(summary -> summaries
+                            .computeIfAbsent(adapter.summaryOrder(), order -> new ArrayList<>()).add(summary));
+                } catch (RuntimeException | LinkageError e) {
+                    reportWarning(request, warnings, "Graph summary failed for provider/" + id + ": " + e);
+                }
+            });
+            summaries.values().forEach(types::addAll);
+        } catch (IOException e) {
+            reportWarning(request, warnings, "Could not load graph adapters: " + e);
         }
 
         if (!graph.findByType(NodeType.CAMEL_ROUTE).isEmpty()) {
@@ -812,15 +880,15 @@ public class InitService {
     }
 
     private String detectCamelVersion(ProjectGraph graph) {
-        String version = findMavenProperty(graph, "camel.version");
+        String version = RuntimeDetector.findMavenProperty(graph, "camel.version");
         if (version != null)
             return version;
 
-        version = findArtifactVersion(graph, "org.apache.camel", "camel-core");
+        version = RuntimeDetector.findArtifactVersion(graph, "org.apache.camel", "camel-core");
         if (version != null)
             return version;
 
-        version = findArtifactVersion(graph, "org.apache.camel", "camel-bom");
+        version = RuntimeDetector.findArtifactVersion(graph, "org.apache.camel", "camel-bom");
         if (version != null)
             return version;
 
@@ -855,30 +923,6 @@ public class InitService {
         }
 
         return "Apache Camel";
-    }
-
-    private String findMavenProperty(ProjectGraph graph, String propertyName) {
-        var node = graph.getNode("maven-property:" + propertyName);
-        if (node != null) {
-            String value = node.properties().get("value");
-            if (value != null && !value.isEmpty() && !value.contains("${")) {
-                return value;
-            }
-        }
-        return null;
-    }
-
-    private String findArtifactVersion(ProjectGraph graph, String groupId, String artifactId) {
-        String nodeId = "maven:" + groupId + ":" + artifactId;
-        var node = graph.getNode(nodeId);
-        if (node != null) {
-            String version = node.properties().get("version");
-            if (version != null && !"managed".equals(version) && !"unknown".equals(version)
-                    && !version.contains("${")) {
-                return version;
-            }
-        }
-        return null;
     }
 
     private InitResult performDryRun(InitRequest request, AgentConfig agent) throws Exception {

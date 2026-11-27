@@ -22,14 +22,14 @@ This pattern keeps raw MCP response traces out of the orchestrator's context win
 ## What You Do
 
 1. Receive a list of artifacts to verify (components, EIPs, dataformats, languages), the runtime, the full platform BOM GAV, and the resolved Camel version
-2. Bind the catalog version from the supplied runtime and full platform BOM (derived from
-   `.camel-kit/config.properties`). Always pass `runtime` and the full `platformBom` GAV on every catalog call.
+2. Use the selected profile’s `catalog` arguments for every version-sensitive call. Require the matching
+   catalog evidence under `shared/mcp-setup.md` before marking results verified.
 3. For EACH artifact, call the appropriate MCP tool with that same binding tuple:
-   - `camel_catalog_component_doc(component, runtime, platformBom)` for components
-   - `camel_catalog_component_maven(component, runtime, platformBom)` when component Maven coordinates are needed
-   - `camel_catalog_eip_doc(eip, runtime, platformBom)` for EIPs
-   - `camel_catalog_dataformat_doc(dataformat, runtime, platformBom)` for dataformats
-   - `camel_catalog_language_doc(language, runtime, platformBom)` for languages
+   - `camel_catalog_component_doc(component, runtime, camelVersion, platformBom)` for components
+   - `camel_catalog_component_maven(component, runtime, camelVersion, platformBom)` when component Maven coordinates are needed
+   - `camel_catalog_eip_doc(eip, runtime, camelVersion, platformBom)` for EIPs
+   - `camel_catalog_dataformat_doc(dataformat, runtime, camelVersion, platformBom)` for dataformats
+   - `camel_catalog_language_doc(language, runtime, camelVersion, platformBom)` for languages
 4. Validate the returned artifact identity and every consumed field against the request. Detail tools do not all return
    `camelVersion`; bind their fields to the matching runtime/BOM call arguments instead of inventing an out-of-schema
    field.

@@ -61,26 +61,15 @@ For each flow in the design spec, generate these tasks in order:
 - `camel-implement/guides/pom-spring-boot.md` (if Spring Boot runtime)
 - `camel-implement/guides/pom-quarkus.md` (if Quarkus runtime)
 
-**POM Template Files (MUST READ AND COPY):**
-- If Quarkus: `templates/pom-quarkus.xml` — copy verbatim, replace only `[PLACEHOLDER]` values
-- If Spring Boot: `templates/pom-spring-boot.xml` — copy verbatim, replace only `[PLACEHOLDER]` values
-
-<HARD-RULE>
-For Main, create the runtime tree from Section 6, do NOT load Maven/POM guides, and do NOT create a POM. For Spring
-Boot/Quarkus, do NOT generate the POM from scratch. COPY the runtime's template file and replace ONLY the bracketed
-placeholders. The template already has the correct groupIds, artifactIds, repositories, and plugins.
-</HARD-RULE>
+Use `{COMMAND_PREFIX} target --pom-template` for a new Spring Boot or Quarkus application. It renders the
+shipped template with the selected versions. For Main, create the runtime tree from Section 6, do NOT load Maven/POM guides, and do not create a POM.
 
 **Design Spec Section:** Section 6 (Project Structure)
 
 - [ ] Create directory structure from design spec Section 6
 - [ ] For Main, verify the module-root route/properties directories exist and `pom.xml` was not created
 - [ ] For Spring Boot/Quarkus, create `pom.xml` using the TEMPLATE-COPY approach:
-  - If Quarkus: Read the file `templates/pom-quarkus.xml`, copy it verbatim to `[MODULE_DIR]pom.xml`
-  - If Spring Boot: Read the file `templates/pom-spring-boot.xml`, copy it verbatim to `[MODULE_DIR]pom.xml`
-  - Replace ONLY these placeholders: `[PROJECT_GROUP_ID]`, `[PROJECT_ARTIFACT_ID]`, `[PROJECT_VERSION]`, `[PROJECT_NAME]`, `[PLATFORM_BOM_VERSION]` (and `[SPRING_BOOT_VERSION]` for Spring Boot)
-  - Get `[PLATFORM_BOM_VERSION]` from the design spec header `platformBomVersion` field
-  - Do NOT modify any other values in the template (groupIds, artifactIds, repositories, plugins)
+  - Use the target-bound template and fill in the four project identity placeholders
   - Add project-specific dependencies in the DEPENDENCIES section
 - [ ] For Spring Boot/Quarkus, verify the project-root wrapper assets written by `camel-kit init`; if any are missing,
   restore the exact init-managed `mvnw`, `mvnw.cmd`, and `.mvn/wrapper/maven-wrapper.properties` assets and make

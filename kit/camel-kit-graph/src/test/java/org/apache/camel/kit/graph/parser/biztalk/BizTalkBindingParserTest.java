@@ -6,8 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.camel.kit.graph.ProjectGraph;
+import org.apache.camel.kit.graph.adapter.biztalk.BizTalkGraphAdapter;
 import org.apache.camel.kit.graph.model.GraphNode;
-import org.apache.camel.kit.graph.model.NodeType;
 
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +25,7 @@ class BizTalkBindingParserTest {
 
         parser.parse(TEST_BINDING, graph);
 
-        List<GraphNode> adapters = graph.findByType(NodeType.BIZTALK_ADAPTER);
+        List<GraphNode> adapters = graph.findByType(BizTalkGraphAdapter.ADAPTER);
         assertEquals(2, adapters.size(), "Should parse exactly 2 adapter nodes (FILE and SQL)");
     }
 
@@ -36,7 +36,7 @@ class BizTalkBindingParserTest {
 
         parser.parse(TEST_BINDING, graph);
 
-        List<GraphNode> adapters = graph.findByType(NodeType.BIZTALK_ADAPTER);
+        List<GraphNode> adapters = graph.findByType(BizTalkGraphAdapter.ADAPTER);
         Map<String, GraphNode> adapterMap = adapters.stream()
                 .collect(java.util.stream.Collectors.toMap(
                         n -> n.properties().get("name"),
@@ -60,7 +60,7 @@ class BizTalkBindingParserTest {
 
         parser.parse(TEST_BINDING, graph);
 
-        List<GraphNode> adapters = graph.findByType(NodeType.BIZTALK_ADAPTER);
+        List<GraphNode> adapters = graph.findByType(BizTalkGraphAdapter.ADAPTER);
         Map<String, GraphNode> adapterMap = adapters.stream()
                 .collect(java.util.stream.Collectors.toMap(
                         n -> n.properties().get("name"),

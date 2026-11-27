@@ -44,6 +44,10 @@ AUTONOMOUS EXECUTION: Execute ALL validated tasks from the plan using wave analy
 
 ---
 
+## Target runtime
+
+Use the selected profile as described in `shared/mcp-setup.md`, Rule 1, including its migration handoff.
+
 ## Invocation Modes
 
 This skill supports two invocation modes (see `shared/pipeline-infrastructure.md` for details):
@@ -200,7 +204,8 @@ The probe prevents wasting implementation cycles on environments that cannot sup
 **Before executing any tasks, check if this is an existing project:**
 
 Read `.camel-kit/config.properties`:
-- If `project.type=existing` → **enforce existing project constraints**
+- For migrations, honor baseline and approved scope, using the destination for runtime and dependency versions.
+- For additions, if `project.type=existing` → **enforce existing project constraints**
 - If `project.type=greenfield` or missing → **skip to Step 1**
 
 ### For Existing Projects: Pre-Execution Validation
@@ -218,7 +223,8 @@ Read `.camel-kit/config.properties`:
    and do not execute. Treat `project.discoveryGaps` as items to inspect in the source before editing, not as proof
    that nothing exists.
 
-   **A missing `project.runtime` or `project.camelVersion` means discovery found conflicting or no evidence, not that
+   When `project.needsResolvedCore=true` and `project.camelVersion` is missing, first follow “Recover the core version from Maven” in
+   `camel-brainstorm/guides/version-selection.md`. **A still-missing `project.runtime` or `project.camelVersion` means discovery found conflicting or no evidence, not that
    the project has no constraint.** If either is absent, or `project.discoveryGaps` reports conflicting runtimes or
    Camel versions or a failed discovery, STOP and report it: the user must resolve it before any file is edited. Never
    fill the value in from the shipped version tables.
@@ -349,7 +355,7 @@ After task loop completes, before final cross-cutting review:
 
 ## Iron Laws (enforced in this phase)
 
-Read `shared/iron-laws.md` for the full Iron Laws. This phase enforces ALL six:
+Read `shared/iron-laws.md` for the full Iron Laws. This phase enforces the following Iron Laws:
 
 - **Iron Law 1: MCP Catalog Verification** — every component must be verified before YAML generation. A
   `catalog-researcher` pre-verification summary satisfies this rule for the wave; otherwise implementer subagents must
@@ -359,6 +365,7 @@ Read `shared/iron-laws.md` for the full Iron Laws. This phase enforces ALL six:
 - **Iron Law 4: Spec Compliance Before Quality** — ALWAYS spec review FIRST, then quality review. Never in parallel. Never reversed.
 - **Iron Law 5: Adversarial Code Review** — Critic Lanes run after implementation and before Stage 1 review. Use parallel fresh contexts when supported; otherwise run the same lenses sequentially in the current session and record that isolation is unavailable.
 - **Iron Law 6: Surgical Changes** — TOUCH ONLY WHAT YOU’RE ASKED TO TOUCH. No unrelated refactoring or "cleanups."
+- **Iron Law 7: Deliverables in Project Directory** — Write ALL deliverables (routes, config, POMs, Java files, tests, Docker Compose) into the project directory from the first edit and iterate in place. NEVER use temporary directories for application code (throwaway verification scripts may use scratch; environment probe MUST use temp per `guides/environment-probe.md`).
 
 ### Rationalization Table
 

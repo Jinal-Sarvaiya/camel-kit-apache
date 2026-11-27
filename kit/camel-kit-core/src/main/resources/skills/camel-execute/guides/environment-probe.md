@@ -265,7 +265,7 @@ a summary; return `NEEDS_USER_CONFIRMATION` if no shipped action covers a genuin
 | Missing dependency | Add the dependency to `pom.xml` (or `camel.jbang.dependencies` for main runtime) |
 | Port conflict | Add 10000 offset to the host port in `docker-compose.yaml` (e.g., 5432 becomes 15432, update `application.properties` accordingly) |
 | Docker env var mismatch | Fix environment variables in `docker-compose.yaml` to match `application.properties` |
-| Wrong BOM version | Align the BOM version with the Camel version from `.camel-kit/config.properties` |
+| Wrong BOM version | Restore the application BOM GAV from the selected target profile |
 
 ### Re-run Rule
 

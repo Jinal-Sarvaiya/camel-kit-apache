@@ -46,8 +46,8 @@ jbang camel@apache/camel run \
   --properties=application.properties
 ```
 
-Replace `{project.camelVersion}` with the literal `CAMEL_VERSION` read from `.camel-kit/config.properties`, never
-with a placeholder or a stripped minor version.
+Replace `{project.camelVersion}` with the literal core version in the active profile. For a migration read
+`camelVersion` from `{COMMAND_PREFIX} target --migration`. Keep the full version including its qualifier.
 
 Expand `ROUTE_FILES` and `XSL_FILES` completely and remove the illustrative `-1`/`-N` placeholders. Never reduce the
 script to the active flow. Pass each file path as a separate quoted argument. When `XSL_FILES` is empty, omit that

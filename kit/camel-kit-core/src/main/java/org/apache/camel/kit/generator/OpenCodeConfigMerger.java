@@ -69,9 +69,10 @@ final class OpenCodeConfigMerger {
      *
      * <p>
      * OpenCode applies the last matching rule, so the order of the rules decides each tool's action. Rules from all
-     * layers are flattened (a later layer replaces an earlier rule for the same key) and compared with the generated
-     * order. Everything from the first deviation onward is kept in the user's order, so exact exceptions on both sides
-     * of a wildcard keep their relative position. Rules that match the generated layout need no special handling.
+     * layers are flattened (a later layer updates an earlier rule for the same key in place) and compared with the
+     * generated order. Everything from the first deviation onward is kept in the user's order, so exact exceptions on
+     * both sides of a wildcard keep their relative position. Rules that match the generated layout need no special
+     * handling.
      */
     private ObjectNode collectUserRules(ObjectNode generatedPermission, List<ExistingConfiguration> configurations) {
         Map<String, JsonNode> managedRules = new java.util.LinkedHashMap<>();
@@ -81,27 +82,11 @@ final class OpenCodeConfigMerger {
                 continue;
             }
 
-            // Count how many managed keys this layer has
-            final long managedKeysInLayer = java.util.stream.StreamSupport
-                    .stream(((Iterable<Map.Entry<String, JsonNode>>) permission::fields).spliterator(), false)
-                    .filter(e -> generatedPermission.has(e.getKey()))
-                    .count();
-
+            // A key declared by an earlier layer is updated in place, as OpenCode's merge does; new keys append.
             permission.fields().forEachRemaining(entry -> {
                 JsonNode generatedValue = generatedPermission.get(entry.getKey());
                 if (generatedValue != null) {
-                    JsonNode normalized = normalizeManagedRule(entry.getValue(), generatedValue);
-                    JsonNode previousValue = managedRules.get(entry.getKey());
-
-                    // If this layer has only one managed key and the value hasn't changed, preserve position
-                    // Otherwise, respect the new position from this layer
-                    boolean preservePosition = managedKeysInLayer == 1 && previousValue != null
-                            && normalized.equals(previousValue);
-
-                    if (!preservePosition) {
-                        managedRules.remove(entry.getKey());
-                        managedRules.put(entry.getKey(), normalized);
-                    }
+                    managedRules.put(entry.getKey(), normalizeManagedRule(entry.getValue(), generatedValue));
                 }
             });
         }

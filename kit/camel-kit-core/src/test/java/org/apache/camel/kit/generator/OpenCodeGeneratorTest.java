@@ -1181,11 +1181,12 @@ class OpenCodeGeneratorTest {
     }
 
     @Test
-    void regenerationPreservesDeliberateTrailingWildcard() throws Exception {
-        // Generate initial config
+    void regenerationKeepsUnmentionedToolsAllowedWhenOverlayRepeatsWildcardAfterExactRules() throws Exception {
+        // Generate initial config (base file: opencode.json)
         new OpenCodeGenerator().generate(createContext("camel-kit", false));
 
-        // User deliberately puts wildcard AFTER exact grants for all-tools approval
+        // User deliberately puts wildcard AFTER exact grants in higher-precedence file
+        // Other exact grants remain in base file
         Path higherPrecedence = tempDir.resolve("opencode.jsonc");
         Files.writeString(higherPrecedence, """
                 {
@@ -1200,15 +1201,50 @@ class OpenCodeGeneratorTest {
         // Regenerate with --force
         new OpenCodeGenerator().generate(createContext("camel-kit", false));
 
-        // Verify wildcard is preserved at the end
-        JsonNode higher = readOpenCodeConfig(higherPrecedence);
-        java.util.List<String> keys = new java.util.ArrayList<>();
-        higher.path("permission").fieldNames().forEachRemaining(keys::add);
+        // The overlay repeats camel_*, which OpenCode updates in place, so it is not a trailing wildcard here:
+        // the two overlay exact rules prompt, and unmentioned tools in the base file stay allowed
+        JsonNode effective = effectivePermission();
+        assertEquals("ask", effectiveAction(effective, "camel_camel_validate_route"));
+        assertEquals("ask", effectiveAction(effective, "camel_camel_catalog_components"));
+        assertEquals("allow", effectiveAction(effective, "camel_camel_catalog_component_doc"),
+                "Unmentioned catalog documentation tool must remain allowed");
+    }
 
-        int camelWildcardPos = keys.indexOf("camel_*");
-        int camelExactPos = keys.indexOf("camel_camel_catalog_components");
-        assertTrue(camelWildcardPos > camelExactPos,
-                "Deliberately placed trailing wildcard must be preserved");
+    @Test
+    void regenerationPreservesDeliberateTrailingWildcardInSingleFile() throws Exception {
+        // Generate initial config
+        Path configFile = tempDir.resolve("opencode.json");
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        // User edits the single file to put wildcard AFTER exact grants
+        ObjectNode config = (ObjectNode) readOpenCodeConfig(configFile);
+        ObjectNode reordered = new ObjectMapper().createObjectNode();
+        reordered.put("camel_camel_validate_route", "ask");
+        reordered.put("camel_camel_catalog_components", "ask");
+        config.path("permission").fields().forEachRemaining(entry -> {
+            if (!"camel_*".equals(entry.getKey())
+                    && !"camel_camel_validate_route".equals(entry.getKey())
+                    && !"camel_camel_catalog_components".equals(entry.getKey())) {
+                reordered.set(entry.getKey(), entry.getValue());
+            }
+        });
+        reordered.put("camel_*", "ask");  // Deliberately trailing
+        config.set("permission", reordered);
+        Files.writeString(configFile, new ObjectMapper().writerWithDefaultPrettyPrinter()
+                .writeValueAsString(config));
+
+        // Regenerate with --force
+        new OpenCodeGenerator().generate(createContext("camel-kit", false));
+
+        // Verify wildcard stays at the end
+        JsonNode after = readOpenCodeConfig(configFile);
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        after.path("permission").fieldNames().forEachRemaining(keys::add);
+
+        int wildcardPos = keys.indexOf("camel_*");
+        int exactPos = keys.indexOf("camel_camel_catalog_components");
+        assertTrue(wildcardPos > exactPos,
+                "Deliberately trailing wildcard must be preserved in single-file config");
     }
 
     @Test
@@ -1339,6 +1375,47 @@ class OpenCodeGeneratorTest {
                 "docs index must stay allowed after regeneration - wildcard must not move before exact grants");
     }
 
+    @Test
+    void regenerationPreservesBothRepeatedFallbacks() throws Exception {
+        // Generate base config with both Camel and Citrus
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // User repeats both fallbacks in higher-precedence file (both values already exist in base)
+        // This is the regression case: {"permission": {"camel_*": "ask", "citrus_*": "ask"}}
+        Path higherPrecedence = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherPrecedence, """
+                {
+                  "permission": {
+                    "camel_*": "ask",
+                    "citrus_*": "ask"
+                  }
+                }
+                """);
+
+        // Regenerate with --force
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // Both lookups must still work - wildcards must not move before exact grants
+        JsonNode after = effectivePermission();
+        assertEquals("allow", effectiveAction(after, "citrus_citrus_docs_index"),
+                "Citrus docs index must stay allowed - citrus_* must not move before exact grants");
+        assertEquals("allow", effectiveAction(after, "camel_camel_catalog_components"),
+                "Camel catalog must stay allowed - camel_* must not move before exact grants");
+
+        // Wildcards stay ahead of the exact grants that override them
+        java.util.List<String> keys = new java.util.ArrayList<>();
+        after.fieldNames().forEachRemaining(keys::add);
+        int camelWildcardPos = keys.indexOf("camel_*");
+        int camelExactPos = keys.indexOf("camel_camel_catalog_components");
+        int citrusWildcardPos = keys.indexOf("citrus_*");
+        int citrusExactPos = keys.indexOf("citrus_citrus_docs_index");
+
+        assertTrue(camelWildcardPos >= 0 && camelWildcardPos < camelExactPos,
+                "camel_* wildcard must precede camel exact grants");
+        assertTrue(citrusWildcardPos >= 0 && citrusWildcardPos < citrusExactPos,
+                "citrus_* wildcard must precede citrus exact grants");
+    }
+
     private static final List<String> CITRUS_TOOLS = List.of(
             "citrus_citrus_catalog_actions", "citrus_citrus_catalog_action", "citrus_citrus_catalog_action_schema",
             "citrus_citrus_catalog_endpoints", "citrus_citrus_catalog_endpoint",
@@ -1363,7 +1440,7 @@ class OpenCodeGeneratorTest {
             Path file = tempDir.resolve(name);
             if (Files.exists(file)) {
                 readOpenCodeConfig(file).path("permission").fields().forEachRemaining(entry -> {
-                    merged.remove(entry.getKey());
+                    // Update existing keys in place (preserves position), new keys append
                     merged.set(entry.getKey(), entry.getValue());
                 });
             }

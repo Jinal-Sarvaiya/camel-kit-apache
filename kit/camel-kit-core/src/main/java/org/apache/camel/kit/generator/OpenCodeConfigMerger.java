@@ -213,7 +213,8 @@ final class OpenCodeConfigMerger {
         String prefix = bom(existing.content());
         String content = contentWithoutBom(existing.content());
         if (content.isBlank()) {
-            return prefix + pretty(generated) + System.lineSeparator();
+            // Treat a blank file as an empty object so saved rules still apply through the normal merge.
+            content = "{}";
         }
 
         JsoncObjectEditor editor = new JsoncObjectEditor(content);

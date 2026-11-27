@@ -81,12 +81,16 @@ class OpenCodeGeneratorTest {
     }
 
     private InitContext createContext(String commandPrefix, boolean withCitrusMcp) {
+        return createContext(commandPrefix, withCitrusMcp, tempDir);
+    }
+
+    private InitContext createContext(String commandPrefix, boolean withCitrusMcp, Path root) {
         AgentConfig agent = AgentRegistry.get("opencode");
         String agentBaseFolder = agent.folder().substring(0, agent.folder().lastIndexOf("/"));
-        Path commandsDir = tempDir.resolve(agent.folder());
-        Path skillsDir = tempDir.resolve(agentBaseFolder + "/skills");
+        Path commandsDir = root.resolve(agent.folder());
+        Path skillsDir = root.resolve(agentBaseFolder + "/skills");
         return new InitContext(
-                agent, "opencode", commandsDir, skillsDir, tempDir,
+                agent, "opencode", commandsDir, skillsDir, root,
                 commandPrefix, DistributionConfig.loadFromClasspathOrDefaults(),
                 withCitrusMcp, Printer.noop());
     }
@@ -1178,6 +1182,42 @@ class OpenCodeGeneratorTest {
         int camelExactPos = keys.indexOf("camel_camel_catalog_components");
         assertTrue(camelWildcardPos < camelExactPos,
                 "camel_* wildcard must come before exact grants for headless mode");
+    }
+
+    @Test
+    void regenerationTreatsZeroByteOverlayLikeEmptyObject() throws Exception {
+        String savedArguments = "{\"*\": \"allow\", \"docs/*.adoc\": \"allow\"}";
+        JsonNode[] results = new JsonNode[2];
+        String[] overlays = {"", "{}"};
+        for (int i = 0; i < overlays.length; i++) {
+            Files.createDirectories(tempDir.resolve("case" + i));
+            Path base = tempDir.resolve("case" + i).resolve("opencode.json");
+            Path overlay = tempDir.resolve("case" + i).resolve("opencode.jsonc");
+            InitContext context = createContext("camel-kit", true, tempDir.resolve("case" + i));
+            new OpenCodeGenerator().generate(context);
+
+            // Saved argument patterns on the docs index in the lower file
+            ObjectNode config = (ObjectNode) readOpenCodeConfig(base);
+            ((ObjectNode) config.path("permission")).set("citrus_citrus_docs_index",
+                    new ObjectMapper().readTree(savedArguments));
+            Files.writeString(base, new ObjectMapper().writerWithDefaultPrettyPrinter().writeValueAsString(config));
+            Files.writeString(overlay, overlays[i]);
+
+            new OpenCodeGenerator().generate(context);
+
+            JsonNode merged = new ObjectMapper().createObjectNode();
+            for (Path file : List.of(base, overlay)) {
+                if (Files.exists(file) && Files.size(file) > 0) {
+                    readOpenCodeConfig(file).path("permission").fields().forEachRemaining(
+                            entry -> ((ObjectNode) merged).set(entry.getKey(), entry.getValue()));
+                }
+            }
+            results[i] = merged.path("citrus_citrus_docs_index");
+            assertEquals("allow", results[i].path("*").asText(), "case " + i);
+            assertEquals("allow", results[i].path("docs/*.adoc").asText(),
+                    "Saved argument pattern must survive a blank overlay, case " + i);
+        }
+        assertEquals(results[1], results[0], "Zero-byte overlay must behave like {}");
     }
 
     @Test

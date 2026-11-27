@@ -1221,6 +1221,50 @@ class OpenCodeGeneratorTest {
     }
 
     @Test
+    void regenerationPreservesRuleOrderAcrossTwoFiles() throws Exception {
+        // Generate initial Citrus config
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // Set custom rule order in base file: page before index (opposite of generated default order)
+        Path baseFile = tempDir.resolve("opencode.json");
+        ObjectNode baseConfig = (ObjectNode) readOpenCodeConfig(baseFile);
+        ObjectNode basePermission = (ObjectNode) baseConfig.path("permission");
+
+        // Remove the generated rules and add them back in custom order
+        basePermission.remove("citrus_citrus_docs_index");
+        basePermission.remove("citrus_citrus_docs_page");
+        basePermission.put("citrus_citrus_docs_page", "allow");
+        basePermission.put("citrus_citrus_docs_index", "allow");
+
+        Files.writeString(baseFile, new ObjectMapper().writerWithDefaultPrettyPrinter()
+                .writeValueAsString(baseConfig));
+
+        // Create higher-precedence file that matches generated defaults (triggers early return path)
+        Path higherFile = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherFile, "{}");
+
+        // Verify custom order before regeneration
+        java.util.List<String> beforeOrder = new java.util.ArrayList<>();
+        effectivePermission().fieldNames().forEachRemaining(beforeOrder::add);
+        int pageIndexBefore = beforeOrder.indexOf("citrus_citrus_docs_page");
+        int indexIndexBefore = beforeOrder.indexOf("citrus_citrus_docs_index");
+        assertTrue(pageIndexBefore >= 0 && indexIndexBefore >= 0, "Both tools should exist");
+        assertTrue(pageIndexBefore < indexIndexBefore, "Page should come before index initially");
+
+        // Regenerate
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // Verify custom order is preserved after regeneration
+        java.util.List<String> afterOrder = new java.util.ArrayList<>();
+        effectivePermission().fieldNames().forEachRemaining(afterOrder::add);
+        int pageIndexAfter = afterOrder.indexOf("citrus_citrus_docs_page");
+        int indexIndexAfter = afterOrder.indexOf("citrus_citrus_docs_index");
+        assertTrue(pageIndexAfter >= 0 && indexIndexAfter >= 0, "Both tools should still exist");
+        assertTrue(pageIndexAfter < indexIndexAfter,
+                "Custom rule order (page before index) must be preserved across regeneration");
+    }
+
+    @Test
     void regenerationKeepsUnmentionedToolsAllowedWhenOverlayRepeatsWildcardAfterExactRules() throws Exception {
         // Generate initial config (base file: opencode.json)
         new OpenCodeGenerator().generate(createContext("camel-kit", false));

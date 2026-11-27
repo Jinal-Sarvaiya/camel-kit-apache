@@ -206,7 +206,7 @@ final class OpenCodeConfigMerger {
             ExistingConfiguration existing, ObjectNode generated, ObjectNode userRestrictions, boolean withCitrusMcp)
             throws IOException {
         boolean needsCitrusRemoval = !withCitrusMcp && hasCitrusEntries(existing.config());
-        if (isCurrentAndOrdered(existing, generated) && !needsCitrusRemoval) {
+        if (isCurrentAndOrdered(existing, generated) && !needsCitrusRemoval && userRestrictions.isEmpty()) {
             return existing.content();
         }
 

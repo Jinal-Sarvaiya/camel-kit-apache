@@ -2,6 +2,7 @@ package org.apache.camel.kit.brainstorm;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -743,26 +744,16 @@ class InterfaceContractDiscoveryTest {
         int q7cIndex = content.indexOf("### Question 7c: Destination Interface Contract");
         String q7bSection = content.substring(q7bIndex, q7cIndex);
 
-        // Q7b must have positive condition paired with skip action
-        assertTrue(q7bSection.contains("If the user already provided")
-                || q7bSection.contains("if the user already provided"),
-                "Q7b must use positive condition 'if the user already provided'");
-
         // Must NOT use inverted condition
         assertFalse(q7bSection.contains("If the user has not already provided")
                 || q7bSection.contains("if the user has not already provided"),
                 "Q7b must NOT use inverted condition 'if the user has not already provided'");
 
-        // Find the section between "already provided" and "skip this question"
-        int alreadyProvidedIndex = q7bSection.toLowerCase().indexOf("already provided");
-        int skipQuestionIndex = q7bSection.toLowerCase().indexOf("skip this question");
-        assertTrue(alreadyProvidedIndex > 0 && skipQuestionIndex > alreadyProvidedIndex,
-                "Q7b must have 'already provided' before 'skip this question' (positive condition → skip action)");
-
-        // The condition and action must be in the same sentence/instruction
-        String conditionToAction = q7bSection.substring(alreadyProvidedIndex, skipQuestionIndex + 20);
-        assertTrue(conditionToAction.length() < 300,
-                "Q7b condition and skip action must be in same instruction (not separated by >300 chars)");
+        // Q7b: supplied condition, record existing, and skip must be in the same sentence
+        String sourceInstruction = "If the user already provided a source"
+                                   + " contract[^.!?]*record the status as \"existing\"[^.!?]*and skip this question for the source";
+        assertTrue(Pattern.compile(sourceInstruction, Pattern.CASE_INSENSITIVE).matcher(q7bSection).find(),
+                "Q7b must have supplied condition, record existing, and skip in same sentence for source");
 
         // Must list what to look for
         assertTrue(q7bSection.contains("OpenAPI") && q7bSection.contains("AsyncAPI")
@@ -773,23 +764,16 @@ class InterfaceContractDiscoveryTest {
         int q8Index = content.indexOf("### Question 8: Sink System");
         String q7cSection = content.substring(q7cIndex, q8Index);
 
-        // Q7c must also have positive condition paired with skip action
-        assertTrue(q7cSection.contains("If the user already provided")
-                || q7cSection.contains("if the user already provided"),
-                "Q7c must use positive condition 'if the user already provided'");
-
+        // Must NOT use inverted condition
         assertFalse(q7cSection.contains("If the user has not already provided")
                 || q7cSection.contains("if the user has not already provided"),
                 "Q7c must NOT use inverted condition 'if the user has not already provided'");
 
-        int q7cAlreadyProvidedIndex = q7cSection.toLowerCase().indexOf("already provided");
-        int q7cSkipQuestionIndex = q7cSection.toLowerCase().indexOf("skip this question");
-        assertTrue(q7cAlreadyProvidedIndex > 0 && q7cSkipQuestionIndex > q7cAlreadyProvidedIndex,
-                "Q7c must have 'already provided' before 'skip this question' (positive condition → skip action)");
-
-        String q7cConditionToAction = q7cSection.substring(q7cAlreadyProvidedIndex, q7cSkipQuestionIndex + 20);
-        assertTrue(q7cConditionToAction.length() < 300,
-                "Q7c condition and skip action must be in same instruction (not separated by >300 chars)");
+        // Q7c: supplied condition, record existing, and skip must be in the same sentence
+        String destinationInstruction = "If the user already provided a destination"
+                                        + " contract[^.!?]*record the status as \"existing\"[^.!?]*and skip this question for the destination";
+        assertTrue(Pattern.compile(destinationInstruction, Pattern.CASE_INSENSITIVE).matcher(q7cSection).find(),
+                "Q7c must have supplied condition, record existing, and skip in same sentence for destination");
     }
 
 }

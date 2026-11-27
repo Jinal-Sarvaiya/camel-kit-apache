@@ -1225,8 +1225,13 @@ class OpenCodeGeneratorTest {
         // Generate initial Citrus config
         new OpenCodeGenerator().generate(createContext("camel-kit", true));
 
-        // Set custom rule order in base file: page before index (opposite of generated default order)
         Path baseFile = tempDir.resolve("opencode.json");
+        Path higherFile = tempDir.resolve("opencode.jsonc");
+
+        // Copy generated config to higher-precedence file (matches defaults, triggers early return path)
+        Files.copy(baseFile, higherFile);
+
+        // Set custom rule order in base file: page before index (opposite of generated default order)
         ObjectNode baseConfig = (ObjectNode) readOpenCodeConfig(baseFile);
         ObjectNode basePermission = (ObjectNode) baseConfig.path("permission");
 
@@ -1238,10 +1243,6 @@ class OpenCodeGeneratorTest {
 
         Files.writeString(baseFile, new ObjectMapper().writerWithDefaultPrettyPrinter()
                 .writeValueAsString(baseConfig));
-
-        // Create higher-precedence file that matches generated defaults (triggers early return path)
-        Path higherFile = tempDir.resolve("opencode.jsonc");
-        Files.writeString(higherFile, "{}");
 
         // Verify custom order before regeneration
         java.util.List<String> beforeOrder = new java.util.ArrayList<>();

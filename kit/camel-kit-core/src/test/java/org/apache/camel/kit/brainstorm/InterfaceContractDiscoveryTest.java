@@ -225,9 +225,9 @@ class InterfaceContractDiscoveryTest {
         assertTrue(step3Section.contains("skip the request") || step3Section.contains("skip"),
                 "Step 3 must skip schema request if artifact is available");
 
-        // Must return to Question 9
-        assertTrue(content.contains("return control to `camel-brainstorm` at Question 9"),
-                "DataMapper interview must return to Question 9");
+        // Must return to calling guide
+        assertTrue(content.contains("return control to the calling guide"),
+                "DataMapper interview must return control to the calling guide");
     }
 
     @Test
@@ -313,21 +313,19 @@ class InterfaceContractDiscoveryTest {
         assertTrue(content.contains("Stage.DISCOVERY"),
                 "ShipCoordinator must have DISCOVERY stage handling");
 
-        // Rules must be inline in text.append() calls
-        assertTrue(content.contains("Interface Contract Discovery"),
-                "DISCOVERY prompt must contain Interface Contract Discovery heading");
+        // Rules must be in prompt.append() calls in the DISCOVERY case (not text.append in briefing)
+        assertTrue(content.contains("Ask one boundary at a time") && content.contains("prompt.append"),
+                "DISCOVERY case must append 'Ask one boundary at a time' rule to prompt");
 
-        assertTrue(content.contains("Ask One Boundary") && content.contains("text.append"),
-                "DISCOVERY prompt must contain inline 'Ask One Boundary at a Time' rule");
+        assertTrue(content.contains("Analyze supplied material first") && content.contains("prompt.append"),
+                "DISCOVERY case must append 'Analyze supplied material first' rule to prompt");
 
-        assertTrue(content.contains("Analyze Supplied Material") && content.contains("text.append"),
-                "DISCOVERY prompt must contain inline 'Analyze Supplied Material First' rule");
+        assertTrue(content.contains("Four possible statuses") && content.contains("prompt.append"),
+                "DISCOVERY case must append 'Four possible statuses' rule to prompt");
 
-        assertTrue(content.contains("Four Possible Statuses") && content.contains("text.append"),
-                "DISCOVERY prompt must contain inline 'Four Possible Statuses' rule");
-
-        assertTrue(content.contains("Status: existing") && content.contains("Status: pending"),
-                "DISCOVERY prompt must define status values inline");
+        assertTrue(content.contains("(1) existing") && content.contains("(2) pending")
+                && content.contains("(3) designed") && content.contains("(4) not-applicable"),
+                "DISCOVERY case must define all four status values in prompt");
     }
 
     @Test
@@ -338,15 +336,16 @@ class InterfaceContractDiscoveryTest {
 
         assertTrue(content.contains("Stage.DISCOVERY"), "DISCOVERY stage handling must exist");
 
-        // Must tell worker to record in report and unansweredQuestions
-        assertTrue(content.contains("report") && content.contains("unansweredQuestions"),
-                "DISCOVERY prompt must mention 'report' and 'unansweredQuestions' fields");
+        // Must tell worker to record in prompt (not briefing)
+        assertTrue(content.contains("prompt.append") && content.contains("report")
+                && content.contains("unansweredQuestions"),
+                "DISCOVERY case must tell worker to use report and unansweredQuestions fields in prompt");
 
-        assertTrue(content.contains("Record all interface contract findings"),
-                "DISCOVERY prompt must instruct to record contract findings");
+        assertTrue(content.contains("Record all findings in the report field"),
+                "DISCOVERY case must instruct to record findings in report field in prompt");
 
-        assertTrue(content.contains("Recording in Ship Result") || content.contains("Recording"),
-                "DISCOVERY prompt must have recording instructions section");
+        assertTrue(content.contains("grouped report structure"),
+                "DISCOVERY case must specify grouped report structure in prompt");
     }
 
     @Test
@@ -700,9 +699,11 @@ class InterfaceContractDiscoveryTest {
         int step3bIndex = content.indexOf("## Step 3b:");
         String step3Section = content.substring(step3Index, step3bIndex);
 
-        // Must have template with branch identifier placeholder
-        assertTrue(step3Section.contains("{flow-name}-{branch-identifier}-target"),
-                "Step 3 must specify filename template with branch identifier placeholder");
+        // Must have both JSON and XSD templates with branch identifier placeholder
+        assertTrue(step3Section.contains("{flow-name}-{branch-identifier}-target.schema.json"),
+                "Step 3 must specify JSON filename template with branch identifier placeholder");
+        assertTrue(step3Section.contains("{flow-name}-{branch-identifier}-target.xsd"),
+                "Step 3 must specify XSD filename template with branch identifier placeholder");
 
         // Must handle conditional routing with branch identifiers
         assertTrue(step3Section.contains("Conditional routing") || step3Section.contains("multiple branches"),
@@ -712,16 +713,23 @@ class InterfaceContractDiscoveryTest {
         assertTrue(step3Section.contains("prevent overwriting") || step3Section.contains("gets its own file"),
                 "Step 3 must prevent one branch's schema from overwriting another's");
 
-        // Must show actual distinct complete filenames in examples
-        assertTrue(step3Section.contains("orders-billing-target.schema.json")
-                && step3Section.contains("orders-warehouse-target.schema.json"),
-                "Step 3 must show billing and warehouse examples with complete distinct filenames");
+        // Must show actual distinct complete filenames for JSON in examples
+        assertTrue(step3Section.contains("orders-billing-target.schema.json"),
+                "Step 3 must show billing example with complete JSON filename");
+        assertTrue(step3Section.contains("orders-warehouse-target.schema.json"),
+                "Step 3 must show warehouse example with complete JSON filename");
 
-        // Verify they are different paths (not accidentally the same)
-        int billingIndex = step3Section.indexOf("orders-billing-target.schema.json");
-        int warehouseIndex = step3Section.indexOf("orders-warehouse-target.schema.json");
-        assertTrue(billingIndex >= 0 && warehouseIndex >= 0 && billingIndex != warehouseIndex,
-                "billing and warehouse must be distinct paths at different positions");
+        // Verify JSON filenames are different (not accidentally the same)
+        int billingJsonIndex = step3Section.indexOf("orders-billing-target.schema.json");
+        int warehouseJsonIndex = step3Section.indexOf("orders-warehouse-target.schema.json");
+        assertTrue(billingJsonIndex >= 0 && warehouseJsonIndex >= 0 && billingJsonIndex != warehouseJsonIndex,
+                "billing and warehouse JSON filenames must be distinct at different positions");
+
+        // Both JSON and XSD examples must maintain branch identifier
+        assertTrue(step3Section.contains("branch-identifier") && step3Section.contains(".schema.json"),
+                "JSON template must maintain branch-identifier placeholder");
+        assertTrue(step3Section.contains("branch-identifier") && step3Section.contains(".xsd"),
+                "XSD template must maintain branch-identifier placeholder");
     }
 
     @Test
@@ -740,28 +748,73 @@ class InterfaceContractDiscoveryTest {
 
         String discoveryCase = content.substring(discoveryIndex, designIndex);
 
-        // Must have contract rules in the DISCOVERY task itself, not just briefing
-        assertTrue(discoveryCase.contains("interface contract"),
-                "DISCOVERY task must mention interface contract");
+        // Must have specific contract rule text appended to prompt in DISCOVERY case
+        assertTrue(discoveryCase.contains("For each integration boundary (source and destination), establish the")
+                && discoveryCase.contains("interface contract status separately"),
+                "DISCOVERY case must append contract boundary text to prompt");
 
-        assertTrue(discoveryCase.contains("existing") && discoveryCase.contains("pending")
-                && discoveryCase.contains("designed") && discoveryCase.contains("not-applicable"),
-                "DISCOVERY task must list all four contract statuses");
+        assertTrue(discoveryCase.contains("Ask one boundary at a time"),
+                "DISCOVERY case must append one-at-a-time instruction to prompt");
 
-        assertTrue(discoveryCase.contains("prompt.append") && discoveryCase.contains("boundary"),
-                "DISCOVERY task must append contract boundary rules to prompt");
+        // Must list all four statuses with their rules in the prompt
+        assertTrue(discoveryCase.contains("(1) existing") && discoveryCase.contains("request artifact"),
+                "DISCOVERY case must append existing status rules to prompt");
+        assertTrue(discoveryCase.contains("(2) pending") && discoveryCase.contains("defer DataMapper"),
+                "DISCOVERY case must append pending status rules to prompt");
+        assertTrue(discoveryCase.contains("(3) designed") && discoveryCase.contains("only for user-controlled"),
+                "DISCOVERY case must append designed status rules to prompt");
+        assertTrue(discoveryCase.contains("(4) not-applicable") && discoveryCase.contains("record rationale"),
+                "DISCOVERY case must append not-applicable status rules to prompt");
 
-        // Must reference report and unansweredQuestions structure
-        assertTrue(discoveryCase.contains("report") && discoveryCase.contains("unansweredQuestions"),
-                "DISCOVERY task must specify where to record contract findings");
+        // Must reference report structure in prompt
+        assertTrue(discoveryCase.contains("grouped report structure")
+                && discoveryCase.contains("analyzed material"),
+                "DISCOVERY case must append report structure to prompt");
 
-        // Verify these rules are in the issued prompt, not in briefing() method
-        int briefingMethodIndex = content.indexOf("private Path briefing(");
-        int promptMethodEndIndex = content.indexOf("private", promptMethodIndex + 1);
+        // Verify prompt.append is used (not a separate variable)
+        assertTrue(discoveryCase.contains("prompt.append(\"For each integration boundary"),
+                "DISCOVERY case must append to the prompt variable, not a copy");
+    }
 
-        // Rules should be in prompt() method range, not before it
-        assertTrue(discoveryIndex > promptMethodIndex && discoveryIndex < promptMethodEndIndex,
-                "Contract rules must be in prompt() method (issued task), not just briefing");
+    @Test
+    @DisplayName("Q7b and Q7c must check supplied material before asking (issue #111)")
+    void testContractQuestionsCheckSuppliedMaterialFirst() throws Exception {
+        Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
+        String content = Files.readString(interviewPath);
+
+        // Find Q7b (source contract)
+        int q7bIndex = content.indexOf("### Question 7b: Source Interface Contract");
+        int q7cIndex = content.indexOf("### Question 7c: Destination Interface Contract");
+        String q7bSection = content.substring(q7bIndex, q7cIndex);
+
+        // Q7b must analyze supplied material FIRST
+        assertTrue(q7bSection.contains("Analyze supplied material first"),
+                "Q7b must analyze supplied material before asking");
+        assertTrue(q7bSection.contains("already provided") && q7bSection.contains("skip this question"),
+                "Q7b must skip question if contract already supplied");
+
+        // Must list what to look for
+        assertTrue(q7bSection.contains("OpenAPI") && q7bSection.contains("AsyncAPI")
+                && q7bSection.contains("WSDL") && q7bSection.contains("JSON Schema"),
+                "Q7b must list contract types to look for in supplied material");
+
+        // Must record as "existing" when found, not ask
+        assertTrue(q7bSection.contains("record the status as \"existing\"")
+                && q7bSection.contains("skip this question"),
+                "Q7b must record existing and skip when contract is found");
+
+        // Find Q7c (destination contract)
+        int q8Index = content.indexOf("### Question 8: Sink System");
+        String q7cSection = content.substring(q7cIndex, q8Index);
+
+        // Q7c must also analyze supplied material FIRST
+        assertTrue(q7cSection.contains("Analyze supplied material first"),
+                "Q7c must analyze supplied material before asking");
+        assertTrue(q7cSection.contains("already provided") && q7cSection.contains("skip this question"),
+                "Q7c must skip question if contract already supplied");
+        assertTrue(q7cSection.contains("record the status as \"existing\"")
+                && q7cSection.contains("skip this question"),
+                "Q7c must record existing and skip when contract is found");
     }
 
 }

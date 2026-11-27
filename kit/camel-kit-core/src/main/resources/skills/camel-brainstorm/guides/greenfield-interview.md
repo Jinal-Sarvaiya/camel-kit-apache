@@ -217,7 +217,7 @@ The contract proposal will be created during design assembly. No artifact exists
 
 Record status as "designed" with no artifact reference yet. The proposal will be carried into the design specification for approval.
 
-If field mapping is needed (Question 7a), it will be deferred until the design specification is approved and the proposed contract becomes available.
+If field mapping is needed (Question 7a), it will be deferred until the proposed contract is available during design assembly. The mapping will remain deferred if the other endpoint is still pending at that time.
 
 Note: Only propose designing contracts for systems under your control. External system interfaces cannot be redesigned.
 
@@ -230,7 +230,7 @@ Record: `flow.contracts.source` with status (existing/pending/designed/na), arti
 
 ### Question 7c: Destination Interface Contract (per flow)
 
-Analyze supplied material first. If the user already provided a destination contract artifact, read it, record status as "existing", extract constraints, and skip this question for the destination.
+Analyze supplied material first. If the user already provided a destination contract artifact, read it, record the status as "existing", extract constraints, and skip this question for the destination.
 
 ```
 For flow "[flow-name]" destination (where data goes):
@@ -281,7 +281,7 @@ The contract proposal will be created during design assembly. No artifact exists
 
 Record status as "designed" with no artifact reference yet. The proposal will be carried into the design specification for approval.
 
-If field mapping is needed (Question 7a), it will be deferred until the design specification is approved and the proposed contract becomes available.
+If field mapping is needed (Question 7a), it will be deferred until the proposed contract is available during design assembly. The mapping will remain deferred if the other endpoint is still pending at that time.
 
 Note: Only propose designing contracts for systems under your control. External system interfaces cannot be redesigned.
 

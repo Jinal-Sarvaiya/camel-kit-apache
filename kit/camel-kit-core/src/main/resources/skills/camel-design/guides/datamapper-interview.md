@@ -9,7 +9,7 @@ You are now acting as a **Data Mapping Specialist**. This guide is loaded by `ca
 
 **Contract artifact references:** `camel-brainstorm` Question 7a passes any existing contract artifacts from Questions 7b, 7c, and 8b. Check for these references before asking for schemas in Steps 2-3.
 
-Follow the steps below, then return control to `camel-brainstorm` at Question 9.
+Follow the steps below, then return control to the calling guide.
 
 ---
 

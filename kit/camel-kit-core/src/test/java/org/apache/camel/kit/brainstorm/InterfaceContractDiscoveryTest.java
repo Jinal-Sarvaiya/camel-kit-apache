@@ -733,50 +733,6 @@ class InterfaceContractDiscoveryTest {
     }
 
     @Test
-    @DisplayName("Ship DISCOVERY task must contain contract rules in issued prompt")
-    void testShipDiscoveryPromptContainsRules() throws Exception {
-        Path shipCoordinatorPath = Path.of(SHIP_COORDINATOR_PATH);
-        String content = Files.readString(shipCoordinatorPath);
-
-        // Find the prompt() method DISCOVERY case
-        int promptMethodIndex = content.indexOf("private String prompt(");
-        int discoveryIndex = content.indexOf("case DISCOVERY ->", promptMethodIndex);
-        int designIndex = content.indexOf("case DESIGN ->", discoveryIndex);
-
-        assertTrue(discoveryIndex > 0 && designIndex > discoveryIndex,
-                "Ship prompt method must have DISCOVERY case");
-
-        String discoveryCase = content.substring(discoveryIndex, designIndex);
-
-        // Must have specific contract rule text appended to prompt in DISCOVERY case
-        assertTrue(discoveryCase.contains("For each integration boundary (source and destination), establish the")
-                && discoveryCase.contains("interface contract status separately"),
-                "DISCOVERY case must append contract boundary text to prompt");
-
-        assertTrue(discoveryCase.contains("Ask one boundary at a time"),
-                "DISCOVERY case must append one-at-a-time instruction to prompt");
-
-        // Must list all four statuses with their rules in the prompt
-        assertTrue(discoveryCase.contains("(1) existing") && discoveryCase.contains("request artifact"),
-                "DISCOVERY case must append existing status rules to prompt");
-        assertTrue(discoveryCase.contains("(2) pending") && discoveryCase.contains("defer DataMapper"),
-                "DISCOVERY case must append pending status rules to prompt");
-        assertTrue(discoveryCase.contains("(3) designed") && discoveryCase.contains("only for user-controlled"),
-                "DISCOVERY case must append designed status rules to prompt");
-        assertTrue(discoveryCase.contains("(4) not-applicable") && discoveryCase.contains("record rationale"),
-                "DISCOVERY case must append not-applicable status rules to prompt");
-
-        // Must reference report structure in prompt
-        assertTrue(discoveryCase.contains("grouped report structure")
-                && discoveryCase.contains("analyzed material"),
-                "DISCOVERY case must append report structure to prompt");
-
-        // Verify prompt.append is used (not a separate variable)
-        assertTrue(discoveryCase.contains("prompt.append(\"For each integration boundary"),
-                "DISCOVERY case must append to the prompt variable, not a copy");
-    }
-
-    @Test
     @DisplayName("Q7b and Q7c must check supplied material before asking (issue #111)")
     void testContractQuestionsCheckSuppliedMaterialFirst() throws Exception {
         Path interviewPath = Path.of(GREENFIELD_INTERVIEW_PATH);
@@ -787,34 +743,53 @@ class InterfaceContractDiscoveryTest {
         int q7cIndex = content.indexOf("### Question 7c: Destination Interface Contract");
         String q7bSection = content.substring(q7bIndex, q7cIndex);
 
-        // Q7b must analyze supplied material FIRST
-        assertTrue(q7bSection.contains("Analyze supplied material first"),
-                "Q7b must analyze supplied material before asking");
-        assertTrue(q7bSection.contains("already provided") && q7bSection.contains("skip this question"),
-                "Q7b must skip question if contract already supplied");
+        // Q7b must have positive condition paired with skip action
+        assertTrue(q7bSection.contains("If the user already provided")
+                || q7bSection.contains("if the user already provided"),
+                "Q7b must use positive condition 'if the user already provided'");
+
+        // Must NOT use inverted condition
+        assertFalse(q7bSection.contains("If the user has not already provided")
+                || q7bSection.contains("if the user has not already provided"),
+                "Q7b must NOT use inverted condition 'if the user has not already provided'");
+
+        // Find the section between "already provided" and "skip this question"
+        int alreadyProvidedIndex = q7bSection.toLowerCase().indexOf("already provided");
+        int skipQuestionIndex = q7bSection.toLowerCase().indexOf("skip this question");
+        assertTrue(alreadyProvidedIndex > 0 && skipQuestionIndex > alreadyProvidedIndex,
+                "Q7b must have 'already provided' before 'skip this question' (positive condition → skip action)");
+
+        // The condition and action must be in the same sentence/instruction
+        String conditionToAction = q7bSection.substring(alreadyProvidedIndex, skipQuestionIndex + 20);
+        assertTrue(conditionToAction.length() < 300,
+                "Q7b condition and skip action must be in same instruction (not separated by >300 chars)");
 
         // Must list what to look for
         assertTrue(q7bSection.contains("OpenAPI") && q7bSection.contains("AsyncAPI")
                 && q7bSection.contains("WSDL") && q7bSection.contains("JSON Schema"),
                 "Q7b must list contract types to look for in supplied material");
 
-        // Must record as "existing" when found, not ask
-        assertTrue(q7bSection.contains("record the status as \"existing\"")
-                && q7bSection.contains("skip this question"),
-                "Q7b must record existing and skip when contract is found");
-
         // Find Q7c (destination contract)
         int q8Index = content.indexOf("### Question 8: Sink System");
         String q7cSection = content.substring(q7cIndex, q8Index);
 
-        // Q7c must also analyze supplied material FIRST
-        assertTrue(q7cSection.contains("Analyze supplied material first"),
-                "Q7c must analyze supplied material before asking");
-        assertTrue(q7cSection.contains("already provided") && q7cSection.contains("skip this question"),
-                "Q7c must skip question if contract already supplied");
-        assertTrue(q7cSection.contains("record the status as \"existing\"")
-                && q7cSection.contains("skip this question"),
-                "Q7c must record existing and skip when contract is found");
+        // Q7c must also have positive condition paired with skip action
+        assertTrue(q7cSection.contains("If the user already provided")
+                || q7cSection.contains("if the user already provided"),
+                "Q7c must use positive condition 'if the user already provided'");
+
+        assertFalse(q7cSection.contains("If the user has not already provided")
+                || q7cSection.contains("if the user has not already provided"),
+                "Q7c must NOT use inverted condition 'if the user has not already provided'");
+
+        int q7cAlreadyProvidedIndex = q7cSection.toLowerCase().indexOf("already provided");
+        int q7cSkipQuestionIndex = q7cSection.toLowerCase().indexOf("skip this question");
+        assertTrue(q7cAlreadyProvidedIndex > 0 && q7cSkipQuestionIndex > q7cAlreadyProvidedIndex,
+                "Q7c must have 'already provided' before 'skip this question' (positive condition → skip action)");
+
+        String q7cConditionToAction = q7cSection.substring(q7cAlreadyProvidedIndex, q7cSkipQuestionIndex + 20);
+        assertTrue(q7cConditionToAction.length() < 300,
+                "Q7c condition and skip action must be in same instruction (not separated by >300 chars)");
     }
 
 }

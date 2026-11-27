@@ -86,7 +86,17 @@ final class OpenCodeConfigMerger {
             permission.fields().forEachRemaining(entry -> {
                 JsonNode generatedValue = generatedPermission.get(entry.getKey());
                 if (generatedValue != null) {
-                    managedRules.put(entry.getKey(), normalizeManagedRule(entry.getValue(), generatedValue));
+                    JsonNode normalized = normalizeManagedRule(entry.getValue(), generatedValue);
+                    JsonNode previousValue = managedRules.get(entry.getKey());
+
+                    // If both values are objects (argument patterns), merge them
+                    if (previousValue != null && previousValue.isObject() && normalized.isObject()) {
+                        ObjectNode merged = ((ObjectNode) previousValue).deepCopy();
+                        normalized.fields().forEachRemaining(e -> merged.set(e.getKey(), e.getValue()));
+                        managedRules.put(entry.getKey(), merged);
+                    } else {
+                        managedRules.put(entry.getKey(), normalized);
+                    }
                 }
             });
         }

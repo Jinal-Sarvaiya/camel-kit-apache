@@ -1275,6 +1275,62 @@ class OpenCodeGeneratorTest {
     }
 
     @Test
+    void regenerationMergesObjectValuedRulesAcrossTwoFiles() throws Exception {
+        // Generate base Citrus config
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // Set object-valued rule in base file
+        Path baseFile = tempDir.resolve("opencode.json");
+        ObjectMapper mapper = new ObjectMapper();
+        ObjectNode baseConfig = (ObjectNode) readOpenCodeConfig(baseFile);
+        ObjectNode basePermission = (ObjectNode) baseConfig.path("permission");
+        ObjectNode argPattern = mapper.createObjectNode();
+        argPattern.put("*", "allow");
+        basePermission.set("citrus_citrus_docs_index", argPattern);
+        Files.writeString(baseFile, mapper.writerWithDefaultPrettyPrinter()
+                .writeValueAsString(baseConfig));
+
+        // Add different argument pattern in higher-precedence file
+        Path higherFile = tempDir.resolve("opencode.jsonc");
+        Files.writeString(higherFile, """
+                {
+                  "permission": {
+                    "citrus_citrus_docs_index": {"README.md": "ask"}
+                  }
+                }
+                """);
+
+        // Verify base file has the object rule
+        JsonNode baseAfterEdit = readOpenCodeConfig(baseFile);
+        JsonNode baseRule = baseAfterEdit.path("permission").path("citrus_citrus_docs_index");
+        assertTrue(baseRule.isObject(), "Base file should have object-valued rule");
+        assertEquals("allow", baseRule.path("*").asText(), "Base file wildcard");
+
+        // Before regeneration: both patterns should work
+        JsonNode beforeEffective = effectivePermission();
+        JsonNode beforeRule = beforeEffective.path("citrus_citrus_docs_index");
+        assertTrue(beforeRule.isObject(), "Rule should be object-valued");
+        assertEquals("allow", beforeRule.path("*").asText(), "Wildcard pattern from base");
+        assertEquals("ask", beforeRule.path("README.md").asText(), "README pattern from higher");
+
+        // Regenerate
+        new OpenCodeGenerator().generate(createContext("camel-kit", true));
+
+        // After regeneration: both argument patterns must be preserved
+        JsonNode afterEffective = effectivePermission();
+        JsonNode afterRule = afterEffective.path("citrus_citrus_docs_index");
+        assertTrue(afterRule.isObject(), "Rule must remain object-valued after regeneration");
+        assertEquals("allow", afterRule.path("*").asText(),
+                "Wildcard pattern from base file must be preserved");
+        assertEquals("ask", afterRule.path("README.md").asText(),
+                "README pattern from higher file must be preserved");
+
+        // The effective action for docs index should be "allow" (wildcard matches)
+        assertEquals("allow", effectiveAction(afterEffective, "citrus_citrus_docs_index"),
+                "Docs index must stay allowed - argument patterns merged correctly");
+    }
+
+    @Test
     void regenerationPreservesExactExceptionsAfterWildcard() throws Exception {
         // Generate initial Citrus-enabled config
         new OpenCodeGenerator().generate(createContext("camel-kit", true));
@@ -1426,8 +1482,16 @@ class OpenCodeGeneratorTest {
         String action = null;
         for (var rules = permission.fields(); rules.hasNext();) {
             var rule = rules.next();
-            if (tool.matches(rule.getKey().replace("*", ".*")) && rule.getValue().isTextual()) {
-                action = rule.getValue().asText();
+            if (tool.matches(rule.getKey().replace("*", ".*"))) {
+                if (rule.getValue().isTextual()) {
+                    action = rule.getValue().asText();
+                } else if (rule.getValue().isObject()) {
+                    // For object-valued rules (argument patterns), use wildcard pattern as default
+                    JsonNode wildcardAction = rule.getValue().path("*");
+                    if (wildcardAction.isTextual()) {
+                        action = wildcardAction.asText();
+                    }
+                }
             }
         }
         return action;
@@ -1440,8 +1504,18 @@ class OpenCodeGeneratorTest {
             Path file = tempDir.resolve(name);
             if (Files.exists(file)) {
                 readOpenCodeConfig(file).path("permission").fields().forEachRemaining(entry -> {
-                    // Update existing keys in place (preserves position), new keys append
-                    merged.set(entry.getKey(), entry.getValue());
+                    JsonNode existingValue = merged.get(entry.getKey());
+                    JsonNode newValue = entry.getValue();
+
+                    // If both values are objects (argument patterns), merge them
+                    if (existingValue != null && existingValue.isObject() && newValue.isObject()) {
+                        ObjectNode mergedArgs = ((ObjectNode) existingValue).deepCopy();
+                        newValue.fields().forEachRemaining(e -> mergedArgs.set(e.getKey(), e.getValue()));
+                        merged.set(entry.getKey(), mergedArgs);
+                    } else {
+                        // Update existing keys in place (preserves position), new keys append
+                        merged.set(entry.getKey(), newValue);
+                    }
                 });
             }
         }

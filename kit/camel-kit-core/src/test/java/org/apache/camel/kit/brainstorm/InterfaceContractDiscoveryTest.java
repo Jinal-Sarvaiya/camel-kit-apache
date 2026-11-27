@@ -2,6 +2,7 @@ package org.apache.camel.kit.brainstorm;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.regex.Pattern;
 
 import org.junit.jupiter.api.DisplayName;
@@ -655,7 +656,7 @@ class InterfaceContractDiscoveryTest {
                 "Q7a must defer mappings when either endpoint has designed status without artifact");
 
         // Must NOT have inverted logic like "proceed when both pending" or "defer when both ready"
-        String q7aLower = q7aSection.toLowerCase();
+        String q7aLower = q7aSection.toLowerCase(Locale.ROOT);
         assertFalse(q7aLower.contains("proceed when both pending")
                 || q7aLower.contains("proceed if both pending")
                 || q7aLower.contains("both pending") && q7aLower.contains(" proceed"),
